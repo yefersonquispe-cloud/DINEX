@@ -1,0 +1,10 @@
+TEAM_ID=
+
+PRODUCT_NAME=Dinex
+PRODUCT_BUNDLE_IDENTIFIER=com.example.dinex.Dinex$(TEAM_ID)
+
+CURRENT_PROJECT_VERSION=1
+MARKETING_VERSION=1.0
+
+// Configura la clave únicamente en tu entorno local. Nunca la publiques.
+GEMINI_API_KEY=
