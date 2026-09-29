@@ -1124,7 +1124,7 @@ private fun SpendingOverview(movements: List<Movement>) {
                         Row(Modifier.clip(RoundedCornerShape(9.dp)).clickable { val index = expenses.indexOfFirst { it.first.name == category.name }; selected = if (selected == index) null else index }.padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                             Box(Modifier.size(8.dp).clip(CircleShape).background(category.color)); Spacer(Modifier.width(8.dp))
                             Text(category.name, modifier = Modifier.weight(1f), color = Gray, fontSize = 10.sp)
-                            Text(if (selected == null) "${percent(value, total)}%" else money(value), color = if (selected == null) Night else category.color, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                            Text(if (selected == null) "${percent(value, safeTotal)}%" else money(value), color = if (selected == null) Night else category.color, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                         }
                     }
                     if (selected != null) Text("Ver todas las categorías", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 9.sp, modifier = Modifier.clickable { selected = null }.padding(vertical = 6.dp))
