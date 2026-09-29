@@ -20,6 +20,17 @@ No guardes claves reales en Git ni las publiques dentro del APK final. Para desa
 
 Dinex intenta primero Gemini 3.1 Pro y dispone de modelos de respaldo compatibles. Si no hay clave, Android conserva el reconocimiento local de texto y objetos; el chat muestra un aviso claro.
 
+## Voz y notificaciones en Android
+
+Desde el botón `+` abre **Voz y notificaciones**:
+
+- **Notificaciones financieras:** detecta importes en alertas de Yape, Plin y aplicaciones bancarias cuando incluyen palabras como “pagaste”, “compraste”, “transferiste”, “recibiste” o “depósito”. Dinex siempre muestra los movimientos detectados antes de registrarlos.
+- **Oye Dinex:** activa un servicio visible de micrófono. Con la pantalla desbloqueada puedes decir “Oye Dinex” y luego dictar un gasto, ingreso o recordatorio. Android mantiene una notificación mientras el modo está activo y permite apagarlo inmediatamente.
+
+En Redmi/HyperOS, una instalación por APK puede bloquear el lector como ajuste restringido. Abre **Información de la aplicación → ⋮ → Permitir ajustes restringidos**, vuelve a Dinex y activa **Acceso a notificaciones**. Para que “Oye Dinex” permanezca disponible, habilita también **Inicio automático** y excluye Dinex del ahorro agresivo de batería.
+
+Android puede impedir que una aplicación abra una pantalla automáticamente desde segundo plano. Si el fabricante bloquea la apertura directa, Dinex muestra una alerta de alta prioridad; tócala para continuar el comando de voz.
+
 ## Acceso por correo
 
 El flujo incluido valida correo y código en modo demostración, sin enviar mensajes reales. Para producción debe conectarse a Firebase Authentication o a un backend propio con enlaces universales/deep links.
