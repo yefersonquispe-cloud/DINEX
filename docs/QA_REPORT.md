@@ -15,6 +15,11 @@ Fecha: 30 de septiembre de 2026.
 - La detección del lector de notificaciones usa la API oficial de AndroidX.
 - Se corrigió el recurso del tema que usaba una propiedad de API 27 pese a que
   Dinex admite desde API 24.
+- Se desactivó la copia de seguridad automática de Android para que los datos
+  financieros locales no salgan del dispositivo mediante backups del sistema.
+- Se corrigieron tres casos de datos: un egreso negativo importado ya no se
+  convierte en ingreso, una fecha de recordatorio ya no se toma como monto y
+  “pasaje del metro” ya no se clasifica como supermercado.
 - `App.kt` fue dividido por pantallas y responsabilidades. El archivo pasó de
   2,225 a 530 líneas.
 
@@ -22,6 +27,8 @@ Fecha: 30 de septiembre de 2026.
 
 - Compilación del APK Android.
 - Pruebas unitarias Android del módulo compartido.
+- Pruebas de regresión para voz, recordatorios, Excel/CSV, credenciales y
+  conversión de fechas.
 - Android Lint sin errores.
 - Instalación limpia del APK ARM64 en emulador.
 - Arranque en frío y navegación hasta **Voz y notificaciones**.
