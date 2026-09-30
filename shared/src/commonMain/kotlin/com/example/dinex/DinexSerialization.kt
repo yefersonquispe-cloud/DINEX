@@ -66,8 +66,10 @@ internal fun parseVoiceCommand(text: String, nextId: Int, location: String?): Mo
     val income = listOf("ingreso", "recibí", "recibi", "gané", "gane", "me pagaron", "abono").any(normalized::contains)
     val category = when {
         income -> "Ingreso"
+        // Se evalúa transporte antes que supermercados: "pasaje del metro"
+        // debe ser transporte, mientras "compré en Metro" sigue siendo comida.
+        listOf("transporte", "taxi", "uber", "pasaje", "pasajes", "metropolitano", "tren", "línea 1", "linea 1", "gasolina", "combustible", "bus", "micro").any(normalized::contains) -> "Transporte"
         listOf("comida", "almuerzo", "cena", "desayuno", "restaurante", "snack", "mercado", "super", "tottus", "metro", "plaza vea", "kfc", "bembos", "cafe", "café", "pan", "hamburguesa").any(normalized::contains) -> "Comida"
-        listOf("transporte", "taxi", "uber", "pasaje", "pasajes", "metro", "metropolitano", "gasolina", "combustible", "bus", "micro").any(normalized::contains) -> "Transporte"
         listOf("estudios", "libro", "curso", "pension", "pensión", "copias", "universidad", "instituto", "colegio", "matricula", "matrícula").any(normalized::contains) -> "Estudios"
         listOf("entretenimiento", "cine", "juego", "salida", "bar", "fiesta", "netflix", "spotify", "steam").any(normalized::contains) -> "Entretenimiento"
         else -> categories.firstOrNull { normalized.contains(it.name.lowercase()) }?.name ?: "Otros"
@@ -84,8 +86,11 @@ internal fun parseVoiceReminder(text: String, nextId: Int): PaymentReminder? {
     val normalized = text.lowercase()
     val reminderWords = listOf("agenda", "agendar", "recuérdame", "recuerdame", "recordatorio", "recordar")
     if (reminderWords.none(normalized::contains)) return null
-    val amount = Regex("(?:s/|soles?|sol)?\\s*([0-9]+(?:[.,][0-9]{1,2})?)")
-        .find(normalized)?.groupValues?.getOrNull(1)?.replace(',', '.')?.toDoubleOrNull() ?: 0.0
+    val amountMatch = Regex("(?:s/\\.?|pen|soles?)\\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\\s*(?:s/\\.?|pen|soles?)")
+        .find(normalized)
+    val amount = amountMatch?.let { match ->
+        match.groupValues[1].ifBlank { match.groupValues[2] }.replace(',', '.').toDoubleOrNull()
+    } ?: 0.0
     val date = when {
         "mañana" in normalized || "manana" in normalized -> "MAÑANA"
         "hoy" in normalized -> "HOY"
@@ -166,7 +171,8 @@ internal fun parseImportedMovements(raw: String): List<Movement> {
         val rawAmount = if (amountText.contains(',')) amountText.replace(".", "").replace(',', '.') else amountText
         val amount = rawAmount.toDoubleOrNull() ?: return@mapIndexedNotNull null
         val type = col(row, listOf("tipo", "movimiento", "operacion"), 4).lowercase()
-        val income = type.contains("ingreso") || type.contains("abono") || type.contains("entrada") || type.contains("deposit") || amount < 0
+        val income = listOf("ingreso", "abono", "entrada", "depósito", "deposito", "recibido")
+            .any(type::contains)
         val category = col(row, listOf("categoria", "categoría"), 2).ifBlank { if (income) "Ingreso" else "Otros" }
         Movement(index + 1, title, category.replaceFirstChar { it.uppercase() }, kotlin.math.abs(amount), income, day, col(row, listOf("medio", "metodo", "método"), 5).ifBlank { "Importado" })
     }
