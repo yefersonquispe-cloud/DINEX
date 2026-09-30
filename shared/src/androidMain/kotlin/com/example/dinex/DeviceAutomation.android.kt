@@ -19,9 +19,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.core.app.ActivityCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import java.util.Locale
-import android.provider.Settings.Secure
 
 @Composable
 actual fun rememberDeviceAutomation(): DeviceAutomation {
@@ -36,10 +36,7 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     private var recognizer: SpeechRecognizer? = null
     override val voiceAvailable: Boolean get() = SpeechRecognizer.isRecognitionAvailable(context)
     override val notificationReaderAvailable: Boolean
-        get() = runCatching {
-            Secure.getString(context.contentResolver, "enabled_notification_listeners")
-                ?.split(":")?.any { it.startsWith(context.packageName + "/") } == true
-        }.getOrDefault(false)
+        get() = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
     override val locationAvailable: Boolean
         get() = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     override val hotwordEnabled: Boolean get() = hotwordPrefs.getBoolean("enabled", false)
@@ -85,14 +82,17 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
         } else null
         val fallback = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
         val intent = detailed?.takeIf { it.resolveActivity(context.packageManager) != null } ?: fallback
-        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .recoverCatching { context.startActivity(fallback.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 
     override fun openAppDetailsSettings() {
-        context.startActivity(
-            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        )
+        runCatching {
+            context.startActivity(
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        }
     }
 
     override fun openBatterySettings() {
@@ -104,7 +104,13 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
         val intent = if ((manufacturer.contains("xiaomi") || manufacturer.contains("redmi")) && xiaomiIntent.resolveActivity(context.packageManager) != null) {
             xiaomiIntent
         } else fallback
-        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .recoverCatching {
+                context.startActivity(
+                    Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                )
+            }
     }
 
     override fun setHotwordEnabled(enabled: Boolean): String? {
@@ -115,17 +121,17 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
         }
         if (!voiceAvailable) return "Este teléfono no tiene un servicio de reconocimiento de voz disponible."
         val activity = context as? Activity
-        val missing = buildList {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                add(Manifest.permission.RECORD_AUDIO)
-            }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
-            ) add(Manifest.permission.POST_NOTIFICATIONS)
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            activity?.let { ActivityCompat.requestPermissions(it, arrayOf(Manifest.permission.RECORD_AUDIO), 7003) }
+            return "Concede el permiso de micrófono y pulsa Activar otra vez."
         }
-        if (missing.isNotEmpty()) {
-            activity?.let { ActivityCompat.requestPermissions(it, missing.toTypedArray(), 7003) }
-            return "Concede micrófono y notificaciones; después pulsa Activar otra vez."
+        // Android 13+ permite ejecutar el servicio aunque el usuario no acepte
+        // notificaciones. Se solicita para que el acceso rápido sea visible,
+        // pero nunca debe bloquear la activación del micrófono.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            activity?.let { ActivityCompat.requestPermissions(it, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7004) }
         }
         return runCatching {
             hotwordPrefs.edit().putBoolean("enabled", true).apply()

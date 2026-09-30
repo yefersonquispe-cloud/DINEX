@@ -33,7 +33,11 @@ Android puede impedir que una aplicación abra una pantalla automáticamente des
 
 ## Acceso por correo
 
-El flujo incluido valida correo y código en modo demostración, sin enviar mensajes reales. Para producción debe conectarse a Firebase Authentication o a un backend propio con enlaces universales/deep links.
+El flujo actual permite crear una cuenta local con nombre, correo y contraseña,
+validando la contraseña en tiempo real. Las credenciales se guardan únicamente
+en el dispositivo mediante un resumen no reversible. Para sincronización real
+entre dispositivos debe conectarse a Firebase Authentication o a un backend
+propio.
 
 ## Estructura
 

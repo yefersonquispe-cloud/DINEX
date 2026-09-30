@@ -14,19 +14,26 @@ tener que revisar todo el proyecto.
 
 ## Cambios de interfaz
 
-Todo lo que debe verse igual en Android, iOS y web está en `App.kt`. El archivo
-ahora tiene separadores grandes para encontrar cada zona:
+La interfaz compartida ya no está concentrada en un archivo gigante. Busca la
+responsabilidad que quieres modificar dentro de
+`shared/src/commonMain/kotlin/com/example/dinex/`:
 
-- `APP STATE & NAVIGATION`: sesión, estado general y navegación.
-- `AUTHENTICATION`: crear cuenta, iniciar sesión y validaciones.
-- `SHARED SHELL`: barra superior, perfil, mascota y navegación inferior.
-- `HOME / WALLET`: dashboard, las dos tarjetas, racha y presupuesto. El botón central `+` abre el registro general.
-- `HISTORY`: historial mensual, movimientos y eliminación.
-- `PLANS & REMINDERS`: presupuestos, recordatorios y confirmación de egreso.
-- `INSIGHTS`: gráfico circular, barras diarias y filtros por categoría.
-- `DINEX IA`: burbuja flotante, chat y contexto financiero para Gemini.
-- `DIALOGS & QUICK CAPTURE`: formularios, cámara, revisión de foto y cargas premium.
-- `SERIALIZATION & FORMATTING`: persistencia local y formato de importes.
+| Archivo | Qué se modifica allí |
+| --- | --- |
+| `App.kt` | Estado global, sesión, navegación y coordinación de pantallas |
+| `AuthScreens.kt` | Crear cuenta, iniciar sesión y validaciones |
+| `NavigationComponents.kt` | Barra superior, perfil, mascota y navegación inferior |
+| `HomeScreen.kt` | Dashboard, las dos tarjetas, racha, presupuesto y resumen |
+| `MovementsScreen.kt` | Historial mensual, movimientos y eliminación |
+| `PlanScreen.kt` | Presupuestos, recordatorios y confirmación de egreso |
+| `InsightsScreen.kt` | Gráficos, barras diarias y filtros por categoría |
+| `AssistantScreen.kt` | Burbuja, chat y contexto financiero para Gemini |
+| `DinexDialogs.kt` | Registro rápido, formularios, cámara y automatización |
+| `DinexSerialization.kt` | Persistencia serializada, importación y formato de importes |
+
+Los colores y modelos compartidos siguen al inicio de `App.kt`; las funciones
+de cada pantalla tienen visibilidad `internal` para reutilizarse dentro del
+módulo sin exponerlas fuera de Dinex.
 
 Las dos imágenes permanentes de las tarjetas están en:
 
@@ -54,7 +61,16 @@ implementa la misma capacidad para una plataforma concreta:
 - `DinexStorage.*.kt`: guardado local de cuentas, movimientos, ahorros y racha.
 - `GeminiAssistant.*.kt` y `GeminiClient.*.kt`: chat y llamadas a Gemini.
 - `ReceiptScanner.*.kt`: cámara y reconocimiento de productos/boletas.
+- `DeviceAutomation.*.kt`: voz, ubicación y acceso a notificaciones.
 - `Platform.*.kt`: información del sistema operativo.
+
+En Android, el servicio de voz permanente y el lector de alertas están en:
+
+```text
+androidApp/src/main/kotlin/com/example/dinex/DinexHotwordService.kt
+androidApp/src/main/kotlin/com/example/dinex/DinexVoiceCommandActivity.kt
+androidApp/src/main/kotlin/com/example/dinex/DinexNotificationListenerService.kt
+```
 
 Si un cambio debe funcionar en todas las plataformas, primero se cambia la
 interfaz `expect` en `commonMain` y después sus implementaciones `actual`.
@@ -65,8 +81,9 @@ Desde la raíz del proyecto:
 
 ```bash
 ./gradlew :androidApp:assembleDebug
+./gradlew :androidApp:lintDebug
 ./gradlew :webApp:jsBrowserDevelopmentExecutableDistribution
-./gradlew :shared:compileKotlinIosSimulatorArm64
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer ./gradlew :shared:compileKotlinIosSimulatorArm64
 ```
 
 Los artefactos para compartir se guardan en `outputs/`. Los directorios

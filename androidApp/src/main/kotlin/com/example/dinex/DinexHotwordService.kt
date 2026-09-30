@@ -33,6 +33,13 @@ class DinexHotwordService : Service() {
     private var recognizer: SpeechRecognizer? = null
     private var pausedForCommand = false
     private var destroyed = false
+    private val restartListening = Runnable {
+        if (!destroyed && !pausedForCommand) beginListening()
+    }
+    private val resumeAfterCommandTimeout = Runnable {
+        pausedForCommand = false
+        scheduleListening(200)
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -46,7 +53,10 @@ class DinexHotwordService : Service() {
                 stopSelf()
                 return START_NOT_STICKY
             }
-            ACTION_RESUME -> pausedForCommand = false
+            ACTION_RESUME -> {
+                handler.removeCallbacks(resumeAfterCommandTimeout)
+                pausedForCommand = false
+            }
         }
         startForeground(NOTIFICATION_ID, listeningNotification())
         if (!pausedForCommand) scheduleListening(180)
@@ -63,8 +73,8 @@ class DinexHotwordService : Service() {
     }
 
     private fun scheduleListening(delayMs: Long) {
-        handler.removeCallbacksAndMessages(null)
-        handler.postDelayed({ if (!destroyed && !pausedForCommand) beginListening() }, delayMs)
+        handler.removeCallbacks(restartListening)
+        handler.postDelayed(restartListening, delayMs)
     }
 
     private fun beginListening() {
@@ -116,7 +126,8 @@ class DinexHotwordService : Service() {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, "es-PE")
                 putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 4)
-                putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
+                // No se fuerza el modo offline: varios Redmi/HyperOS no incluyen
+                // el paquete español local y devolvían error inmediatamente.
             })
         }
     }
@@ -124,6 +135,8 @@ class DinexHotwordService : Service() {
     private fun onWakeWord() {
         if (pausedForCommand) return
         pausedForCommand = true
+        handler.removeCallbacks(restartListening)
+        handler.removeCallbacks(resumeAfterCommandTimeout)
         stopRecognizer()
         val commandIntent = Intent(this, DinexVoiceCommandActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -149,10 +162,7 @@ class DinexHotwordService : Service() {
             .build()
         (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).notify(COMMAND_NOTIFICATION_ID, notification)
         // Protección por si la actividad fue cerrada por el sistema.
-        handler.postDelayed({
-            pausedForCommand = false
-            scheduleListening(200)
-        }, 35_000)
+        handler.postDelayed(resumeAfterCommandTimeout, 35_000)
     }
 
     private fun stopRecognizer() {
