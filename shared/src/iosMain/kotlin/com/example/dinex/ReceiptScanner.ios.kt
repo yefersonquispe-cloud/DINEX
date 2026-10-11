@@ -15,20 +15,25 @@ import platform.darwin.NSObject
 actual fun rememberReceiptScanner(
     onResult: (ScannedPurchase) -> Unit,
     onError: (String) -> Unit,
+    onAnalyzing: () -> Unit,
+    onCancelled: () -> Unit,
 ): () -> Unit {
     val currentResult = rememberUpdatedState(onResult)
     val currentError = rememberUpdatedState(onError)
+    val analyzing = rememberUpdatedState(onAnalyzing)
+    val cancelled = rememberUpdatedState(onCancelled)
     val scope = rememberCoroutineScope()
     val delegate = remember {
         DinexImagePickerDelegate(
             onImage = { image ->
+                analyzing.value()
                 scope.launch {
                     runCatching { analyzeIosPurchase(image) }
                         .onSuccess { currentResult.value(it) }
                         .onFailure { currentError.value(it.message ?: "No pudimos analizar la foto.") }
                 }
             }
-        ) { currentError.value("Captura cancelada.") }
+        ) { cancelled.value() }
     }
     return scanner@{
         if (!UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.UIImagePickerControllerSourceTypeCamera)) {

@@ -3,6 +3,11 @@ package com.example.dinex
 import kotlin.js.Date
 import web.storage.localStorage
 
+internal actual fun readLocalValue(key: String): String? = localStorage.getItem("dinex_db_$key")
+internal actual fun writeLocalValue(key: String, value: String?) {
+    if (value == null) localStorage.removeItem("dinex_db_$key") else localStorage.setItem("dinex_db_$key", value)
+}
+
 internal actual fun loadSavedMovements(): String? = localStorage.getItem("dinex_movements")
 
 internal actual fun saveSavedMovements(data: String) {
@@ -27,7 +32,7 @@ internal actual fun saveSavedStreakDay(day: Int) {
     localStorage.setItem("dinex_streak_day", day.toString())
 }
 
-internal actual fun currentDayIndex(): Int = (Date.now() / 86_400_000.0).toInt()
+internal actual fun currentDayIndex(): Int = ((Date.now() - Date().getTimezoneOffset() * 60_000.0) / 86_400_000.0).toInt()
 
 internal actual fun loadSavedReminders(): String? = localStorage.getItem("dinex_reminders")
 

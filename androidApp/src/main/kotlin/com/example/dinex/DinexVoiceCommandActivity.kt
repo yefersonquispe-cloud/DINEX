@@ -78,8 +78,9 @@ class DinexVoiceCommandActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
-        recognizer?.destroy()
+        recognizer?.runCatching { destroy() }
         recognizer = null
+        resumeHotword()
         super.onDestroy()
     }
 
@@ -228,7 +229,7 @@ class DinexVoiceCommandActivity : ComponentActivity() {
     private fun resumeHotword() {
         val prefs = getSharedPreferences(DinexHotwordService.PREFS, Context.MODE_PRIVATE)
         if (prefs.getBoolean(DinexHotwordService.KEY_ENABLED, false)) {
-            startService(Intent(this, DinexHotwordService::class.java).setAction(DinexHotwordService.ACTION_RESUME))
+            runCatching { startService(Intent(this, DinexHotwordService::class.java).setAction(DinexHotwordService.ACTION_RESUME)) }
         }
     }
 

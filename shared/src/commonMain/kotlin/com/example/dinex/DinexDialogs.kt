@@ -55,23 +55,43 @@ import kotlin.math.max
 // ═══════════════════════════════════════════════════════════════════════════
 @Composable
 internal fun QuickAddDialog(onDismiss: () -> Unit, onExpense: () -> Unit, onIncome: () -> Unit, onSaving: () -> Unit, onScan: () -> Unit, onAutomation: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(28.dp),
-        title = { Column { Text("¿Qué quieres registrar?", fontWeight = FontWeight.Black); Text("Elige la forma más rápida", color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Normal) } },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            DialogAction("-", "Registrar gasto", "Monto, categoría y listo", Red.copy(alpha = .12f), Red, onExpense)
-            DialogAction("+", "Registrar ingreso", "Aumenta tu saldo", Mint, GreenDark, onIncome)
-            DialogAction("AH", "Súper registro de ahorro", "Activa tu racha y suma a tu tarjeta", Color(0xFF073F3A), Lime, onSaving)
-            DialogAction("CAM", "Escanear compra", "Foto + reconocimiento automático", Indigo.copy(alpha = .14f), GreenDark, onScan)
-            DialogAction("VOZ", "Voz y notificaciones", "Di un gasto o revisa alertas del teléfono", Color(0xFF173249), ElectricBlue, onAutomation)
-        } }, confirmButton = {}, dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } })
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Card,
+        title = {
+            Column {
+                Text("¿Qué quieres registrar?", fontWeight = FontWeight.Black, color = Night)
+                Text("Elige cómo añadir tu próximo movimiento", color = Gray, fontSize = 13.sp, fontWeight = FontWeight.Normal)
+            }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DialogAction("−", "Registrar gasto", "Monto, categoría y listo", Red.copy(alpha = .10f), Red, onExpense)
+                DialogAction("+", "Registrar ingreso", "Aumenta tu saldo", Green.copy(alpha = .10f), GreenDark, onIncome)
+                DialogAction("AH", "Crear meta / ahorro", "Activa tu racha y suma a tu tarjeta", Mint, Lime, onSaving)
+                DialogAction("CAM", "Escanear comprobante", "Foto + reconocimiento automático", Indigo.copy(alpha = .12f), Indigo, onScan)
+                DialogAction("VOZ", "Voz y notificaciones", "Di un gasto o revisa alertas del teléfono", ElectricBlue.copy(alpha = .10f), ElectricBlue, onAutomation)
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
+    )
 }
 
 @Composable
 internal fun DialogAction(code: String, title: String, subtitle: String, bg: Color, tint: Color, onClick: () -> Unit) {
-    Surface(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(17.dp), color = bg) {
+    Surface(Modifier.fillMaxWidth().clickable(onClick = onClick), shape = RoundedCornerShape(18.dp), color = bg, border = androidx.compose.foundation.BorderStroke(1.dp, tint.copy(alpha = .2f))) {
         Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(39.dp).clip(CircleShape).background(tint), contentAlignment = Alignment.Center) { Text(code, color = Color.White, fontWeight = FontWeight.Black, fontSize = if (code == "CAM") 8.sp else 18.sp) }
-            Spacer(Modifier.width(11.dp)); Column(Modifier.weight(1f)) { Text(title, color = tint, fontWeight = FontWeight.Black, fontSize = 13.sp); Text(subtitle, color = Gray, fontSize = 9.sp) }; Text(">", color = tint, fontWeight = FontWeight.Black)
+            Box(Modifier.size(42.dp).clip(RoundedCornerShape(14.dp)).background(tint.copy(alpha = .15f)), contentAlignment = Alignment.Center) {
+                Icon(when(code) { "−" -> DinexNavigationIcons.ArrowDown; "+" -> DinexNavigationIcons.ArrowUp; "CAM" -> DinexNavigationIcons.Camera; "VOZ" -> DinexNavigationIcons.Microphone; else -> DinexNavigationIcons.Wallet }, null, tint = tint, modifier = Modifier.size(23.dp))
+            }
+            Spacer(Modifier.width(11.dp))
+            Column(Modifier.weight(1f)) {
+                Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(subtitle, color = Gray, fontSize = 12.sp, lineHeight = 17.sp)
+            }
+            Icon(DinexNavigationIcons.Chevron, null, tint = tint, modifier = Modifier.size(18.dp))
         }
     }
 }
@@ -89,6 +109,20 @@ internal fun AutomationDialog(
     var accessRefresh by remember { mutableIntStateOf(0) }
     val notificationAccess = accessRefresh.let { automation.notificationReaderAvailable }
     var hotwordActive by remember { mutableStateOf(automation.hotwordEnabled) }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, automation) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                accessRefresh++
+                hotwordActive = automation.hotwordEnabled
+                captured = automation.drainNotifications()
+                automation.reconnectNotifications()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); automation.stopVoice() }
+    }
+    val overlayAccess = accessRefresh.let { automation.overlayAvailable }
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
@@ -115,24 +149,29 @@ internal fun AutomationDialog(
                 Surface(shape = RoundedCornerShape(18.dp), color = Color(0xFF173249), border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .30f))) {
                     Column(Modifier.padding(13.dp)) {
                         Text("Notificaciones del teléfono", color = GreenDark, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                        Text("Detecta alertas con “gastaste”, “compraste”, “pagaste”, “recibiste” y un monto.", color = Gray, fontSize = 10.sp)
+                        Text("Detecta ingresos (“te yapearon”, “te envió”, “recibiste”, “abono”) y gastos (“yapeaste”, “compraste”, “pagaste”) cuando la alerta incluye un monto en soles.", color = Gray, fontSize = 12.sp)
                         Spacer(Modifier.height(7.dp))
                         if (!notificationAccess) {
                             Text("Acceso todavía bloqueado", color = Orange, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                            Text("En Redmi/HyperOS: 1) abre Información de la app, 2) toca ⋮, 3) Permitir ajustes restringidos, 4) vuelve y activa Dinex en Acceso a notificaciones.", color = Gray, fontSize = 9.sp)
+                            Text("Si Android bloquea el acceso: abre Información de la app → menú ⋮ → Permitir ajustes restringidos (si aparece). Después habilita Dinex en Acceso a notificaciones. La ruta depende de tu teléfono.", color = Gray, fontSize = 13.sp)
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 TextButton(onClick = { automation.openAppDetailsSettings() }, modifier = Modifier.weight(1f)) {
-                                    Text("1. Info de app", color = Orange, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                    Text("1. Info de app", color = Orange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                                 TextButton(onClick = { automation.openNotificationSettings() }, modifier = Modifier.weight(1f)) {
-                                    Text("2. Dar acceso", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                                    Text("2. Dar acceso", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                             }
                             TextButton(onClick = { accessRefresh++ }, modifier = Modifier.fillMaxWidth()) {
                                 Text("Ya lo activé · comprobar", color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 10.sp)
                             }
                         } else {
-                            Text("✓ Acceso activo. Dinex ya puede detectar alertas financieras.", color = Lime, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Text("Acceso autorizado. ${if (automation.notificationListenerConnected) "Lector conectado." else "Esperando conexión del lector."}", color = Lime, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            if (!automation.notificationListenerConnected) {
+                                TextButton(onClick = { automation.reconnectNotifications(); accessRefresh++ }) {
+                                    Text("Reconectar lector", fontSize = 12.sp)
+                                }
+                            }
                         }
                         Button(
                             onClick = { accessRefresh++; captured = automation.drainNotifications() },
@@ -149,7 +188,7 @@ internal fun AutomationDialog(
                         }
                     }
                 }
-                Surface(shape = RoundedCornerShape(18.dp), color = Green.copy(alpha = .09f), border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .30f))) {
+                if (automation.supportsBackgroundVoice) Surface(shape = RoundedCornerShape(18.dp), color = Green.copy(alpha = .09f), border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .30f))) {
                     Column(Modifier.padding(13.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.weight(1f)) {
@@ -160,6 +199,16 @@ internal fun AutomationDialog(
                         }
                         Spacer(Modifier.height(7.dp))
                         Text("Con la pantalla desbloqueada di “Oye Dinex”. Se abrirá una interfaz para registrar gastos, ingresos o recordatorios. Android mostrará una notificación permanente mientras escucha.", color = Gray, fontSize = 9.sp)
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            if (overlayAccess) "Burbuja lista: al salir de Dinex, podrás arrastrarla, hablar o desactivar la voz."
+                            else "Activa la burbuja para registrar por voz sin abrir la aplicación.",
+                            color = if (overlayAccess) GreenDark else Gray, fontSize = 12.sp,
+                        )
+                        if (!overlayAccess) OutlinedButton(
+                            onClick = { automation.openOverlaySettings() },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                        ) { Text("Permitir burbuja flotante", fontSize = 12.sp) }
                         Spacer(Modifier.height(8.dp))
                         Button(
                             onClick = {
@@ -173,7 +222,7 @@ internal fun AutomationDialog(
                         ) { Text(if (hotwordActive) "Desactivar Oye Dinex" else "Activar Oye Dinex", fontWeight = FontWeight.Bold) }
                         if (hotwordActive) {
                             TextButton(onClick = { automation.openBatterySettings() }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Permitir Inicio automático en Redmi", color = Orange, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                Text("Revisar batería e inicio automático", color = Orange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                             }
                         }
                     }
@@ -193,28 +242,120 @@ internal fun AutomationDialog(
 }
 
 @Composable
-internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit, onSave: (Movement) -> Unit) {
-    var amount by remember { mutableStateOf("") }; var title by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(if (income) "Ingreso" else "Comida") }; var method by remember { mutableStateOf("Yape") }; var error by remember { mutableStateOf(false) }
-    val tint = if (income) Green else Red
-    AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(28.dp),
-        title = { Column { Text(if (income) "Nuevo ingreso" else "Nuevo gasto", fontWeight = FontWeight.Black); Text("Solo lo esencial", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Normal) } },
-        text = { Column(Modifier.verticalScroll(rememberScrollState())) {
-            OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false }, Modifier.fillMaxWidth(),
-                label = { Text("Monto") }, prefix = { Text("S/ ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, isError = error)
-            Spacer(Modifier.height(9.dp)); OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), label = { Text(if (income) "¿De dónde viene?" else "¿Qué compraste?") }, singleLine = true)
-            if (!income) { Spacer(Modifier.height(12.dp)); Text("Categoría", fontWeight = FontWeight.Bold, fontSize = 10.sp); LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(categories) { item -> FilterChip(category == item.name, { category = item.name }, label = { Text(item.name) }) } } }
-            Spacer(Modifier.height(10.dp)); Text("Medio", fontWeight = FontWeight.Bold, fontSize = 10.sp); Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("Yape", "Plin", "Efectivo", "Tarjeta").forEach { item -> FilterChip(method == item, { method = item }, label = { Text(item) }) } }
-        } },
-        confirmButton = { Button(onClick = { val value = amount.replace(',', '.').toDoubleOrNull(); if (value == null || value <= 0) error = true else onSave(Movement(nextId, title.ifBlank { if (income) "Ingreso" else "Compra" }, category, value, income, currentDayOfMonth(), method)) }, colors = ButtonDefaults.buttonColors(containerColor = tint)) { Text("Guardar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } })
+internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit, onSave: (Movement) -> Unit, onScan: (() -> Unit)? = null) {
+    var isIncome by remember { mutableStateOf(income) }
+    var amount by remember { mutableStateOf("") }
+    var title by remember { mutableStateOf("") }
+    var category by remember { mutableStateOf(if (income) "Ingreso" else "Comida") }
+    var method by remember { mutableStateOf("Yape") }
+    var day by remember { mutableStateOf(currentDayOfMonth().toString()) }
+    var note by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf(false) }
+    val tint = if (isIncome) Green else Red
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Card,
+        title = {
+            Column {
+                Text("¿Qué quieres registrar?", fontWeight = FontWeight.Black, color = Night)
+                Text("Una acción clara, sin ruido", color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Normal)
+            }
+        },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(isIncome, {
+                        isIncome = true
+                        category = "Ingreso"
+                    }, label = { Text("Ingreso") })
+                    FilterChip(!isIncome, {
+                        isIncome = false
+                        if (category == "Ingreso") category = "Comida"
+                    }, label = { Text("Gasto") })
+                }
+                OutlinedTextField(
+                    title,
+                    { title = it },
+                    Modifier.fillMaxWidth(),
+                    label = { Text("Nombre") },
+                    placeholder = { Text(if (isIncome) "¿De dónde viene?" else "¿Qué compraste?") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(RadiusMd),
+                )
+                OutlinedTextField(
+                    amount,
+                    { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false },
+                    Modifier.fillMaxWidth(),
+                    label = { Text("Monto") },
+                    prefix = { Text("S/ ") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    isError = error,
+                    shape = RoundedCornerShape(RadiusMd),
+                )
+                if (!isIncome) {
+                    Text("Categoría", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Gray)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(categories) { item -> FilterChip(category == item.name, { category = item.name }, label = { Text(item.name) }) }
+                    }
+                }
+                Text("Método de pago", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Gray)
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("Yape", "Plin", "Efectivo", "Tarjeta", "Transferencia").forEach { item ->
+                        FilterChip(method == item, { method = item }, label = { Text(item) })
+                    }
+                }
+                OutlinedTextField(
+                    day,
+                    { day = it.filter(Char::isDigit).take(2) },
+                    Modifier.fillMaxWidth(),
+                    label = { Text("Fecha (día del mes)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(RadiusMd),
+                )
+                OutlinedTextField(
+                    note,
+                    { note = it.take(80) },
+                    Modifier.fillMaxWidth(),
+                    label = { Text("Nota (opcional)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(RadiusMd),
+                )
+                if (onScan != null && !isIncome) {
+                    OutlinedButton(onClick = onScan, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(RadiusMd)) {
+                        Text("Escanear comprobante", fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val value = amount.replace(',', '.').toDoubleOrNull()
+                    val parsedDay = day.toIntOrNull()?.coerceIn(1, 31) ?: currentDayOfMonth()
+                    val savedTitle = buildString {
+                        append(title.ifBlank { if (isIncome) "Ingreso" else "Compra" })
+                        if (note.isNotBlank()) append(" · ").append(note)
+                    }
+                    if (value == null || value <= 0) error = true
+                    else onSave(Movement(nextId, savedTitle, if (isIncome) "Ingreso" else category, value, isIncome, parsedDay, method))
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = tint),
+            ) { Text("Guardar") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
 }
 
 @Composable
-internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit) {
+internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, available: Double = Double.MAX_VALUE, currentPurpose: String = "", currentTarget: Double = 0.0, goals: List<SavingsGoal> = emptyList(), initialGoalId: Int? = null) {
+    var selectedId by remember { mutableStateOf(initialGoalId) }
+    var menuOpen by remember { mutableStateOf(false) }
+    val initial = goals.firstOrNull { it.id == initialGoalId }
     var amount by remember { mutableStateOf("") }
-    var purpose by remember { mutableStateOf("") }
-    var target by remember { mutableStateOf("") }
+    var purpose by remember { mutableStateOf(initial?.name ?: currentPurpose) }
+    var target by remember { mutableStateOf((initial?.target ?: currentTarget).let { if (it > 0) format2(it) else "" }) }
     var error by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -222,7 +363,15 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit) 
         icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Mascota de ahorro", Modifier.size(76.dp), contentScale = ContentScale.Fit) },
         title = { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("¿Cuánto ahorraste?", fontWeight = FontWeight.Black); Text("Este monto irá a tu tarjeta de ahorro", color = Gray, fontSize = 10.sp) } },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Box {
+                    OutlinedButton(onClick = { menuOpen = true }) { Text(goals.firstOrNull { it.id == selectedId }?.name ?: "Crear una nueva meta") }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(text = { Text("+ Nueva meta de ahorro") }, onClick = { selectedId = null; purpose = ""; target = ""; menuOpen = false })
+                        goals.forEach { goal -> DropdownMenuItem(text = { Text("${goal.name} · ${money(goal.saved)}") }, onClick = { selectedId = goal.id; purpose = goal.name; target = if (goal.target > 0) format2(goal.target) else ""; menuOpen = false }) }
+                    }
+                }
+                Text("Disponible para ahorrar: ${money(available)}. Este monto se separará del saldo disponible; no es un gasto.", color = Gray)
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it.filter { char -> char.isDigit() || char == '.' || char == ',' }; error = false },
@@ -234,15 +383,15 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit) 
                     isError = error,
                     shape = RoundedCornerShape(16.dp),
                 )
-                OutlinedTextField(purpose, { purpose = it.take(60) }, Modifier.fillMaxWidth(), label = { Text("¿Para qué estás ahorrando?") }, placeholder = { Text("Ej. PlayStation, celular, emergencia") }, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(purpose, { purpose = it.take(60) }, Modifier.fillMaxWidth(), label = { Text("¿Para qué estás ahorrando?") }, placeholder = { Text("Ej. PlayStation, celular, emergencia") }, readOnly = selectedId != null, singleLine = true, shape = RoundedCornerShape(16.dp))
                 OutlinedTextField(target, { target = it.filter { char -> char.isDigit() || char == '.' || char == ',' } }, Modifier.fillMaxWidth(), label = { Text("Meta total (opcional)") }, placeholder = { Text("¿Cuánto necesitas reunir?") }, prefix = { Text("S/ ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, shape = RoundedCornerShape(16.dp))
                 Surface(shape = RoundedCornerShape(14.dp), color = Lime.copy(alpha = .10f), border = androidx.compose.foundation.BorderStroke(1.dp, Lime.copy(alpha = .22f))) {
                     Text("Registrar un ahorro activa el día de tu racha. Solo cuenta una vez por día, aunque puedes agregar varios montos.", color = Lime, fontSize = 9.sp, modifier = Modifier.padding(11.dp))
                 }
-                if (error) Text("Ingresa un monto mayor que cero.", color = Red, fontSize = 9.sp)
+                if (error) Text("Ingresa un monto válido que no supere tu saldo disponible.", color = Red, fontSize = 12.sp)
             }
         },
-        confirmButton = { Button(onClick = { val value = amount.replace(',', '.').toDoubleOrNull(); val targetValue = target.replace(',', '.').toDoubleOrNull() ?: 0.0; if (value == null || value <= 0) error = true else onSave(SavingEntry(value, purpose.trim(), targetValue)) }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0C8D7F))) { Text("Guardar ahorro", fontWeight = FontWeight.Bold) } },
+        confirmButton = { Button(onClick = { val value = amount.replace(',', '.').toDoubleOrNull(); val targetValue = target.replace(',', '.').toDoubleOrNull() ?: 0.0; if (value == null || !value.isFinite() || value <= 0 || value > available) error = true else onSave(SavingEntry(value, purpose.trim(), targetValue, selectedId)) }) { Text("Guardar ahorro", fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 }
@@ -370,52 +519,26 @@ internal fun ScanReviewDialog(result: ScannedPurchase, movementId: Int?, nextId:
 }
 
 @Composable
-internal fun ImportMovementsDialog(onDismiss: () -> Unit, onImport: (List<Movement>) -> Unit) {
-    var content by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
-        title = { Column { Text("Importar movimientos", fontWeight = FontWeight.Black); Text("Pega aquí el contenido CSV exportado por Yape, Plin o tu banco.", color = Gray, fontSize = 10.sp) } },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-            OutlinedTextField(content, { content = it; error = "" }, Modifier.fillMaxWidth().heightIn(min = 150.dp), label = { Text("CSV de movimientos") }, placeholder = { Text("fecha,descripcion,categoria,monto,tipo,medio") })
-            Text("También puedes abrir tu Excel, guardarlo como CSV y pegarlo aquí. Tus datos se quedan en el dispositivo.", color = Gray, fontSize = 9.sp)
-            if (error.isNotBlank()) Text(error, color = Red, fontSize = 9.sp)
-        } },
-        confirmButton = { Button(onClick = { val parsed = parseImportedMovements(content); if (parsed.isEmpty()) error = "No encontramos filas válidas. Revisa las columnas y el separador." else onImport(parsed) }) { Text("Importar") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar", color = Gray) } },
-    )
-}
-
-@Composable
-internal fun ExportReportDialog(movements: List<Movement>, onDismiss: () -> Unit) {
-    val csv = remember(movements) { exportMovementsCsv(movements) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp),
-        title = { Column { Text("Reporte listo", fontWeight = FontWeight.Black); Text("Este formato es compatible con Excel y se puede guardar como PDF desde imprimir/compartir.", color = Gray, fontSize = 10.sp) } },
-        text = { Column(verticalArrangement = Arrangement.spacedBy(9.dp)) { Text("${movements.size} movimientos · ingresos, egresos y fechas", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 11.sp); OutlinedTextField(csv, {}, Modifier.fillMaxWidth().heightIn(min = 170.dp), readOnly = true, label = { Text("CSV para Excel") }, textStyle = LocalTextStyle.current.copy(fontSize = 9.sp)) } },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Listo", color = GreenDark, fontWeight = FontWeight.Bold) } },
-    )
-}
-
-@Composable
 internal fun InlineMessage(message: String, onDismiss: () -> Unit) {
+    LaunchedEffect(message) {
+        kotlinx.coroutines.delay(3200)
+        onDismiss()
+    }
     Surface(
-        Modifier.padding(16.dp).fillMaxWidth(.9f).clickable(onClick = onDismiss),
-        shape = RoundedCornerShape(18.dp),
-        color = Color(0xFF191A22),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .55f)),
-        shadowElevation = 14.dp,
+        Modifier.padding(16.dp).fillMaxWidth(.92f).clickable(onClick = onDismiss),
+        shape = RoundedCornerShape(RadiusLg),
+        color = CardRaised,
+        border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .35f)),
+        shadowElevation = 12.dp,
     ) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(
-                Modifier.size(30.dp).clip(CircleShape).background(Lime.copy(alpha = .14f)),
+                Modifier.size(28.dp).clip(CircleShape).background(Lime.copy(alpha = .14f)),
                 contentAlignment = Alignment.Center,
-            ) { Text("✓", color = Lime, fontWeight = FontWeight.Black, fontSize = 15.sp) }
-            Spacer(Modifier.width(11.dp))
-            Text(message, color = Night, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
-            Text("×", color = Gray, fontSize = 18.sp)
+            ) { Text("✓", color = Lime, fontWeight = FontWeight.Black, fontSize = 14.sp) }
+            Spacer(Modifier.width(10.dp))
+            Text(message, color = Night, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, modifier = Modifier.weight(1f))
+            Text("×", color = Gray, fontSize = 16.sp)
         }
     }
 }

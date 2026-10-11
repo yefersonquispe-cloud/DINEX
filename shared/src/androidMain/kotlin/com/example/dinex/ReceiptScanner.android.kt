@@ -36,10 +36,14 @@ import java.text.Normalizer
 actual fun rememberReceiptScanner(
     onResult: (ScannedPurchase) -> Unit,
     onError: (String) -> Unit,
+    onAnalyzing: () -> Unit,
+    onCancelled: () -> Unit,
 ): () -> Unit {
     val context = LocalContext.current
     val currentResult by rememberUpdatedState(onResult)
     val currentError by rememberUpdatedState(onError)
+    val currentAnalyzing by rememberUpdatedState(onAnalyzing)
+    val currentCancelled by rememberUpdatedState(onCancelled)
     val scope = rememberCoroutineScope()
     val recognizer = remember { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
     val labeler = remember { ImageLabeling.getClient(ImageLabelerOptions.DEFAULT_OPTIONS) }
@@ -85,7 +89,13 @@ actual fun rememberReceiptScanner(
 
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { captured ->
         val uri = pendingUri
-        if (!captured || (uri == null)) return@rememberLauncherForActivityResult
+        pendingUri = null
+        if (!captured || uri == null) {
+            uri?.let { runCatching { context.contentResolver.delete(it, null, null) } }
+            currentCancelled()
+            return@rememberLauncherForActivityResult
+        }
+        currentAnalyzing()
         analyze(uri)
     }
 

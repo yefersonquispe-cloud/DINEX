@@ -7,10 +7,18 @@ import android.database.sqlite.SQLiteOpenHelper
 
 private var dinexDatabase: DinexDatabase? = null
 
+@Synchronized
 fun configureDinexStorage(context: Context) {
+    if (dinexDatabase != null) return
     val appContext = context.applicationContext
     dinexDatabase = DinexDatabase(appContext)
     migrateLegacyPreferences(appContext)
+}
+
+internal actual fun readLocalValue(key: String): String? = checkNotNull(dinexDatabase) { "Configure Dinex storage before use" }.read(key)
+internal actual fun writeLocalValue(key: String, value: String?) {
+    val database = checkNotNull(dinexDatabase) { "Configure Dinex storage before use" }
+    if (value == null) database.delete(key) else database.write(key, value)
 }
 
 internal actual fun loadSavedMovements(): String? = dinexDatabase?.read("movements")
@@ -37,7 +45,10 @@ internal actual fun saveSavedStreakDay(day: Int) {
     dinexDatabase?.write("streak_day", day.toString())
 }
 
-internal actual fun currentDayIndex(): Int = (System.currentTimeMillis() / 86_400_000L).toInt()
+internal actual fun currentDayIndex(): Int {
+    val now = System.currentTimeMillis()
+    return ((now + java.util.TimeZone.getDefault().getOffset(now)) / 86_400_000L).toInt()
+}
 
 internal actual fun loadSavedReminders(): String? = dinexDatabase?.read("reminders")
 
@@ -69,6 +80,7 @@ internal actual fun loadSavedGoalTarget(): Double? = dinexDatabase?.read("goal_t
 internal actual fun saveSavedGoalTarget(target: Double) { dinexDatabase?.write("goal_target", target.toString()) }
 
 private class DinexDatabase(context: Context) : SQLiteOpenHelper(context, "dinex.db", null, 1) {
+    init { setWriteAheadLoggingEnabled(true) }
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(
             "CREATE TABLE app_state (state_key TEXT PRIMARY KEY NOT NULL, state_value TEXT NOT NULL, updated_at INTEGER NOT NULL)"
@@ -94,7 +106,9 @@ private class DinexDatabase(context: Context) : SQLiteOpenHelper(context, "dinex
             put("state_value", value)
             put("updated_at", System.currentTimeMillis())
         }
-        writableDatabase.insertWithOnConflict("app_state", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+        check(writableDatabase.insertWithOnConflict("app_state", null, values, SQLiteDatabase.CONFLICT_REPLACE) != -1L) {
+            "No se pudo guardar la base de datos Dinex"
+        }
     }
 
     fun delete(key: String) {

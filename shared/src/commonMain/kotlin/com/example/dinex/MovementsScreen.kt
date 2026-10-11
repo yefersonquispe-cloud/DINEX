@@ -1,137 +1,209 @@
 package com.example.dinex
 
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import dinex.shared.generated.resources.Res
-import dinex.shared.generated.resources.dinex_card_balance_bg
-import dinex.shared.generated.resources.dinex_card_savings_bg
-import dinex.shared.generated.resources.dinex_app_icon
-import dinex.shared.generated.resources.dinex_mascot_ai
-import kotlinx.coroutines.launch
-import org.jetbrains.compose.resources.painterResource
-import kotlin.math.PI
-import kotlin.math.atan2
-import kotlin.math.max
 
-// ═══════════════════════════════════════════════════════════════════════════
-// HISTORY
-// Movements, monthly pass and delete flows.
-// ═══════════════════════════════════════════════════════════════════════════
 @Composable
 internal fun HistoryPage(movements: List<Movement>, onAdd: () -> Unit, onDelete: (Movement) -> Unit, onImport: () -> Unit, onExport: () -> Unit) {
+    var query by remember { mutableStateOf("") }
     var filter by remember { mutableIntStateOf(0) }
-    val visible = movements.filter { filter == 0 || (filter == 1 && !it.income) || (filter == 2 && it.income) }
-    val income = movements.filter { it.income }.sumOf { it.amount }
-    val expense = movements.filterNot { it.income }.sumOf { it.amount }
-    LazyColumn(Modifier.fillMaxSize().widthIn(max = 820.dp), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(13.dp)) {
-        item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) { Text("Movimientos", fontWeight = FontWeight.Black, fontSize = 25.sp); Text(currentMonthYearLabel(), color = Gray, fontSize = 11.sp) }
-                Button(onClick = onAdd, shape = RoundedCornerShape(13.dp)) { Text("Nuevo") }
+    var categoryFilter by remember { mutableStateOf("Todas") }
+    var methodFilter by remember { mutableStateOf("Todos") }
+    var dayFilter by remember { mutableStateOf("Todos") }
+    var selected by remember { mutableStateOf<Movement?>(null) }
+    val methods = listOf("Todos") + movements.map { it.method }.distinct()
+    val days = listOf("Todos") + movements.map { it.dateIso() }.distinct().sortedDescending()
+    val categoryOptions = listOf("Todas") + (categories.map { it.name } + movements.map { it.category } + "Ingreso").distinct()
+    val visible = movements.filter { movement ->
+        val matchesType = filter == 0 || (filter == 1 && !movement.income) || (filter == 2 && movement.income)
+        val matchesQuery = query.isBlank() ||
+            movement.title.contains(query, ignoreCase = true) ||
+            movement.category.contains(query, ignoreCase = true) ||
+            movement.method.contains(query, ignoreCase = true)
+        val matchesCategory = categoryFilter == "Todas" || movement.category == categoryFilter
+        val matchesMethod = methodFilter == "Todos" || movement.method == methodFilter
+        val matchesDay = dayFilter == "Todos" || movement.dateIso() == dayFilter
+        matchesType && matchesQuery && matchesCategory && matchesMethod && matchesDay
+    }.sortedWith(compareByDescending<Movement> { it.dateIso() }.thenByDescending { it.id })
+    val income = visible.filter { it.income }.sumOf { it.amount }
+    val expense = visible.filterNot { it.income }.sumOf { it.amount }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        LazyColumn(
+            Modifier.fillMaxSize().widthIn(max = 960.dp),
+            contentPadding = PaddingValues(18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    DinexPageHeading("Tu actividad", "Movimientos", "Todo lo que entra y sale, en un solo lugar.", modifier = Modifier.weight(1f))
+                }
+            }
+            item {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("Buscar por nombre, categoría o método") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(RadiusMd),
+                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onImport, modifier = Modifier.weight(1f), shape = RoundedCornerShape(RadiusMd)) {
+                        Text("Importar Excel/CSV", fontSize = 11.sp)
+                    }
+                    OutlinedButton(onClick = onExport, modifier = Modifier.weight(1f), shape = RoundedCornerShape(RadiusMd)) {
+                        Text("Exportar reporte", fontSize = 11.sp)
+                    }
+                }
+            }
+            item { MonthPass(income, expense, visible.size) }
+            item {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("Todos", "Gastos", "Ingresos").forEachIndexed { i, label ->
+                        FilterChip(filter == i, { filter = i }, label = { Text(label, fontSize = 11.sp) })
+                    }
+                }
+            }
+            item {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    categoryOptions.forEach { item ->
+                        FilterChip(categoryFilter == item, { categoryFilter = item }, label = { Text(item, fontSize = 10.sp) })
+                    }
+                }
+            }
+            item {
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    methods.forEach { item ->
+                        FilterChip(methodFilter == item, { methodFilter = item }, label = { Text(item, fontSize = 10.sp) })
+                    }
+                    days.forEach { item ->
+                        FilterChip(
+                            dayFilter == item,
+                            { dayFilter = item },
+                            label = { Text(if (item == "Todos") "Todas las fechas" else item, fontSize = 10.sp) },
+                        )
+                    }
+                }
+            }
+            if (visible.isEmpty()) {
+                item {
+                    DinexCard {
+                        DinexEmptyState(
+                            "Sin movimientos todavía",
+                            if (movements.isEmpty()) "Registra tu primer ingreso o gasto para comenzar." else "Ningún movimiento coincide con los filtros.",
+                            if (movements.isEmpty()) "+ Registrar movimiento" else null,
+                            if (movements.isEmpty()) onAdd else null,
+                        )
+                    }
+                }
+            } else {
+                item {
+                    DinexCard {
+                        Text("${visible.size} movimientos", color = Gray, fontSize = 12.sp)
+                    }
+                }
+                items(visible, key = { it.id }) { movement ->
+                    DinexCard { MovementListRow(movement) { selected = movement } }
+                }
             }
         }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onImport, modifier = Modifier.weight(1f), shape = RoundedCornerShape(13.dp)) { Text("Importar Excel/CSV", fontSize = 11.sp) }
-                OutlinedButton(onClick = onExport, modifier = Modifier.weight(1f), shape = RoundedCornerShape(13.dp)) { Text("Exportar reporte", fontSize = 11.sp) }
-            }
-        }
-        item { MonthPass(income, expense, movements.size) }
-        item {
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                listOf("Todos", "Gastos", "Ingresos").forEachIndexed { i, label -> FilterChip(filter == i, { filter = i }, label = { Text(label) }) }
-            }
-        }
-        items(visible, key = { it.id }) { movement -> Ticket(movement, onDelete = { onDelete(movement) }) }
     }
+    selected?.let { movement ->
+        MovementDetailDialog(
+            movement = movement,
+            onDismiss = { selected = null },
+            onDelete = { onDelete(movement); selected = null },
+        )
+    }
+}
+
+@Composable
+internal fun MovementListRow(movement: Movement, onClick: () -> Unit) {
+    MovementRow(movement, onClick)
 }
 
 @Composable
 internal fun MonthPass(income: Double, expense: Double, movementCount: Int) {
-    Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Brush.linearGradient(listOf(Color(0xFF171A24), Color(0xFF27203C)))).padding(20.dp)) {
-        Column {
-            Text("BALANCE DEL MES", color = Lime, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.1.sp)
-            Text(money(income - expense), color = Color.White, fontWeight = FontWeight.Black, fontSize = 28.sp)
-            Spacer(Modifier.height(16.dp)); Dashes(Color.White.copy(alpha = .18f)); Spacer(Modifier.height(14.dp))
-            Row { PassValue("ENTRÓ", money(income), Lime, Modifier.weight(1f)); PassValue("SALIÓ", money(expense), Color(0xFFFFA19B), Modifier.weight(1f)); PassValue("MOVS.", "$movementCount", Color.White, Modifier.weight(1f)) }
+    DinexCard(elevated = true, accent = Indigo, vibrant = true) {
+        Text("BALANCE DE LOS MOVIMIENTOS VISIBLES", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+        Text(money(income - expense), color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp)
+        Spacer(Modifier.height(12.dp))
+        Row {
+            PassValue("Entró", money(income), Lime, Modifier.weight(1f))
+            PassValue("Salió", money(expense), Red, Modifier.weight(1f))
+            PassValue("Movs.", "$movementCount", Night, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
-internal fun PassValue(label: String, text: String, color: Color, modifier: Modifier) {
-    Column(modifier) { Text(label, color = Color.White.copy(alpha = .5f), fontSize = 8.sp); Text(text, color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+internal fun PassValue(label: String, text: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
+    Column(modifier) {
+        Text(label, color = Gray, fontSize = 12.sp)
+        Text(text, color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+    }
 }
 
 @Composable
 internal fun Ticket(movement: Movement, onDelete: () -> Unit) {
-    val info = categories.firstOrNull { it.name == movement.category }
-    val tint = if (movement.income) Green else info?.color ?: Gray
-    Surface(shape = RoundedCornerShape(18.dp), color = Card, border = androidx.compose.foundation.BorderStroke(1.dp, tint.copy(alpha = .18f))) {
-        Column {
-            Row(Modifier.padding(15.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(44.dp).clip(CircleShape).background(tint.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
-                    Text(if (movement.income) "IN" else info?.code ?: "GT", color = tint, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                }
-                Spacer(Modifier.width(12.dp)); Column(Modifier.weight(1f)) {
-                    Text(movement.title, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("${movement.category}  ·  ${movement.method}", color = Gray, fontSize = 9.sp)
-                }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text((if (movement.income) "+" else "-") + money(movement.amount), color = if (movement.income) GreenDark else Red, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                    Text("${movement.day} ${currentMonthShort()}", color = Gray, fontSize = 8.sp)
-                }
-            }
-            Dashes(tint.copy(alpha = .14f)); Row(Modifier.fillMaxWidth().padding(horizontal = 15.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("COMPROBANTE DINEX", color = Gray, fontSize = 7.sp, letterSpacing = .8.sp)
+    MovementRow(movement, onClick = onDelete)
+}
+
+@Composable
+internal fun MovementDetailDialog(movement: Movement, onDismiss: () -> Unit, onDelete: () -> Unit) {
+    val tint = movementTint(movement)
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(22.dp),
+        containerColor = Card,
+        title = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CategoryMark(movementCode(movement), tint, 40.dp)
                 Spacer(Modifier.width(10.dp))
-                Text(
-                    "Eliminar",
-                    color = Red,
-                    fontSize = 9.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clip(RoundedCornerShape(9.dp)).clickable(onClick = onDelete)
-                        .background(Red.copy(alpha = .10f)).padding(horizontal = 9.dp, vertical = 6.dp),
-                )
-                Spacer(Modifier.weight(1f))
-                Text("#${movement.id.toString().padStart(4, '0')}", color = Gray, fontSize = 7.sp)
+                Column {
+                    Text(movement.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Night, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(movement.category, color = Gray, fontSize = 11.sp)
+                }
             }
-        }
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                DetailLine("Importe", (if (movement.income) "+ " else "− ") + money(movement.amount))
+                DetailLine("Fecha", movement.dateLabel())
+                DetailLine("Método", movement.method)
+                if (movement.location.isNotBlank()) DetailLine("Ubicación", movement.location)
+                DetailLine("ID", "#${movement.id.toString().padStart(4, '0')}")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDelete) { Text("Eliminar", color = Red, fontWeight = FontWeight.Bold) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
+    )
+}
+
+@Composable
+private fun DetailLine(label: String, value: String) {
+    Row(Modifier.fillMaxWidth()) {
+        Text(label, color = Gray, fontSize = 11.sp, modifier = Modifier.weight(1f))
+        Text(value, color = Night, fontWeight = FontWeight.SemiBold, fontSize = 11.sp)
     }
 }

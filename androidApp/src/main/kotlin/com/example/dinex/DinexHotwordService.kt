@@ -13,6 +13,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
+import android.app.KeyguardManager
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -33,6 +35,9 @@ class DinexHotwordService : Service() {
     private var recognizer: SpeechRecognizer? = null
     private var pausedForCommand = false
     private var destroyed = false
+    private var generation = 0
+    private var foregroundStarted = false
+    private lateinit var overlay: DinexVoiceOverlay
     private val restartListening = Runnable {
         if (!destroyed && !pausedForCommand) beginListening()
     }
@@ -43,32 +48,68 @@ class DinexHotwordService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        configureDinexStorage(this)
+        overlay = DinexVoiceOverlay(this,
+            onListen = { beginFloatingCommand() },
+            onOpenApp = { startActivity(Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) },
+            onStop = { getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply(); stopSelf() },
+        )
         createChannels()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
+            ACTION_APP_VISIBLE -> {
+                if (!foregroundStarted) { clearStaleActivation(); return START_NOT_STICKY }
+                overlay.hide(); return START_NOT_STICKY
+            }
+            ACTION_APP_HIDDEN -> {
+                if (!foregroundStarted) { clearStaleActivation(); return START_NOT_STICKY }
+                if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_ENABLED, false)) overlay.show()
+                return START_NOT_STICKY
+            }
             ACTION_STOP -> {
                 getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
                 stopSelf()
                 return START_NOT_STICKY
             }
             ACTION_RESUME -> {
+                if (!foregroundStarted) { clearStaleActivation(); return START_NOT_STICKY }
                 handler.removeCallbacks(resumeAfterCommandTimeout)
                 pausedForCommand = false
             }
         }
-        startForeground(NOTIFICATION_ID, listeningNotification())
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        try {
+            startForeground(NOTIFICATION_ID, listeningNotification())
+            foregroundStarted = true
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, true).apply()
+        } catch (_: SecurityException) {
+            getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_APP_VISIBLE, false)) overlay.show()
         if (!pausedForCommand) scheduleListening(180)
-        return START_STICKY
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun clearStaleActivation() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
+        stopSelf()
+    }
 
     override fun onDestroy() {
         destroyed = true
         handler.removeCallbacksAndMessages(null)
         stopRecognizer()
+        overlay.hide()
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
         super.onDestroy()
     }
 
@@ -77,7 +118,7 @@ class DinexHotwordService : Service() {
         handler.postDelayed(restartListening, delayMs)
     }
 
-    private fun beginListening() {
+    private fun beginListening(commandMode: Boolean = false) {
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
             stopSelf()
@@ -88,22 +129,45 @@ class DinexHotwordService : Service() {
             return
         }
         stopRecognizer()
+        val activeGeneration = generation
+        try {
         recognizer = SpeechRecognizer.createSpeechRecognizer(this).also { speech ->
             speech.setRecognitionListener(object : RecognitionListener {
                 override fun onResults(results: Bundle?) {
+                    if (activeGeneration != generation || destroyed) return
                     val phrases = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                    if (phrases.any(::isWakePhrase)) onWakeWord() else scheduleListening(350)
+                    if (commandMode) {
+                        val command = phrases.firstOrNull().orEmpty()
+                        val message = if (command.isBlank()) "No entendí la frase. Pulsa Hablar para repetir." else runCatching {
+                            recordDinexVoiceCommand(command)
+                        }.getOrDefault("No pude guardar. Abre Dinex y vuelve a intentarlo.")
+                        overlay.showResult(message)
+                        stopRecognizer()
+                        handler.removeCallbacks(resumeAfterCommandTimeout)
+                        handler.postDelayed(resumeAfterCommandTimeout, 1800)
+                    } else if (phrases.any(::isWakePhrase)) onWakeWord() else scheduleListening(900)
                 }
 
                 override fun onPartialResults(partialResults: Bundle?) {
+                    if (activeGeneration != generation || destroyed) return
                     val phrases = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                    if (phrases.any(::isWakePhrase)) onWakeWord()
+                    if (commandMode) phrases.firstOrNull()?.let { overlay.showResult("Escuché: " + it) }
+                    else if (phrases.any(::isWakePhrase)) onWakeWord()
                 }
 
                 override fun onError(error: Int) {
+                    if (activeGeneration != generation || destroyed) return
+                    if (commandMode) {
+                        overlay.showResult(if (error == SpeechRecognizer.ERROR_NETWORK || error == SpeechRecognizer.ERROR_NETWORK_TIMEOUT)
+                            "Revisa tu conexión y pulsa Hablar." else "No entendí la frase. Pulsa Hablar para repetir.")
+                        handler.removeCallbacks(resumeAfterCommandTimeout)
+                        handler.postDelayed(resumeAfterCommandTimeout, 1800)
+                        return
+                    }
                     val delay = when (error) {
                         SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> 1_500L
                         SpeechRecognizer.ERROR_TOO_MANY_REQUESTS -> 8_000L
+                        SpeechRecognizer.ERROR_NETWORK, SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> 8_000L
                         SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> {
                             getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, false).apply()
                             stopSelf()
@@ -130,6 +194,13 @@ class DinexHotwordService : Service() {
                 // el paquete español local y devolvían error inmediatamente.
             })
         }
+        } catch (_: Exception) {
+            stopRecognizer()
+            if (commandMode) {
+                overlay.showResult("El servicio de voz no está disponible. Abre Dinex para revisar los permisos.")
+                handler.postDelayed(resumeAfterCommandTimeout, 1800)
+            } else scheduleListening(8_000)
+        }
     }
 
     private fun onWakeWord() {
@@ -138,6 +209,12 @@ class DinexHotwordService : Service() {
         handler.removeCallbacks(restartListening)
         handler.removeCallbacks(resumeAfterCommandTimeout)
         stopRecognizer()
+        val locked = (getSystemService(KEYGUARD_SERVICE) as KeyguardManager).isKeyguardLocked
+        if (Settings.canDrawOverlays(this) && !locked &&
+            !getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(KEY_APP_VISIBLE, false)) {
+            beginFloatingCommand()
+            return
+        }
         val commandIntent = Intent(this, DinexVoiceCommandActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
@@ -166,9 +243,21 @@ class DinexHotwordService : Service() {
     }
 
     private fun stopRecognizer() {
+        generation++
         recognizer?.runCatching { cancel() }
         recognizer?.runCatching { destroy() }
         recognizer = null
+    }
+
+    private fun beginFloatingCommand() {
+        if (destroyed) return
+        pausedForCommand = true
+        handler.removeCallbacks(restartListening)
+        handler.removeCallbacks(resumeAfterCommandTimeout)
+        stopRecognizer()
+        overlay.showPanel("Te escucho. Por ejemplo: registra 20 soles en comida.")
+        handler.postDelayed({ if (!destroyed) beginListening(commandMode = true) }, 250)
+        handler.postDelayed(resumeAfterCommandTimeout, 25_000)
     }
 
     private fun isWakePhrase(value: String): Boolean {
@@ -226,9 +315,12 @@ class DinexHotwordService : Service() {
         const val ACTION_START = "com.example.dinex.action.START_HOTWORD"
         const val ACTION_STOP = "com.example.dinex.action.STOP_HOTWORD"
         const val ACTION_RESUME = "com.example.dinex.action.RESUME_HOTWORD"
+        const val ACTION_APP_VISIBLE = "com.example.dinex.action.APP_VISIBLE"
+        const val ACTION_APP_HIDDEN = "com.example.dinex.action.APP_HIDDEN"
         const val PREFS = "dinex_hotword"
         const val KEY_ENABLED = "enabled"
         const val KEY_PENDING_COMMAND = "pending_command"
+        const val KEY_APP_VISIBLE = "app_visible"
         private const val SERVICE_CHANNEL = "dinex_hotword_service"
         private const val COMMAND_CHANNEL = "dinex_voice_commands"
         private const val NOTIFICATION_ID = 4100

@@ -1,6 +1,17 @@
 package com.example.dinex
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -61,15 +72,20 @@ internal fun AssistantPage(
     streak: Int,
     savings: Double,
     messages: androidx.compose.runtime.snapshots.SnapshotStateList<ChatMessage>,
+    categoryBudgets: Map<String, Double> = emptyMap(),
 ) {
     val scope = rememberCoroutineScope()
     val chatListState = rememberLazyListState()
     var draft by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
+    val reducedMotion = LocalDinexReducedMotion.current
 
-    LaunchedEffect(messages.size, loading) {
-        val lastItem = if (loading) messages.size else messages.lastIndex
-        if (lastItem >= 0) chatListState.animateScrollToItem(lastItem)
+    LaunchedEffect(messages.size, loading, reducedMotion) {
+        if (messages.size <= 1 && !loading) return@LaunchedEffect
+        val lastItem = messages.lastIndex + (if (messages.size <= 1) 1 else 0) + (if (loading) 1 else 0)
+        if (lastItem >= 0) {
+            if (reducedMotion) chatListState.scrollToItem(lastItem) else chatListState.animateScrollToItem(lastItem)
+        }
     }
 
     fun send(question: String) {
@@ -80,104 +96,113 @@ internal fun AssistantPage(
         loading = true
         scope.launch {
             val reply = runCatching {
-                assistant.ask(cleanQuestion, buildFinancialContext(movements, dailyLimit, streak, savings))
+                assistant.ask(cleanQuestion, buildFinancialContext(movements, dailyLimit, streak, savings, categoryBudgets))
             }.getOrElse { GeminiReply("Error de conexión con Dinex IA.", successful = false) }
             messages.add(ChatMessage(reply.text, user = false, error = !reply.successful))
             loading = false
         }
     }
 
-    Column(
-        Modifier.fillMaxSize().widthIn(max = 820.dp).imePadding().padding(horizontal = 18.dp, vertical = 15.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Image(painterResource(Res.drawable.dinex_mascot_ai), "Asistente Dinex", Modifier.size(56.dp), contentScale = ContentScale.Fit)
-            Spacer(Modifier.width(8.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Dinex IA", fontWeight = FontWeight.Black, fontSize = 25.sp)
-                Text("Tu asistente financiero · IA segura", color = Gray, fontSize = 11.sp)
-            }
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = if (assistant.isConfigured) Mint else Color(0xFF2B2118),
-            ) {
-                Text(
-                    if (assistant.isConfigured) "CONECTADO" else "CONFIGURAR",
-                    modifier = Modifier.padding(horizontal = 9.dp, vertical = 6.dp),
-                    color = if (assistant.isConfigured) GreenDark else Orange,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 8.sp,
-                )
-            }
-        }
-        Spacer(Modifier.height(13.dp))
-        Surface(
-            shape = RoundedCornerShape(18.dp),
-            color = Indigo.copy(alpha = .13f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .14f)),
-        ) {
-            Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(CircleShape).background(Indigo), contentAlignment = Alignment.Center) {
-                    Text("IA", color = Color.White, fontWeight = FontWeight.Black, fontSize = 9.sp)
+    BoxWithConstraints(Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.TopCenter) {
+        val wide = maxWidth >= 940.dp
+        Row(Modifier.widthIn(max = 1180.dp).fillMaxSize().padding(if (wide) 24.dp else 16.dp), horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+            if (wide) Column(Modifier.width(260.dp).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                DinexCard(accent = Indigo, vibrant = true) {
+                    Image(painterResource(Res.drawable.dinex_mascot_ai), null, Modifier.size(108.dp).align(Alignment.CenterHorizontally), contentScale = ContentScale.Fit)
+                    Spacer(Modifier.height(14.dp))
+                    Text("Un aliado para tus decisiones.", color = Night, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 30.sp)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Convierte tus movimientos en una conversación más clara sobre tu dinero.", color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
                 }
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    "Analiza solo tu resumen de Dinex. No accede a cuentas bancarias ni solicita claves.",
-                    color = Gray,
-                    fontSize = 9.sp,
-                    modifier = Modifier.weight(1f),
-                )
+                DinexCard(accent = ElectricBlue) {
+                    Text("TU CONTEXTO", color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+                    Spacer(Modifier.height(14.dp))
+                    val income = movements.filter { it.income }.sumOf { it.amount }
+                    val expense = movements.filterNot { it.income }.sumOf { it.amount }
+                    AssistantContextLine("Saldo registrado", money(income - expense), Night)
+                    AssistantContextLine("Ahorros", money(savings), Lime)
+                    AssistantContextLine("Racha", "$streak días", Orange)
+                    Spacer(Modifier.height(12.dp))
+                    Text("Usa tu resumen de Dinex. No accede a tus bancos ni solicita claves.", color = Gray, fontSize = 12.sp, lineHeight = 18.sp)
+                }
             }
-        }
-        Spacer(Modifier.height(12.dp))
-        LazyColumn(
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            state = chatListState,
-            verticalArrangement = Arrangement.spacedBy(9.dp),
-            contentPadding = PaddingValues(vertical = 4.dp),
-        ) {
-            items(messages) { item -> ChatBubble(item) }
-            if (loading) {
-                item {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Surface(shape = RoundedCornerShape(18.dp), color = Card, border = androidx.compose.foundation.BorderStroke(1.dp, Border)) {
-                            Row(Modifier.padding(horizontal = 15.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp, color = Indigo)
-                                Spacer(Modifier.width(9.dp))
-                                Text("Preparando una respuesta premium para ti…", color = Gray, fontSize = 10.sp)
-                            }
+            Column(Modifier.weight(1f).fillMaxHeight()) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(46.dp).clip(RoundedCornerShape(17.dp)).background(CardRaised), contentAlignment = Alignment.Center) {
+                        Icon(DinexNavigationIcons.Sparkle, null, tint = Color.White, modifier = Modifier.size(25.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("Dinex IA", color = Night, fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.5).sp)
+                        Text(if (assistant.isConfigured) "Disponible para ayudarte" else "Configura Gemini para conversar", color = if (assistant.isConfigured) GreenDark else Orange, fontSize = 12.sp)
+                    }
+                }
+                HorizontalDivider(color = Border.copy(alpha = .65f))
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(), state = chatListState,
+                    verticalArrangement = Arrangement.spacedBy(14.dp), contentPadding = PaddingValues(vertical = 18.dp),
+                ) {
+                    if (messages.size <= 1) item {
+                        DinexCard(accent = Indigo, vibrant = true) {
+                            Text("MENOS DUDAS. MÁS CLARIDAD.", color = Indigo, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(10.dp))
+                            Text("¿Qué quieres descubrir hoy?", color = Night, fontSize = 25.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(9.dp))
+                            Text("Revisa tus gastos, piensa en tu próxima compra o empieza un plan de ahorro.", color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
+                        }
+                    }
+                    items(messages) { item -> ChatBubble(item) }
+                    if (loading) item { AssistantThinking() }
+                }
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 7.dp)) {
+                    items(listOf("¿En qué gasto más?", "Hazme un plan semanal", "¿Puedo gastar S/ 80?", "¿Cómo voy con mi ahorro?")) { suggestion ->
+                        SuggestionChip(onClick = { send(suggestion) }, label = { Text(suggestion, fontSize = 12.sp) }, enabled = !loading,
+                            icon = { Icon(DinexNavigationIcons.Sparkle, null, tint = Indigo, modifier = Modifier.size(15.dp)) },
+                            shape = RoundedCornerShape(14.dp))
+                    }
+                }
+                Spacer(Modifier.height(5.dp))
+                Surface(shape = RoundedCornerShape(24.dp), color = CardRaised.copy(alpha = .9f), border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .35f))) {
+                    Row(Modifier.padding(8.dp), verticalAlignment = Alignment.Bottom) {
+                        TextField(draft, { if (it.length <= 500) draft = it }, Modifier.weight(1f),
+                            placeholder = { Text("Escribe tu pregunta…", fontSize = 14.sp) }, maxLines = 4,
+                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send(draft) }))
+                        Button(onClick = { send(draft) }, enabled = draft.isNotBlank() && !loading,
+                            modifier = Modifier.size(48.dp).semantics { contentDescription = "Enviar mensaje" },
+                            contentPadding = PaddingValues(0.dp), shape = RoundedCornerShape(17.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = colors.onPrimary)) {
+                            Icon(DinexNavigationIcons.Send, null, modifier = Modifier.size(23.dp))
                         }
                     }
                 }
+                Text("Puede equivocarse. Revisa cualquier decisión financiera.", color = Gray, fontSize = 10.sp, modifier = Modifier.fillMaxWidth().padding(top = 7.dp), textAlign = TextAlign.Center)
             }
         }
-        Spacer(Modifier.height(8.dp))
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp), contentPadding = PaddingValues(vertical = 3.dp)) {
-            items(listOf("¿En qué gasto más?", "Hazme un plan semanal", "¿Puedo gastar S/ 80?")) { suggestion ->
-                SuggestionChip(onClick = { send(suggestion) }, label = { Text(suggestion, fontSize = 9.sp) }, enabled = !loading)
-            }
+    }
+}
+
+@Composable
+private fun AssistantContextLine(label: String, value: String, tint: Color) {
+    Column(Modifier.padding(vertical = 6.dp)) {
+        Text(label, color = Gray, fontSize = 12.sp)
+        Text(value, color = tint, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
+@Composable
+private fun AssistantThinking() {
+    val reducedMotionForDots = LocalDinexReducedMotion.current
+    val phase: State<Float> = if (reducedMotionForDots) remember { mutableStateOf(.5f) }
+    else rememberInfiniteTransition(label = "thinking").animateFloat(0f, 1f, infiniteRepeatable(tween(1200, easing = LinearEasing)), label = "dots")
+    Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(3) { i ->
+            Box(Modifier.padding(end = 5.dp).size(6.dp).graphicsLayer {
+                translationY = if (reducedMotionForDots) 0f else -kotlin.math.sin(phase.value * 2 * PI - i).toFloat() * 3.dp.toPx()
+            }.clip(CircleShape).background(Indigo))
         }
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            OutlinedTextField(
-                value = draft,
-                onValueChange = { if (it.length <= 500) draft = it },
-                modifier = Modifier.weight(1f),
-                placeholder = { Text("Pregúntale a Dinex IA…", fontSize = 11.sp) },
-                shape = RoundedCornerShape(18.dp),
-                maxLines = 3,
-                enabled = !loading,
-            )
-            Spacer(Modifier.width(8.dp))
-            Button(
-                onClick = { send(draft) },
-                enabled = draft.isNotBlank() && !loading,
-                modifier = Modifier.size(54.dp),
-                contentPadding = PaddingValues(0.dp),
-                shape = CircleShape,
-                colors = ButtonDefaults.buttonColors(containerColor = Indigo),
-            ) { Text(">", color = Color.White, fontWeight = FontWeight.Black, fontSize = 18.sp) }
-        }
+        Spacer(Modifier.width(7.dp))
+        Text("Analizando tus movimientos…", color = Gray, fontSize = 13.sp)
     }
 }
 
@@ -188,7 +213,7 @@ internal fun ChatBubble(message: ChatMessage) {
         horizontalArrangement = if (message.user) Arrangement.End else Arrangement.Start,
     ) {
         Surface(
-            modifier = Modifier.widthIn(max = 610.dp).clickable(enabled = false) {},
+            modifier = Modifier.widthIn(max = 610.dp).dinexEntrance(),
             shape = RoundedCornerShape(
                 topStart = 19.dp,
                 topEnd = 19.dp,
@@ -196,9 +221,9 @@ internal fun ChatBubble(message: ChatMessage) {
                 bottomEnd = if (message.user) 5.dp else 19.dp,
             ),
             color = when {
-                message.user -> Indigo
-                message.error -> Color(0xFF2B2118)
-                else -> Card
+                message.user -> Mint
+                message.error -> Orange.copy(alpha = .12f)
+                else -> CardRaised
             },
             border = if (message.user) null else androidx.compose.foundation.BorderStroke(
                 1.dp,
@@ -211,33 +236,34 @@ internal fun ChatBubble(message: ChatMessage) {
                         if (message.error) "DINEX · AVISO" else "DINEX IA",
                         color = if (message.error) Orange else GreenDark,
                         fontWeight = FontWeight.Black,
-                        fontSize = 8.sp,
+                        fontSize = 10.sp,
                         letterSpacing = .7.sp,
                     )
                     Spacer(Modifier.height(4.dp))
                 }
-                Text(message.text, color = if (message.user) Color.White else Night, fontSize = 11.sp, lineHeight = 16.sp)
+                SelectionContainer { Text(message.text, color = if (message.user) Color.White else Night, fontSize = 14.sp, lineHeight = 22.sp) }
             }
         }
     }
 }
 
-internal fun buildFinancialContext(movements: List<Movement>, dailyLimit: Float, streak: Int, savings: Double): String {
+internal fun buildFinancialContext(movements: List<Movement>, dailyLimit: Float, streak: Int, savings: Double, categoryBudgets: Map<String, Double> = emptyMap()): String {
     val income = movements.asSequence().filter { it.income }.sumOf { it.amount }
     val expenses = movements.asSequence().filterNot { it.income }.sumOf { it.amount }
-    val today = movements.asSequence().filter { (!it.income && it.day == currentDayOfMonth()) }.sumOf { it.amount }
+    val today = movements.asSequence().filter { !it.income && it.isToday() }.sumOf { it.amount }
     val categoryLines = categories.joinToString("\n") { category ->
-        val spent = movements.filter { !it.income && it.category == category.name }.sumOf { it.amount }
-        "- ${category.name}: ${money(spent)} de límite ${money(category.limit)}"
+        val spent = movements.filter { !it.income && it.isInCurrentMonth() && it.category == category.name }.sumOf { it.amount }
+        val limit = categoryBudgets[category.name] ?: 0.0
+        "- ${category.name}: ${money(spent)} este mes; " + if (limit > 0) "límite mensual ${money(limit)}" else "sin límite configurado"
     }
     val recent = movements.take(8).joinToString("\n") { item ->
-        "- Día ${item.day}: ${item.title}, ${if (item.income) "ingreso" else "gasto"} ${money(item.amount)}, ${item.category}, ${item.method}"
+        "- ${item.dateIso()}: ${item.title}, ${if (item.income) "ingreso" else "gasto"} ${money(item.amount)}, ${item.category}, ${item.method}"
     }
     return """
-        Periodo: mes actual.
+        Periodo: historial completo. Cada movimiento incluye su fecha.
         Ingresos: ${money(income)}.
         Gastos: ${money(expenses)}.
-        Saldo disponible: ${money(income - expenses)}.
+        Saldo disponible: ${money(income - expenses - savings)}.
         Gasto de hoy: ${money(today)}; límite diario: ${money(dailyLimit.toDouble())}.
         Racha de ahorro: $streak días.
         Ahorro acumulado: ${money(savings)}.

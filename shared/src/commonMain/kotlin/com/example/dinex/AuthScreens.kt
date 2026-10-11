@@ -76,31 +76,31 @@ internal fun AuthFlow(
         "Una letra mayúscula (A-Z)" to password.any(Char::isUpperCase),
         "Una letra minúscula (a-z)" to password.any(Char::isLowerCase),
         "Un número (0-9)" to password.any(Char::isDigit),
-        "Un símbolo (ej. ! @ # $ %)" to password.any { !it.isLetterOrDigit() },
+        "Un símbolo (ej. ! @ # $ %)" to password.any { !it.isLetterOrDigit() && !it.isWhitespace() },
     )
     val passwordValid = passwordRules.all { it.second }
 
-    Box(Modifier.fillMaxSize().background(AppBg).statusBarsPadding().navigationBarsPadding()) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawCircle(Indigo.copy(alpha = .28f), radius = size.minDimension * .55f, center = Offset(size.width * .92f, size.height * .08f))
-            drawCircle(ElectricBlue.copy(alpha = .18f), radius = size.minDimension * .48f, center = Offset(size.width * .05f, size.height * .92f))
+    BoxWithConstraints(Modifier.fillMaxSize().background(AppBg).statusBarsPadding().navigationBarsPadding()) {
+        val wideLayout = maxWidth >= DesktopBreakpoint
+        DinexAuroraBackground()
+        if (wideLayout) {
+            AuthBrandStory(
+                modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(.47f),
+            )
         }
         LazyColumn(
-            modifier = Modifier.align(Alignment.Center).widthIn(max = 500.dp).fillMaxWidth().imePadding(),
+            modifier = Modifier
+                .align(if (wideLayout) Alignment.CenterEnd else Alignment.TopCenter)
+                .fillMaxHeight()
+                .then(if (wideLayout) Modifier.width(minOf(560.dp, maxWidth * .53f)) else Modifier.widthIn(max = 500.dp).fillMaxWidth())
+                .imePadding(),
             contentPadding = PaddingValues(horizontal = 26.dp, vertical = 28.dp),
         ) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(Res.drawable.dinex_app_icon),
-                        contentDescription = "Logo Dinex",
-                        modifier = Modifier.size(58.dp).clip(RoundedCornerShape(18.dp)),
-                        contentScale = ContentScale.Crop,
-                    )
-                    Spacer(Modifier.width(13.dp))
                     Column {
                         Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 24.sp, letterSpacing = 2.sp)
-                        Text("Tu dinero. Tus decisiones.", color = Gray, fontSize = 11.sp)
+                        Text("Decide mejor. Ahorra más.", color = Gray, fontSize = 11.sp)
                     }
                 }
                 Spacer(Modifier.height(30.dp))
@@ -114,14 +114,14 @@ internal fun AuthFlow(
                 )
                 Spacer(Modifier.height(22.dp))
                 Surface(
-                    shape = RoundedCornerShape(28.dp),
-                    color = Card.copy(alpha = .96f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .35f)),
-                    shadowElevation = 22.dp,
+                    shape = RoundedCornerShape(22.dp),
+                    color = Card.copy(alpha = .92f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .32f)),
+                    shadowElevation = 10.dp,
                 ) {
                     Column(Modifier.padding(20.dp)) {
                         if (createMode) {
-                            Text("NOMBRE", color = Gray, fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 1.sp)
+                            Text("NOMBRE", color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                             Spacer(Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = name,
@@ -137,7 +137,7 @@ internal fun AuthFlow(
                             Spacer(Modifier.height(12.dp))
                         }
 
-                        Text("EMAIL", color = Gray, fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text("EMAIL", color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                         Spacer(Modifier.height(6.dp))
                         OutlinedTextField(
                             value = email,
@@ -153,7 +153,7 @@ internal fun AuthFlow(
                         if ((attempted || email.isNotBlank()) && !emailValid) ValidationHint("Ingresa un email válido", false)
                         Spacer(Modifier.height(12.dp))
 
-                        Text("CONTRASEÑA", color = Gray, fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 1.sp)
+                        Text("CONTRASEÑA", color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                         Spacer(Modifier.height(6.dp))
                         OutlinedTextField(
                             value = password,
@@ -168,9 +168,9 @@ internal fun AuthFlow(
                                 Text(
                                     if (showPassword) "OCULTAR" else "VER",
                                     color = GreenDark,
-                                    fontSize = 8.sp,
+                                    fontSize = 12.sp,
                                     fontWeight = FontWeight.Black,
-                                    modifier = Modifier.clickable { showPassword = !showPassword }.padding(6.dp),
+                                    modifier = Modifier.heightIn(min = 48.dp).clickable(onClickLabel = if (showPassword) "Ocultar contraseña" else "Mostrar contraseña") { showPassword = !showPassword }.wrapContentHeight().padding(6.dp),
                                 )
                             },
                             shape = RoundedCornerShape(15.dp),
@@ -179,7 +179,7 @@ internal fun AuthFlow(
                             Spacer(Modifier.height(9.dp))
                             passwordRules.forEach { (label, valid) -> ValidationHint(label, valid) }
                             Spacer(Modifier.height(12.dp))
-                            Text("CONFIRMAR CONTRASEÑA", color = Gray, fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 1.sp)
+                            Text("CONFIRMAR CONTRASEÑA", color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                             Spacer(Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = confirmation,
@@ -218,9 +218,9 @@ internal fun AuthFlow(
                                     else error = "Correo o contraseña incorrectos."
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().height(54.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Indigo),
+                            modifier = Modifier.fillMaxWidth().height(50.dp),
+                            shape = RoundedCornerShape(RadiusMd),
+                            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color(0xFF062018)),
                         ) { Text(if (createMode) "Crear cuenta" else "Iniciar sesión", fontWeight = FontWeight.Bold) }
                         TextButton(
                             onClick = { createMode = !createMode; attempted = false; error = null; password = ""; confirmation = "" },
@@ -231,8 +231,77 @@ internal fun AuthFlow(
                     }
                 }
                 Spacer(Modifier.height(15.dp))
-                Text("Tus credenciales se guardan localmente; Dinex no almacena tu contraseña visible.", color = Gray.copy(alpha = .75f), fontSize = 9.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                Text("Cuenta local de este dispositivo. No se sincroniza todavía con otros celulares ni con la web. Dinex no almacena tu contraseña visible.", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
+        }
+    }
+}
+
+@Composable
+private fun AuthBrandStory(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(start = 64.dp, end = 38.dp),
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Surface(
+            shape = RoundedCornerShape(30.dp),
+            color = CardRaised.copy(alpha = .84f),
+            border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .4f)),
+            shadowElevation = 18.dp,
+        ) {
+            Column(Modifier.padding(34.dp)) {
+                Surface(
+                    shape = CircleShape,
+                    color = Green.copy(alpha = .13f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .3f)),
+                ) {
+                    Text(
+                        "DINEX / EXPERIENCIA PERSONAL",
+                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
+                        color = GreenDark,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 9.sp,
+                        letterSpacing = 1.sp,
+                    )
+                }
+                Spacer(Modifier.height(24.dp))
+                Text(
+                    "Convierte cada sol\nen una mejor decisión.",
+                    color = Night,
+                    fontWeight = FontWeight.Black,
+                    fontSize = 34.sp,
+                    lineHeight = 39.sp,
+                    letterSpacing = (-.5).sp,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "Controla tus gastos, crea metas y deja que Dinex te acompañe con una visión clara de tu dinero.",
+                    color = Gray,
+                    fontSize = 13.sp,
+                    lineHeight = 20.sp,
+                )
+                Spacer(Modifier.height(28.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    AuthBenefit("01", "Privado", "Tus datos permanecen contigo", Modifier.weight(1f))
+                    AuthBenefit("02", "Inteligente", "Decisiones con contexto", Modifier.weight(1f))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuthBenefit(index: String, title: String, body: String, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(RadiusMd),
+        color = Green.copy(alpha = .055f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+    ) {
+        Column(Modifier.padding(13.dp)) {
+            Text(index, color = Green, fontWeight = FontWeight.Black, fontSize = 9.sp)
+            Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            Text(body, color = Gray, fontSize = 9.sp, lineHeight = 13.sp)
         }
     }
 }

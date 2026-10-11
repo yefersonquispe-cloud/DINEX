@@ -4,6 +4,11 @@ import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import web.storage.localStorage
 
+internal actual fun readLocalValue(key: String): String? = localStorage.getItem("dinex_db_$key")
+internal actual fun writeLocalValue(key: String, value: String?) {
+    if (value == null) localStorage.removeItem("dinex_db_$key") else localStorage.setItem("dinex_db_$key", value)
+}
+
 internal actual fun loadSavedMovements(): String? = localStorage.getItem("dinex_movements")
 
 internal actual fun saveSavedMovements(data: String) {
@@ -28,8 +33,10 @@ internal actual fun saveSavedStreakDay(day: Int) {
     localStorage.setItem("dinex_streak_day", day.toString())
 }
 
-@OptIn(ExperimentalTime::class)
-internal actual fun currentDayIndex(): Int = (Clock.System.now().toEpochMilliseconds() / 86_400_000L).toInt()
+@OptIn(kotlin.js.ExperimentalWasmJsInterop::class)
+@JsFun("() => { const date = new Date(); return Math.floor((date.getTime() - date.getTimezoneOffset() * 60000) / 86400000); }")
+private external fun currentLocalDayIndex(): Int
+internal actual fun currentDayIndex(): Int = currentLocalDayIndex()
 
 internal actual fun loadSavedReminders(): String? = localStorage.getItem("dinex_reminders")
 
@@ -60,4 +67,3 @@ internal actual fun loadSavedGoalName(): String? = localStorage.getItem("dinex_g
 internal actual fun saveSavedGoalName(name: String) { localStorage.setItem("dinex_goal_name", name) }
 internal actual fun loadSavedGoalTarget(): Double? = localStorage.getItem("dinex_goal_target")?.toDoubleOrNull()
 internal actual fun saveSavedGoalTarget(target: Double) { localStorage.setItem("dinex_goal_target", target.toString()) }
-

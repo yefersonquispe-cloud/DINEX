@@ -7,6 +7,8 @@ import androidx.compose.runtime.rememberUpdatedState
 actual fun rememberReceiptScanner(
     onResult: (ScannedPurchase) -> Unit,
     onError: (String) -> Unit,
+    onAnalyzing: () -> Unit,
+    onCancelled: () -> Unit,
 ): () -> Unit {
     val error = rememberUpdatedState(onError)
     return { error.value("El reconocimiento automático con cámara está disponible en la app Android.") }

@@ -19,7 +19,7 @@ private fun webFinancialReply(message: String, context: String): String {
     val question = message.lowercase()
     return when {
         "gasto" in question && ("más" in question || "mayor" in question) -> {
-            val categories = context.lineSequence().filter { it.trimStart().startsWith("-") && "de límite" in it }
+            val categories = context.lineSequence().filter { it.trimStart().startsWith("-") && ("límite mensual" in it || "sin límite configurado" in it) }
                 .take(5).joinToString("\n") { it.trim() }
             "Este es tu gasto por categoría:\n$categories\nRevisa primero la categoría más cercana a su límite."
         }

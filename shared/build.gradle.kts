@@ -17,15 +17,23 @@ kotlin {
             baseName = "Shared"
             isStatic = true
         }
+        iosTarget.compilations.getByName("main") {
+            cinterops.create("sqlite3") {
+                definitionFile.set(project.file("src/nativeInterop/cinterop/sqlite3.def"))
+            }
+        }
     }
     
     js {
         browser()
+        nodejs()
     }
     
     @OptIn(ExperimentalWasmDsl::class)
     wasmJs {
-        browser()
+        browser {
+            testTask { useKarma { useChromeHeadless() } }
+        }
     }
     
     android {

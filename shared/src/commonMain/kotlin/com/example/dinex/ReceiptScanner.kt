@@ -16,4 +16,6 @@ data class ScannedPurchase(
 expect fun rememberReceiptScanner(
     onResult: (ScannedPurchase) -> Unit,
     onError: (String) -> Unit,
+    onAnalyzing: () -> Unit = {},
+    onCancelled: () -> Unit = {},
 ): () -> Unit

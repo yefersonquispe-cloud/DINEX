@@ -57,7 +57,7 @@ internal fun money(value: Double): String = "S/ ${format2(value)}"
 
 internal fun parseVoiceCommand(text: String, nextId: Int, location: String?): Movement? {
     val normalized = text.lowercase()
-    val explicit = Regex("(?i)(?:s/\\.?|soles?|sol|pen)\\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\\s*(?:s/\\.?|soles?|sol|pen)").find(normalized)
+    val explicit = Regex("(?:s/\\.?|soles?|sol|pen)\\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\\s*(?:s/\\.?|soles?|sol|pen)", RegexOption.IGNORE_CASE).find(normalized)
     val amount = explicit?.let { match ->
         (match.groupValues[1].ifBlank { match.groupValues[2] }).replace(',', '.').toDoubleOrNull()
     } ?: Regex("([0-9]+(?:[.,][0-9]{1,2})?)").findAll(normalized).lastOrNull()?.groupValues?.getOrNull(1)?.replace(',', '.')?.toDoubleOrNull()
@@ -74,9 +74,9 @@ internal fun parseVoiceCommand(text: String, nextId: Int, location: String?): Mo
         listOf("entretenimiento", "cine", "juego", "salida", "bar", "fiesta", "netflix", "spotify", "steam").any(normalized::contains) -> "Entretenimiento"
         else -> categories.firstOrNull { normalized.contains(it.name.lowercase()) }?.name ?: "Otros"
     }
-    val title = Regex("(?i)(?:en|de|para|por)\\s+([a-záéíóúñ0-9\\s]+)$").find(text)?.groupValues?.getOrNull(1)?.trim()
+    val title = Regex("(?:en|de|para|por)\\s+([a-záéíóúñ0-9\\s]+)$", RegexOption.IGNORE_CASE).find(text)?.groupValues?.getOrNull(1)?.trim()
         ?.replaceFirstChar { it.uppercase() }
-        ?.replace(Regex("(?i)\\b(soles?|sol|s/\\.?|pen)\\b.*"), "")
+        ?.replace(Regex("\\b(soles?|sol|s/\\.?|pen)\\b.*", RegexOption.IGNORE_CASE), "")
         ?.trim(' ', '.', ',')
         ?.ifBlank { null } ?: if (income) "Ingreso por voz" else "Gasto por voz"
     return Movement(nextId, title.take(60), category, amount, income, currentDayOfMonth(), "Voz", location.orEmpty())
@@ -99,11 +99,11 @@ internal fun parseVoiceReminder(text: String, nextId: Int): PaymentReminder? {
         else -> "PRÓXIMO"
     }
     val cleaned = text
-        .replace(Regex("(?i)\\b(oye\\s+dinex|dinex|agenda|agendar|recuérdame|recuerdame|recordatorio|recordar|para\\s+hoy|para\\s+mañana|hoy|mañana)\\b"), " ")
-        .replace(Regex("(?i)(?:s/|soles?|sol)?\\s*[0-9]+(?:[.,][0-9]{1,2})?"), " ")
+        .replace(Regex("\\b(oye\\s+dinex|dinex|agenda|agendar|recuérdame|recuerdame|recordatorio|recordar|para\\s+hoy|para\\s+mañana|hoy|mañana)\\b", RegexOption.IGNORE_CASE), " ")
+        .replace(Regex("(?:s/|soles?|sol)?\\s*[0-9]+(?:[.,][0-9]{1,2})?", RegexOption.IGNORE_CASE), " ")
         .replace(Regex("\\s+"), " ")
         .trim(' ', ',', '.', ':')
-    val title = cleaned.replace(Regex("(?i)\\b(por|de|para|en)\\s*$"), "")
+    val title = cleaned.replace(Regex("\\b(por|de|para|en)\\s*$", RegexOption.IGNORE_CASE), "")
         .trim(' ', ',', '.', ':')
         .ifBlank { "Recordatorio por voz" }
         .replaceFirstChar { it.uppercase() }
@@ -145,45 +145,29 @@ internal fun decodeAccounts(raw: String?): List<UserAccount> = raw?.lineSequence
 }?.toList().orEmpty()
 
 internal fun encodeMovements(items: List<Movement>): String = items.joinToString("\n") { item ->
-    listOf(item.id, item.title.clean(), item.category.clean(), item.amount, item.income, item.day, item.method.clean(), item.location.clean()).joinToString("|")
+    "m3|" + listOf(item.id, transferEncodeField(item.title), transferEncodeField(item.category), item.amount, item.income, item.day, transferEncodeField(item.method), transferEncodeField(item.location), item.month, item.year).joinToString("|")
 }
 internal fun decodeMovements(raw: String?): List<Movement> = raw?.lineSequence()?.mapNotNull { line ->
-    val f = line.split('|'); if (f.size < 7) return@mapNotNull null
-    Movement(f[0].toIntOrNull() ?: return@mapNotNull null, f[1], f[2], f[3].toDoubleOrNull() ?: return@mapNotNull null,
-        f[4].toBooleanStrictOrNull() ?: return@mapNotNull null, f[5].toIntOrNull() ?: return@mapNotNull null, f[6], f.getOrNull(7).orEmpty())
+    val escaped = line.startsWith("m3|")
+    val f = line.removePrefix("m3|").split('|'); if (f.size < 7) return@mapNotNull null
+    fun field(index: Int) = f.getOrNull(index).orEmpty().let { if (escaped) transferDecodeField(it) else it }
+    Movement(f[0].toIntOrNull() ?: return@mapNotNull null, field(1), field(2), f[3].toDoubleOrNull() ?: return@mapNotNull null,
+        f[4].toBooleanStrictOrNull() ?: return@mapNotNull null, f[5].toIntOrNull() ?: return@mapNotNull null, field(6), field(7),
+        f.getOrNull(8)?.toIntOrNull() ?: civilDateFromEpochDays().month,
+        f.getOrNull(9)?.toIntOrNull() ?: civilDateFromEpochDays().year)
 }?.toList().orEmpty()
 
+private fun transferEncodeField(value: String) = value.replace("%", "%25").replace("|", "%7C").replace("\n", "%0A").replace("\r", "%0D")
+private fun transferDecodeField(value: String) = value.replace("%7C", "|").replace("%0A", "\n").replace("%0D", "\r").replace("%25", "%")
+
 internal fun parseImportedMovements(raw: String): List<Movement> {
-    val lines = raw.lineSequence().map { it.trim() }.filter { it.isNotBlank() }.toList()
-    if (lines.isEmpty()) return emptyList()
-    val separator = if (lines.first().contains(';')) ';' else ','
-    val first = lines.first().split(separator).map { it.trim().lowercase().removeSurrounding("\"") }
-    val hasHeader = first.any { it.contains("monto") || it.contains("importe") || it.contains("descrip") }
-    val rows = if (hasHeader) lines.drop(1) else lines
-    fun col(row: List<String>, keys: List<String>, fallback: Int): String = first.indexOfFirst { header -> keys.any(header::contains) }.takeIf { it >= 0 }?.let { row.getOrNull(it) }.orEmpty().ifBlank { row.getOrNull(fallback).orEmpty() }
-    return rows.mapIndexedNotNull { index, line ->
-        val row = line.split(separator).map { it.trim().removeSurrounding("\"") }
-        val title = col(row, listOf("descrip", "concept", "detalle", "comercio"), 1).ifBlank { "Movimiento importado" }
-        val dateCol = col(row, listOf("fecha", "date", "dia", "día"), 0)
-        val parsedDay = Regex("\\b([0-3]?[0-9])\\b").find(dateCol)?.groupValues?.getOrNull(1)?.toIntOrNull()?.coerceIn(1, 31)
-        val day = parsedDay ?: currentDayOfMonth()
-        val amountText = col(row, listOf("monto", "importe", "total", "valor"), 3).replace("S/", "").replace(" ", "")
-        val rawAmount = if (amountText.contains(',')) amountText.replace(".", "").replace(',', '.') else amountText
-        val amount = rawAmount.toDoubleOrNull() ?: return@mapIndexedNotNull null
-        val type = col(row, listOf("tipo", "movimiento", "operacion"), 4).lowercase()
-        val income = listOf("ingreso", "abono", "entrada", "depósito", "deposito", "recibido")
-            .any(type::contains)
-        val category = col(row, listOf("categoria", "categoría"), 2).ifBlank { if (income) "Ingreso" else "Otros" }
-        Movement(index + 1, title, category.replaceFirstChar { it.uppercase() }, kotlin.math.abs(amount), income, day, col(row, listOf("medio", "metodo", "método"), 5).ifBlank { "Importado" })
-    }
+    return runCatching { reviewImportedRows(parseCsvRows(raw)).movements }.getOrDefault(emptyList())
 }
 
 internal fun exportMovementsCsv(movements: List<Movement>): String = buildString {
-    val monthShort = currentMonthShort()
-    val year = civilDateFromEpochDays().year
-    appendLine("fecha,descripcion,categoria,monto,tipo,medio,ubicacion")
+    appendLine("fecha;descripcion;categoria;monto;tipo;medio;ubicacion")
     movements.forEach { movement ->
-        appendLine("\"${movement.day} $monthShort $year\",\"${movement.title.clean()}\",\"${movement.category.clean()}\",${format2(movement.amount)},${if (movement.income) "Ingreso" else "Egreso"},\"${movement.method.clean()}\",\"${movement.location.clean()}\"")
+        appendLine(listOf(movement.dateIso(), movement.title, movement.category, format2(movement.amount), if (movement.income) "Ingreso" else "Egreso", movement.method, movement.location).joinToString(";", transform = ::csvField))
     }
 }
 

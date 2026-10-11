@@ -12,6 +12,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.service.notification.NotificationListenerService
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -40,6 +41,27 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     override val locationAvailable: Boolean
         get() = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
     override val hotwordEnabled: Boolean get() = hotwordPrefs.getBoolean("enabled", false)
+    override val supportsBackgroundVoice = true
+    override val overlayAvailable: Boolean get() = Settings.canDrawOverlays(context)
+    override val notificationListenerConnected: Boolean
+        get() = context.getSharedPreferences("dinex_notification_status", Context.MODE_PRIVATE).getBoolean("connected", false)
+
+    override fun openOverlaySettings() {
+        runCatching {
+            context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + context.packageName))
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.recoverCatching { openAppDetailsSettings() }
+    }
+
+    override fun reconnectNotifications() {
+        if (notificationReaderAvailable) {
+            runCatching { NotificationListenerService.requestRebind(
+                ComponentName(context.packageName, context.packageName + ".DinexNotificationListenerService"),
+            ) }
+        }
+    }
+
+    override fun acknowledgeNotifications(items: List<CapturedTransaction>) = DinexNotificationStore.acknowledge(context, items)
 
     override fun startVoice(onResult: (String) -> Unit, onError: (String) -> Unit) {
         if (!voiceAvailable) return onError("Este teléfono no tiene reconocimiento de voz disponible.")

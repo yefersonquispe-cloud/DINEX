@@ -1,5 +1,9 @@
 package com.example.dinex
 
+/** Persistent key/value boundary used by the repository (SQLite on mobile). */
+internal expect fun readLocalValue(key: String): String?
+internal expect fun writeLocalValue(key: String, value: String?)
+
 internal expect fun loadSavedMovements(): String?
 
 internal expect fun saveSavedMovements(data: String)
@@ -71,4 +75,3 @@ internal fun currentMonthYearLabel(): String {
     val date = civilDateFromEpochDays()
     return "${currentMonthName(date.month)} ${date.year}"
 }
-
