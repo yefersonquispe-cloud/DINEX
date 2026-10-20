@@ -33,6 +33,16 @@ internal fun InsightsPage(history: List<Movement>, onExport: () -> Unit = {}) {
     val movements = if (weekly) reportMovements(history, ReportPeriod.WEEK) else history.filter { it.dateIso().startsWith(selectedMonth) }
     val income = movements.filter { it.income }.sumOf { it.amount }
     val expense = movements.filterNot { it.income }.sumOf { it.amount }
+    val previousPeriod = if (weekly) {
+        val previousDates = (7..13).map { dateIso(civilDateFromEpochDays(currentDayIndex() - it)) }.toSet()
+        history.filter { it.dateIso() in previousDates }
+    } else {
+        val year = selectedMonth.take(4).toIntOrNull() ?: current.year
+        val month = selectedMonth.takeLast(2).toIntOrNull() ?: current.month
+        val previousKey = if (month == 1) "${year - 1}-12" else "$year-${(month - 1).toString().padStart(2, '0')}"
+        history.filter { it.dateIso().startsWith(previousKey) }
+    }
+    val previousExpense = previousPeriod.filterNot { it.income }.sumOf { it.amount }
     val smallSpends = movements.filter { !it.income && it.amount in 0.01..14.99 }
     val antTotal = smallSpends.sumOf { it.amount }
     val categoryTotals = movementChartCategories(movements).map { category ->
@@ -43,7 +53,7 @@ internal fun InsightsPage(history: List<Movement>, onExport: () -> Unit = {}) {
         val wide = maxWidth >= 760.dp
         LazyColumn(
             Modifier.fillMaxSize().widthIn(max = 960.dp),
-            contentPadding = PaddingValues(18.dp),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = if (wide) 18.dp else 132.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
@@ -68,6 +78,7 @@ internal fun InsightsPage(history: List<Movement>, onExport: () -> Unit = {}) {
                 }
             }
             item { MonthPass(income, expense, movements.size) }
+            item { SpendingRhythm(expense, previousExpense, income, if (weekly) "la semana anterior" else "el mes anterior") }
             if (!weekly && selectedMonth == currentKey) item { ForecastCard(income, expense) }
             item { PeriodCashFlow(movements, if (weekly) (0..6).map { dateIso(civilDateFromEpochDays(currentDayIndex() - 6 + it)) } else
                 (1..31).filter { validDate(selectedMonth.take(4).toInt(), selectedMonth.takeLast(2).toInt(), it) }.map { "$selectedMonth-${it.toString().padStart(2, '0')}" }) }
@@ -107,6 +118,36 @@ internal fun InsightsPage(history: List<Movement>, onExport: () -> Unit = {}) {
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun SpendingRhythm(expense: Double, previousExpense: Double, income: Double, comparisonLabel: String) {
+    var expanded by remember { mutableStateOf(false) }
+    val change = if (previousExpense > 0) ((expense - previousExpense) / previousExpense * 100).toInt() else null
+    val rate = if (income > 0) (expense / income * 100).toInt() else 0
+    DinexCard(accent = if (change != null && change > 0) Orange else GreenDark, vibrant = true) {
+        Text("TU RITMO", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+        Spacer(Modifier.height(6.dp))
+        Text(when {
+            change == null -> "Comienza a descubrir tus patrones"
+            change > 0 -> "Gastaste $change% más que $comparisonLabel"
+            change < 0 -> "Gastaste ${-change}% menos que $comparisonLabel"
+            else -> "Tu gasto se mantuvo estable"
+        }, color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Spacer(Modifier.height(7.dp))
+        Text("${money(expense)} en gastos · ${money(income)} en ingresos", color = Gray, fontSize = 13.sp)
+        Spacer(Modifier.height(14.dp))
+        DinexProgress((rate / 100f).coerceIn(0f, 1f), if (rate > 100) Red else GreenDark)
+        Spacer(Modifier.height(7.dp))
+        Text("Usaste $rate% de tus ingresos registrados", color = if (rate > 100) Red else Gray, fontSize = 12.sp)
+        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Ocultar detalle" else "Ver detalle") }
+        if (expanded) {
+            HorizontalDivider(color = Border)
+            Spacer(Modifier.height(10.dp))
+            Text("Periodo anterior: ${money(previousExpense)} en gastos", color = Night, fontSize = 13.sp)
+            Text("Disponible después de gastos: ${money(income - expense)}", color = Night, fontSize = 13.sp)
         }
     }
 }

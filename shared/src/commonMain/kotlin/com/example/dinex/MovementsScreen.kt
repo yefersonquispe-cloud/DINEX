@@ -43,10 +43,11 @@ internal fun HistoryPage(movements: List<Movement>, onAdd: () -> Unit, onDelete:
     }.sortedWith(compareByDescending<Movement> { it.dateIso() }.thenByDescending { it.id })
     val income = visible.filter { it.income }.sumOf { it.amount }
     val expense = visible.filterNot { it.income }.sumOf { it.amount }
-    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+    BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        val wide = maxWidth >= 760.dp
         LazyColumn(
             Modifier.fillMaxSize().widthIn(max = 960.dp),
-            contentPadding = PaddingValues(18.dp),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = if (wide) 18.dp else 132.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item {
@@ -142,7 +143,7 @@ internal fun MovementListRow(movement: Movement, onClick: () -> Unit) {
 
 @Composable
 internal fun MonthPass(income: Double, expense: Double, movementCount: Int) {
-    DinexCard(elevated = true, accent = Indigo, vibrant = true) {
+    DinexCard(elevated = true, accent = GreenDark, vibrant = true) {
         Text("BALANCE DE LOS MOVIMIENTOS VISIBLES", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
         Text(money(income - expense), color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp)
         Spacer(Modifier.height(12.dp))

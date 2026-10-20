@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
@@ -45,6 +46,45 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     override val overlayAvailable: Boolean get() = Settings.canDrawOverlays(context)
     override val notificationListenerConnected: Boolean
         get() = context.getSharedPreferences("dinex_notification_status", Context.MODE_PRIVATE).getBoolean("connected", false)
+    override val systemNotificationsSupported = true
+    override val systemNotificationsEnabled: Boolean
+        get() = NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+            (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+
+    override fun requestSystemNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            val activity = context.findActivity()
+            if (activity != null) {
+                val prefs = context.getSharedPreferences("dinex_notifications", Context.MODE_PRIVATE)
+                val asked = prefs.getBoolean("asked", false)
+                // After a permanent denial Android returns "denied" without a
+                // dialog, so the only useful next step is the settings screen.
+                if (asked && !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)) {
+                    openSystemNotificationSettings()
+                    return
+                }
+                prefs.edit().putBoolean("asked", true).apply()
+                ActivityCompat.requestPermissions(activity, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 7005)
+                return
+            }
+        }
+        openSystemNotificationSettings()
+    }
+
+    private fun openSystemNotificationSettings() {
+        val appDetails = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val notifications = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        } else null
+        runCatching { context.startActivity(notifications ?: appDetails) }
+            .recoverCatching { context.startActivity(appDetails) }
+    }
 
     override fun openOverlaySettings() {
         runCatching {
@@ -190,4 +230,14 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
             }
         }.getOrNull() ?: "Ubicación GPS disponible"
     }
+}
+
+/** Compose may hand a ContextThemeWrapper instead of the Activity itself. */
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return null
 }

@@ -3,6 +3,8 @@ package com.example.dinex
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -19,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.round
 
 @Composable
 internal fun PlanPage(
@@ -29,13 +32,17 @@ internal fun PlanPage(
     onAddReminder: () -> Unit,
     onDeleteReminder: (PaymentReminder) -> Unit,
     categoryBudgets: Map<String, Double> = emptyMap(),
-    onCategoryBudgetChange: (String, Double) -> Unit = { _, _ -> },
+    historyMovements: List<Movement> = movements,
+    onCategoryBudgetsSave: (Map<String, Double>) -> Unit = {},
+    onCategoryBudgetsReset: () -> Unit = {},
 ) {
+    var showBudgetEditor by remember { mutableStateOf(false) }
+    val suggestions = suggestedCategoryBudgets(movements, historyMovements)
     BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         val wide = maxWidth >= 760.dp
         LazyColumn(
             Modifier.fillMaxSize().widthIn(max = 960.dp),
-            contentPadding = PaddingValues(18.dp),
+            contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 18.dp, bottom = if (wide) 18.dp else 132.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             item {
@@ -44,10 +51,11 @@ internal fun PlanPage(
             if (wide) item {
                 Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                        DailyBudget(movements.filter { !it.income && it.isToday() }.sumOf { it.amount }, dailyLimit, onDailyLimitChange)
+                        DailyBudget(movements.filter { !it.income && it.isToday() }.sumOf { it.amount }, dailyLimit, onDailyLimitChange,
+                            onAdjustCategories = { showBudgetEditor = true })
                         PaymentPlanner(reminders, onAddReminder, onDeleteReminder)
                     }
-                    Box(Modifier.weight(1f)) { CategoryPlans(movements, categoryBudgets, onCategoryBudgetChange) }
+                    Box(Modifier.weight(1f)) { CategoryPlans(movements, categoryBudgets, suggestions) }
                 }
             } else {
               item {
@@ -55,37 +63,62 @@ internal fun PlanPage(
                     movements.filter { !it.income && it.isToday() }.sumOf { it.amount },
                     dailyLimit,
                     onDailyLimitChange,
+                    onAdjustCategories = { showBudgetEditor = true },
                 )
             }
-            item { CategoryPlans(movements, categoryBudgets, onCategoryBudgetChange) }
+            item { CategoryPlans(movements, categoryBudgets, suggestions) }
               item { PaymentPlanner(reminders, onAddReminder, onDeleteReminder) }
             }
         }
     }
+    if (showBudgetEditor) CategoryBudgetEditorDialog(
+        suggestions = suggestions,
+        overrides = categoryBudgets,
+        onDismiss = { showBudgetEditor = false },
+        onSave = { onCategoryBudgetsSave(it); showBudgetEditor = false },
+        onReset = { onCategoryBudgetsReset(); showBudgetEditor = false },
+    )
+}
+
+/** Local, explainable estimate based on monthly income and past spending. No remote data transfer. */
+internal fun suggestedCategoryBudgets(movements: List<Movement>, history: List<Movement> = movements): Map<String, Double> {
+    val income = movements.filter { it.income && it.amount.isFinite() && it.amount > 0 }.sumOf { it.amount }
+    val baseline = mapOf("Comida" to .35, "Transporte" to .20, "Estudios" to .20, "Entretenimiento" to .10, "Otros" to .15)
+    val pastExpenses = history.filter { !it.income && !it.isInCurrentMonth() && it.amount.isFinite() && it.amount > 0 }
+    val pastTotal = pastExpenses.sumOf { it.amount }
+    var allocated = 0.0
+    return categories.mapIndexed { index, category ->
+        val limit = if (index == categories.lastIndex) income - allocated else {
+            val pastShare = if (pastTotal > 0) pastExpenses.filter { it.category == category.name }.sumOf { it.amount } / pastTotal else 0.0
+            val weight = if (pastTotal > 0) .7 * (baseline[category.name] ?: 0.0) + .3 * pastShare else baseline[category.name] ?: 0.0
+            (round(income * weight * 100.0) / 100.0).also { allocated += it }
+        }
+        category.name to limit.coerceAtLeast(0.0)
+    }.toMap()
 }
 
 @Composable
-internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Double> = emptyMap(), onChange: (String, Double) -> Unit = { _, _ -> }) {
-    var editing by remember { mutableStateOf<CategoryInfo?>(null) }
+internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Double> = emptyMap(), suggestions: Map<String, Double> = suggestedCategoryBudgets(movements)) {
     val income = movements.filter { it.income }.sumOf { it.amount }
     DinexCard(accent = Lime) {
         Text("Presupuestos por categoría", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Night)
-        Text("Toca una categoría para editar su límite mensual", color = Gray, fontSize = 12.sp)
+        Text("Sugerencia basada en tus ingresos e historial", color = Gray, fontSize = 12.sp)
         Text("Ingresos del mes: ${money(income)}", color = Gray, fontSize = 12.sp)
         Spacer(Modifier.height(12.dp))
         categories.forEach { category ->
             val spent = movements.filter { !it.income && it.category == category.name }.sumOf { it.amount }
-            val limit = budgets[category.name] ?: 0.0
+            val custom = budgets.containsKey(category.name)
+            val limit = budgets[category.name] ?: suggestions[category.name] ?: 0.0
             val ratio = if (limit > 0) (spent / limit).toFloat().coerceIn(0f, 1f) else 0f
             val warning = ratio >= .8f
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable { editing = category }.padding(vertical = 8.dp)) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CategoryMark(category.code, category.color)
                     Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
                         Row {
                             Text(category.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Night, modifier = Modifier.weight(1f))
-                            Text(if (limit > 0) "${money(spent)} / ${money(limit)}" else "${money(spent)} · Configurar", color = if (warning) Orange else Gray, fontSize = 11.sp)
+                            Text("${money(spent)} / ${money(limit)}", color = if (warning) Orange else Gray, fontSize = 11.sp)
                         }
                         Spacer(Modifier.height(6.dp))
                         DinexProgress(ratio, if (warning) Orange else category.color)
@@ -93,6 +126,7 @@ internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Doubl
                     Spacer(Modifier.width(8.dp))
                     Text("${(ratio * 100).toInt()}%", color = if (warning) Orange else Gray, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
+                Text(if (custom) "Personalizado" else "Sugerido automáticamente", color = Gray, fontSize = 10.sp, modifier = Modifier.padding(start = 44.dp, top = 3.dp))
                 if (warning) {
                     Spacer(Modifier.height(4.dp))
                     Text("Cerca del límite en ${category.name.lowercase()}", color = Orange, fontSize = 10.sp)
@@ -100,20 +134,55 @@ internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Doubl
             }
         }
     }
-    editing?.let { category ->
-        var amount by remember(category.name) { mutableStateOf(budgets[category.name]?.let(::format2).orEmpty()) }
-        val parsed = amount.replace(',', '.').toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 }
-        val total = budgets.filterKeys { it != category.name }.values.sum() + (parsed ?: 0.0)
-        AlertDialog(onDismissRequest = { editing = null }, title = { Text("Presupuesto: ${category.name}") }, text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("Ingresos registrados este mes: ${money(income)}. Elige cuánto deseas destinar; no se mueve dinero.")
-                OutlinedTextField(amount, { amount = it }, label = { Text("Límite mensual en soles") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
-                Text("Total destinado a categorías: ${money(total)}", color = Gray)
-                if (total > income) Text("Tus presupuestos superan los ingresos del mes. Puedes ajustarlos o continuar si prevés nuevos ingresos.", color = Orange)
-                Text("0 desactiva el límite de esta categoría.", color = Gray)
+}
+
+@Composable
+internal fun CategoryBudgetEditorDialog(
+    suggestions: Map<String, Double>,
+    overrides: Map<String, Double>,
+    onDismiss: () -> Unit,
+    onSave: (Map<String, Double>) -> Unit,
+    onReset: () -> Unit,
+) {
+    val initial = remember { categories.associate { it.name to (overrides[it.name] ?: suggestions[it.name] ?: 0.0) } }
+    val amounts = remember { mutableStateMapOf<String, String>().apply { initial.forEach { (name, value) -> put(name, format2(value)) } } }
+    val parsed = categories.associate { it.name to amounts[it.name].orEmpty().replace(',', '.').toDoubleOrNull() }
+    val valid = parsed.values.all { it != null && it.isFinite() && it >= 0 }
+    val total = parsed.values.sumOf { it ?: 0.0 }
+    val income = suggestions.values.sum()
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Ajustar presupuestos", color = Night) },
+        text = {
+            Column(Modifier.heightIn(max = 390.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Estos importes se sugieren a partir de tus ingresos del mes. Cámbialos solo si lo deseas; no se mueve dinero.", color = Gray, fontSize = 12.sp)
+                categories.forEach { category ->
+                    OutlinedTextField(
+                        value = amounts[category.name].orEmpty(),
+                        onValueChange = { amounts[category.name] = it },
+                        label = { Text(category.name) },
+                        prefix = { Text("S/ ") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+                Text("Total destinado: ${money(total)} · Ingresos: ${money(income)}", color = if (total > income) Orange else Gray, fontSize = 11.sp)
+                if (total > income) Text("El total supera tus ingresos registrados.", color = Orange, fontSize = 11.sp)
+                TextButton(onClick = onReset) { Text("Volver a sugerencias automáticas") }
             }
-        }, confirmButton = { Button(enabled = parsed != null, onClick = { parsed?.let { onChange(category.name, it) }; editing = null }) { Text("Guardar") } }, dismissButton = { TextButton(onClick = { editing = null }) { Text("Cancelar") } })
-    }
+        },
+        confirmButton = {
+            Button(enabled = valid, onClick = {
+                val updated = overrides.toMutableMap()
+                parsed.forEach { (name, amount) ->
+                    if (amount != null && amount != initial[name]) updated[name] = amount
+                }
+                onSave(updated)
+            }) { Text("Guardar cambios") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
 }
 
 @Composable

@@ -28,6 +28,23 @@ Se conserva la fecha local de la notificación al confirmar. Si se reconecta el
 servicio, también revisa las últimas notificaciones todavía visibles; no puede
 recuperar las que ya fueron descartadas. Los textos ambiguos requieren revisión.
 
+## Alertas propias de Dinex
+
+Además del lector de notificaciones, Dinex publica sus propios avisos reales:
+
+- **Presupuesto diario:** al guardar un gasto que cruza el límite del día,
+  aparece una notificación de alta prioridad con lo gastado, el límite y lo
+  excedido. El diálogo dentro de la app sigue funcionando igual.
+- **Ahorra hoy:** una vez al día, a la hora elegida en
+  **Perfil → Recordatorios** (8:00 pm por defecto), Dinex revisa si ya ahorraste.
+  Si no lo hiciste envía un recordatorio tipo racha; si ya ahorraste no molesta.
+  Se cancela al guardar un ahorro.
+- Android 13+ pide el permiso de notificaciones. Puedes activarlo desde la
+  tarjeta **Activa tus alertas** o desde el perfil. Si lo bloqueaste antes,
+  usa **Abrir ajustes**.
+- El recordatorio diario usa WorkManager. Si el sistema está en ahorro extremo
+  de batería puede retrasarse, pero se reintenta y sobrevive reinicios.
+
 ## Si Android/HyperOS deniega el acceso
 
 En APK instaladas fuera de una tienda, Android puede bloquear permisos especiales.

@@ -37,13 +37,16 @@ import kotlin.math.max
 
 @Composable
 internal fun HomePage(
-    movements: List<Movement>, dailyLimit: Float, streak: Int, savedToday: Boolean, savings: Double, goalName: String, goalTarget: Double,
-    onDailyLimitChange: (Float) -> Unit, onSaveToday: () -> Unit,
+    movements: List<Movement>, dailyLimit: Float, streak: Int, savings: Double, goalName: String, goalTarget: Double,
+    onDailyLimitChange: (Float) -> Unit,
     onHistory: () -> Unit,
     onAdd: () -> Unit = {},
     onGoalDetails: () -> Unit = {},
     goals: List<SavingsGoal> = emptyList(),
     onOpenGoal: (Int) -> Unit = {},
+    notificationsSupported: Boolean = false,
+    notificationsEnabled: Boolean = true,
+    onEnableNotifications: () -> Unit = {},
 ) {
     val income = movements.asSequence().filter { it.income }.sumOf { it.amount }
     val expenses = movements.asSequence().filterNot { it.income }.sumOf { it.amount }
@@ -56,11 +59,15 @@ internal fun HomePage(
         val desktop = maxWidth >= 760.dp
         LazyColumn(
             modifier = Modifier.widthIn(max = 1180.dp).fillMaxWidth().align(Alignment.TopCenter),
-            contentPadding = PaddingValues(horizontal = if (desktop) 28.dp else 18.dp, vertical = 24.dp),
+            contentPadding = PaddingValues(start = if (desktop) 28.dp else 18.dp, end = if (desktop) 28.dp else 18.dp,
+                top = 24.dp, bottom = if (desktop) 24.dp else 132.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             item {
                 DinexPageHeading(currentMonthYearLabel(), "Tu dinero, con propósito.", "Cada movimiento cuenta. Dale forma a tu próximo objetivo.")
+            }
+            if (notificationsSupported && !notificationsEnabled) {
+                item { NotificationsNudge(onEnableNotifications) }
             }
             item {
                 if (desktop) Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
@@ -81,13 +88,8 @@ internal fun HomePage(
                 }
             }
             item {
-                if (desktop) Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
-                    Box(Modifier.weight(1f)) { DailyBudget(today, dailyLimit, onDailyLimitChange) }
-                    Box(Modifier.weight(1f)) { SavingsStreak(streak, savedToday, onSaveToday) }
-                } else Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    DailyBudget(today, dailyLimit, onDailyLimitChange)
-                    SavingsStreak(streak, savedToday, onSaveToday)
-                }
+                // La racha y el ahorro se abren ahora desde la billetera de la barra superior.
+                DailyBudget(today, dailyLimit, onDailyLimitChange)
             }
             goals.forEach { goal -> item(key = "goal-${goal.id}") { SavingsGoalCard(goal.name, goal.saved, goal.target, onClick = { onOpenGoal(goal.id) }) } }
             item { Spacer(Modifier.height(8.dp)) }
@@ -96,18 +98,61 @@ internal fun HomePage(
 }
 
 @Composable
-internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, savingRate: Int) {
-    DinexCard(elevated = true, accent = ElectricBlue, vibrant = true) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("SALDO DISPONIBLE", color = Color(0xFFC6F3FF), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
-            Icon(DinexNavigationIcons.Wallet, contentDescription = null, tint = ElectricBlue, modifier = Modifier.size(24.dp))
+internal fun NotificationsNudge(onEnable: () -> Unit) {
+    DinexCard(accent = Orange) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text("Activa tus alertas", color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(
+                    "Te avisamos si superas tu presupuesto diario y te recordamos ahorrar antes de que termine el día.",
+                    color = Gray, fontSize = 11.sp,
+                )
+            }
+            Spacer(Modifier.width(10.dp))
+            Button(
+                onClick = onEnable,
+                colors = ButtonDefaults.buttonColors(containerColor = Green),
+            ) { Text("Activar", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
         }
-        Spacer(Modifier.height(4.dp))
-        Text(money(balance), color = Night, fontWeight = FontWeight.Bold, fontSize = 36.sp, letterSpacing = (-1).sp)
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MiniStat("Ingresos", "+ ${money(income)}", Green, Modifier.weight(1f))
-            MiniStat("Gastos", "− ${money(expenses)}", Red, Modifier.weight(1f))
+    }
+}
+
+@Composable
+internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, savingRate: Int) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().dinexEntrance(),
+        shape = RoundedCornerShape(RadiusLg),
+        color = Green,
+        shadowElevation = 8.dp,
+    ) {
+        Column(
+            Modifier.fillMaxWidth()
+                .background(Brush.linearGradient(listOf(Color(0xFF0E5431), Green, Color(0xFF328859))))
+                .padding(22.dp),
+        ) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Text("SALDO DISPONIBLE", color = Color.White.copy(alpha = .82f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
+                Icon(DinexNavigationIcons.Wallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.height(6.dp))
+            Text(money(balance), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 36.sp, letterSpacing = (-1).sp)
+            Spacer(Modifier.height(18.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                BalanceStat("Ingresos", "+ ${money(income)}", Modifier.weight(1f), expense = false)
+                BalanceStat("Gastos", "− ${money(expenses)}", Modifier.weight(1f), expense = true)
+            }
+        }
+    }
+}
+
+@Composable
+private fun BalanceStat(label: String, value: String, modifier: Modifier, expense: Boolean) {
+    val amountColor = if (expense) Color(0xFFFF7182) else Color(0xFF56FF9C)
+    Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = Color(0xFF082B1D).copy(alpha = .96f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = .23f))) {
+        Column(Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
+            Text(label, color = Color.White.copy(alpha = .82f), fontSize = 12.sp)
+            Text(value, color = amountColor, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2)
         }
     }
 }
@@ -183,14 +228,14 @@ internal fun SavingsHero(savings: Double, streak: Int, goalName: String = "", go
     val goal = if (goalTarget > 0) goalTarget else when { savings < 500 -> 500.0; savings < 1000 -> 1000.0; savings < 2500 -> 2500.0; else -> 5000.0 }
     val goalTitle = if (goalTarget > 0 && goalName.isNotBlank()) "Mi tarjeta de ahorro · $goalName" else "Mi tarjeta de ahorro"
     val progress = (savings / goal).toFloat().coerceIn(0f, 1f)
-    DinexCard(modifier = modifier.fillMaxWidth(), elevated = true, accent = Indigo, vibrant = true, onClick = onClick) {
+    DinexCard(modifier = modifier.fillMaxWidth(), elevated = true, accent = Green, vibrant = true, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(goalTitle, color = Color(0xFFE0D9FF), fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(goalTitle, color = GreenDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text(money(savings), color = Night, fontWeight = FontWeight.Black, fontSize = 34.sp)
             }
-            Box(Modifier.size(46.dp).clip(RoundedCornerShape(16.dp)).background(Brush.linearGradient(listOf(Indigo.copy(alpha = .45f), ElectricBlue.copy(alpha = .18f)))), contentAlignment = Alignment.Center) {
-                Icon(DinexNavigationIcons.Sparkle, null, tint = Night, modifier = Modifier.size(26.dp))
+            Box(Modifier.size(46.dp).clip(RoundedCornerShape(16.dp)).background(Mint), contentAlignment = Alignment.Center) {
+                Icon(DinexNavigationIcons.Sparkle, null, tint = GreenDark, modifier = Modifier.size(26.dp))
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -199,23 +244,23 @@ internal fun SavingsHero(savings: Double, streak: Int, goalName: String = "", go
             Text("${(progress * 100).toInt()}%", color = Lime, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         }
         Spacer(Modifier.height(6.dp))
-        DinexProgress(progress, Indigo, height = 8.dp)
+        DinexProgress(progress, Green, height = 8.dp)
         if (onClick != null) Text("Ver mi meta y su imagen →", color = Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
     }
 }
 
 @Composable
-internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> Unit) {
+internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> Unit, elevated: Boolean = false) {
     val level = streakLevel(streak)
     val next = nextStreakLevel(streak)
-    DinexCard(accent = level.color) {
+    DinexCard(accent = level.color, elevated = elevated) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             MiniWalletMedal(level.color, 44.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Racha actual", color = Gray, fontSize = 10.sp)
                 Text("$streak días", color = Night, fontWeight = FontWeight.Black, fontSize = 22.sp)
-                Text("Nivel ${level.name.uppercase()}", color = level.color, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text("Nivel ${level.name.uppercase()}", color = readableAccent(level.color), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 if (next != null) Text("Progreso hacia ${next.name}", color = Gray, fontSize = 10.sp)
             }
             FilledTonalButton(
@@ -223,11 +268,15 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
                 enabled = !savedToday,
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = level.color.copy(alpha = .16f),
-                    contentColor = level.color,
+                    contentColor = readableAccent(level.color),
                     disabledContainerColor = CardRaised,
                     disabledContentColor = Gray,
                 ),
             ) { Text(if (savedToday) "Registrado" else "Ahorré hoy", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+        }
+        if (!savedToday) {
+            Spacer(Modifier.height(8.dp))
+            Text("Ahorra hoy y suma +1 a tu racha. Aunque sea S/ 1, cuenta.", color = Orange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -252,7 +301,7 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     MiniWalletMedal(if (unlocked) item.color else Border, 34.dp)
                     Spacer(Modifier.height(4.dp))
-                    Text(item.name, color = if (unlocked) item.color else Gray.copy(alpha = .55f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                    Text(item.name, color = if (unlocked) readableAccent(item.color) else Gray.copy(alpha = .75f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     Text(if (unlocked) "✓" else "${item.startsAt}d", color = Gray, fontSize = 7.sp)
                 }
             }
@@ -260,13 +309,39 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
     }
 }
 
+/** Floating bubble opened from the wallet in the top bar. */
 @Composable
-internal fun DailyBudget(today: Double, limit: Float, onChange: (Float) -> Unit) {
+internal fun SavingsBubble(streak: Int, savedToday: Boolean, onSaveToday: () -> Unit, onClose: () -> Unit) {
+    // Aprovecha el ancho disponible dejando solo un margen pequeño a los lados.
+    Box(Modifier.widthIn(max = 560.dp).fillMaxWidth()) {
+        SavingsStreak(streak, savedToday, onSaveToday, elevated = true)
+        Surface(
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-6).dp).size(32.dp)
+                .clickable(onClickLabel = "Cerrar mi ahorro", onClick = onClose),
+            shape = CircleShape,
+            color = Card,
+            border = BorderStroke(1.dp, Border),
+            shadowElevation = 6.dp,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text("×", color = Gray, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun DailyBudget(today: Double, limit: Float, onChange: (Float) -> Unit, onAdjustCategories: (() -> Unit)? = null) {
     val ratio = (today / limit.coerceAtLeast(1f)).toFloat()
     val warning = ratio >= .8f
     val remaining = max(limit - today, 0.0)
     DinexCard(accent = if (warning) Red else Green) {
-        Text("Tu presupuesto", color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("Tu presupuesto", color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            if (onAdjustCategories != null) {
+                TextButton(onClick = onAdjustCategories) { Text("Ajustar categorías", color = GreenDark, fontSize = 11.sp) }
+            }
+        }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MiniStat("Diario", money(limit.toDouble()), Green, Modifier.weight(1f))

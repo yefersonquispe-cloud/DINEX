@@ -20,6 +20,8 @@ import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,23 +36,29 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
-// Muted mineral palette: no fluorescent accents. Shared by Android, iOS and web.
-internal val AppBg = Color(0xFF151C22)
-internal val Night = Color(0xFFF2EEE7)
-internal val NightSoft = Color(0xFF46535E)
-internal val Green = Color(0xFF9ABFAF)
-internal val GreenDark = Color(0xFFBED6CB)
-internal val Mint = Color(0xFF314B43)
-internal val Lime = Color(0xFFB9C6A1)
-internal val Card = Color(0xFF202A32)
-internal val CardRaised = Color(0xFF2A363F)
-internal val SurfaceHover = Color(0xFF37464F)
-internal val Red = Color(0xFFE0AAA1)
-internal val Orange = Color(0xFFD9BE93)
-internal val Indigo = Color(0xFFB6B3C9)
-internal val ElectricBlue = Color(0xFFA6BDC9)
-internal val Gray = Color(0xFFBAC3C8)
-internal val Border = Color(0xFF46535D)
+// Tokens reactivos compartidos por Android, iOS y web. Los gráficos conservan
+// sus propios colores para que las categorías sigan siendo distinguibles.
+internal object DinexThemeState { var dark by mutableStateOf(false) }
+fun isDinexDarkModeEnabled(): Boolean = DinexRepository().darkMode()
+internal val AppBg get() = if (DinexThemeState.dark) Color(0xFF101A15) else Color(0xFFF7FAF7)
+internal val Night get() = if (DinexThemeState.dark) Color(0xFFF3F8F3) else Color(0xFF183326)
+internal val NightSoft get() = if (DinexThemeState.dark) Color(0xFFC0D6C5) else Color(0xFF365442)
+internal val Green get() = Color(0xFF176B43)
+internal val GreenDark get() = if (DinexThemeState.dark) Color(0xFF9CE3B5) else Color(0xFF115B38)
+internal val Mint get() = if (DinexThemeState.dark) Color(0xFF203D2C) else Color(0xFFE5F3E9)
+internal val Lime get() = if (DinexThemeState.dark) Color(0xFFA8DA99) else Color(0xFF438A53)
+internal val Card get() = if (DinexThemeState.dark) Color(0xFF19271F) else Color(0xFFFFFFFF)
+internal val CardRaised get() = if (DinexThemeState.dark) Color(0xFF23382B) else Color(0xFFF0F7F1)
+internal val SurfaceHover get() = if (DinexThemeState.dark) Color(0xFF2B4435) else Color(0xFFE7F1E9)
+internal val Red get() = if (DinexThemeState.dark) Color(0xFFEF9CA5) else Color(0xFFB84754)
+internal val Orange get() = if (DinexThemeState.dark) Color(0xFFEAC081) else Color(0xFFA66822)
+internal val Indigo get() = if (DinexThemeState.dark) Color(0xFFB7A6E6) else Color(0xFF6959A5)
+internal val ElectricBlue get() = if (DinexThemeState.dark) Color(0xFF9AC8DD) else Color(0xFF326D91)
+internal val Gray get() = if (DinexThemeState.dark) Color(0xFFB9C8BC) else Color(0xFF536A5A)
+internal val Border get() = if (DinexThemeState.dark) Color(0xFF385641) else Color(0xFFD4E4D8)
+
+// Las medallas conservan su material; sus rótulos se oscurecen sobre blanco.
+internal fun readableAccent(color: Color): Color = lerp(color, Night, .48f)
 
 internal val RadiusSm = 12.dp
 internal val RadiusMd = 18.dp

@@ -220,7 +220,7 @@ internal fun AuthFlow(
                             },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = RoundedCornerShape(RadiusMd),
-                            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color(0xFF062018)),
+                            colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
                         ) { Text(if (createMode) "Crear cuenta" else "Iniciar sesión", fontWeight = FontWeight.Bold) }
                         TextButton(
                             onClick = { createMode = !createMode; attempted = false; error = null; password = ""; confirmation = "" },

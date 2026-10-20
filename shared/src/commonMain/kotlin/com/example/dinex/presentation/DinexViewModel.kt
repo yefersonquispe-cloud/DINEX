@@ -14,6 +14,11 @@ internal data class DinexUiState(
     val levelCelebration: StreakLevel? = null,
     val reduceMotion: Boolean = false,
     val largeText: Boolean = false,
+    val darkMode: Boolean = false,
+    val budgetAlerts: Boolean = true,
+    val saveReminderEnabled: Boolean = true,
+    val saveReminderHour: Int = 20,
+    val profilePhoto: String = "",
     val budgetWarning: String? = null,
     val pendingExpense: Movement? = null,
     val pendingReminderId: Int? = null,
@@ -26,6 +31,7 @@ internal data class DinexUiState(
 
 /** Owns session and financial actions; composables only render state and send events. */
 internal class DinexViewModel(private val repository: DinexRepository = DinexRepository()) : ViewModel() {
+    init { DinexThemeState.dark = repository.darkMode() }
     private val initialEmail = repository.session()
     private val mutableState = MutableStateFlow(DinexUiState(
         accounts = repository.accounts(),
@@ -33,15 +39,27 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         data = initialEmail?.let(repository::profile) ?: FinancialData(),
         reduceMotion = repository.reduceMotion(),
         largeText = repository.largeText(),
+        darkMode = repository.darkMode(),
+        budgetAlerts = repository.budgetAlertsEnabled(),
+        saveReminderEnabled = repository.saveReminderEnabled(),
+        saveReminderHour = repository.saveReminderHour(),
+        profilePhoto = initialEmail?.let(repository::profilePhoto).orEmpty(),
     ))
+    init {
+        // Keep the daily Android reminder aligned with the saved preference even
+        // when the app was updated, reinstalled or reopened after a reboot.
+        DinexAlerts.scheduleSaveReminder(mutableState.value.saveReminderEnabled, mutableState.value.saveReminderHour)
+        if (mutableState.value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
+    }
     val state = mutableState.asStateFlow()
     private val value get() = mutableState.value
     fun refreshProfile() {
         val email = value.email ?: return
         mutableState.value = value.copy(data = repository.profile(email))
+        if (value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
     }
 
-    fun selectPage(page: Int) { mutableState.value = value.copy(page = page.coerceIn(0, 4)) }
+    fun selectPage(page: Int) { mutableState.value = value.copy(page = page.coerceIn(0, 3)) }
     fun showMessage(message: String?) { mutableState.value = value.copy(message = message) }
     fun setReduceMotion(enabled: Boolean) {
         repository.setReduceMotion(enabled)
@@ -51,6 +69,33 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         repository.setLargeText(enabled)
         mutableState.value = value.copy(largeText = enabled)
     }
+    fun setDarkMode(enabled: Boolean) {
+        repository.setDarkMode(enabled)
+        DinexThemeState.dark = enabled
+        mutableState.value = value.copy(darkMode = enabled)
+    }
+    fun setBudgetAlerts(enabled: Boolean) {
+        repository.setBudgetAlertsEnabled(enabled)
+        mutableState.value = value.copy(budgetAlerts = enabled)
+    }
+    fun setSaveReminderEnabled(enabled: Boolean) {
+        repository.setSaveReminderEnabled(enabled)
+        mutableState.value = value.copy(saveReminderEnabled = enabled)
+        DinexAlerts.scheduleSaveReminder(enabled, value.saveReminderHour)
+        if (!enabled) DinexAlerts.cancelSaveReminder()
+    }
+    fun setSaveReminderHour(hour: Int) {
+        val safe = hour.coerceIn(0, 23)
+        repository.setSaveReminderHour(safe)
+        mutableState.value = value.copy(saveReminderHour = safe)
+        if (value.saveReminderEnabled) DinexAlerts.scheduleSaveReminder(true, safe)
+    }
+    fun setProfilePhoto(encoded: String?): Boolean {
+        val email = value.email ?: return false
+        if (runCatching { repository.setProfilePhoto(email, encoded) }.isFailure) return false
+        mutableState.value = value.copy(profilePhoto = encoded.orEmpty())
+        return true
+    }
 
     fun createAccount(account: UserAccount) {
         if (value.accounts.any { it.email == account.email }) return
@@ -58,18 +103,22 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         repository.saveAccounts(accounts)
         repository.saveProfile(account.email, FinancialData())
         repository.setSession(account.email)
-        mutableState.value = DinexUiState(accounts, account.email, reduceMotion = value.reduceMotion, largeText = value.largeText)
+        mutableState.value = DinexUiState(accounts, account.email, reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
+            budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour)
     }
 
     fun authenticate(email: String) {
         if (value.accounts.none { it.email == email }) return
         repository.setSession(email)
-        mutableState.value = DinexUiState(value.accounts, email, repository.profile(email), reduceMotion = value.reduceMotion, largeText = value.largeText)
+        mutableState.value = DinexUiState(value.accounts, email, repository.profile(email), reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
+            budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour, profilePhoto = repository.profilePhoto(email))
+        if (value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
     }
 
     fun logout() {
         repository.setSession(null)
-        mutableState.value = DinexUiState(accounts = value.accounts, reduceMotion = value.reduceMotion, largeText = value.largeText)
+        mutableState.value = DinexUiState(accounts = value.accounts, reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
+            budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour)
     }
 
     fun nextMovementId() = (value.data.movements.maxOfOrNull { it.id } ?: 0) + 1
@@ -89,9 +138,15 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
             movements = if (exists) movements.map { if (it.id == movement.id) movement else it } else listOf(movement) + movements,
             reminders = if (reminderId == null) value.data.reminders else value.data.reminders.filterNot { it.id == reminderId },
         ))
-        if (after > before && after > value.data.dailyLimit) mutableState.value = value.copy(
-            budgetWarning = "Hoy gastaste ${money(after)}. Superaste tu presupuesto de ${money(value.data.dailyLimit.toDouble())} por ${money(after - value.data.dailyLimit)}.",
-        )
+        val limit = value.data.dailyLimit.toDouble()
+        if (after > before && after > limit) {
+            mutableState.value = value.copy(
+                budgetWarning = "Hoy gastaste ${money(after)}. Superaste tu presupuesto de ${money(limit)} por ${money(after - limit)}.",
+            )
+            // Only fire the real notification when the limit is crossed, not on
+            // every extra expense once the day is already over budget.
+            if (value.budgetAlerts && before <= limit) DinexAlerts.budgetExceeded(after, limit)
+        }
         showMessage(if (movement.income) "Ingreso guardado" else "Gasto guardado")
     }
     fun dismissBudgetWarning() { mutableState.value = value.copy(budgetWarning = null) }
@@ -111,8 +166,12 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         val firstId = nextMovementId()
         val clean = items.filter { it.amount.isFinite() && it.amount > 0 && validDate(it.year, it.month, it.day) }.mapIndexed { index, item -> item.copy(id = firstId + index) }
         persist(value.data.copy(movements = clean + value.data.movements))
+        val limit = value.data.dailyLimit.toDouble()
         val after = value.data.movements.filter { !it.income && it.isToday() }.sumOf { it.amount }
-        if (after > before && after > value.data.dailyLimit) mutableState.value = value.copy(budgetWarning = "Los movimientos importados llevan el gasto de hoy a ${money(after)}, por encima de tu límite de ${money(value.data.dailyLimit.toDouble())}.")
+        if (after > before && after > limit) {
+            mutableState.value = value.copy(budgetWarning = "Los movimientos importados llevan el gasto de hoy a ${money(after)}, por encima de tu límite de ${money(limit)}.")
+            if (value.budgetAlerts && before <= limit) DinexAlerts.budgetExceeded(after, limit)
+        }
         showMessage("${clean.size} movimientos importados")
     }
     fun importNotifications(items: List<CapturedTransaction>, location: String?) {
@@ -140,6 +199,16 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         persist(value.data.copy(categoryBudgets = value.data.categoryBudgets + (category to amount)))
         showMessage("Presupuesto de $category actualizado")
         return true
+    }
+    fun setCategoryBudgets(budgets: Map<String, Double>): Boolean {
+        if (budgets.any { (category, amount) -> categories.none { it.name == category } || !amount.isFinite() || amount < 0 }) return false
+        persist(value.data.copy(categoryBudgets = budgets))
+        showMessage("Presupuestos actualizados")
+        return true
+    }
+    fun resetCategoryBudgets() {
+        persist(value.data.copy(categoryBudgets = emptyMap()))
+        showMessage("Volviste a las sugerencias automáticas")
     }
     fun saveGoalArtwork(email: String, purpose: String, artwork: String) {
         if (value.email != email || value.data.goalName != purpose || artwork.length > 8_000_000) return
@@ -208,6 +277,8 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
             goalCelebration = goal.target > 0 && goal.saved >= goal.target && (existing?.saved ?: 0.0) < goal.target,
             message = "Ahorro de ${money(entry.amount)} guardado",
         )
+        // The person already saved today: remove a nudge that may still be on screen.
+        DinexAlerts.cancelSaveReminder()
         return true
     }
     fun dismissCelebrations() { mutableState.value = value.copy(goalCelebration = false, levelCelebration = null) }

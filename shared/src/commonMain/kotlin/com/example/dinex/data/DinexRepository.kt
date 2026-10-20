@@ -72,6 +72,16 @@ internal class DinexRepository(
     fun setReduceMotion(value: Boolean) = store.put("reduce_motion", value.toString())
     fun largeText(): Boolean = store.get("large_text") == "true"
     fun setLargeText(value: Boolean) = store.put("large_text", value.toString())
+    fun budgetAlertsEnabled(): Boolean = store.get("alert_budget") != "false"
+    fun setBudgetAlertsEnabled(value: Boolean) = store.put("alert_budget", value.toString())
+    fun saveReminderEnabled(): Boolean = store.get("save_reminder") != "false"
+    fun setSaveReminderEnabled(value: Boolean) = store.put("save_reminder", value.toString())
+    fun saveReminderHour(): Int = store.get("save_reminder_hour")?.toIntOrNull()?.takeIf { it in 0..23 } ?: 20
+    fun setSaveReminderHour(hour: Int) = store.put("save_reminder_hour", hour.coerceIn(0, 23).toString())
+    fun darkMode(): Boolean = store.get("theme_dark") == "true"
+    fun setDarkMode(value: Boolean) = store.put("theme_dark", value.toString())
+    fun profilePhoto(email: String): String = store.get("avatar:${email.trim().lowercase()}").orEmpty()
+    fun setProfilePhoto(email: String, encoded: String?) = store.put("avatar:${email.trim().lowercase()}", encoded)
 
     private fun profileKey(email: String) = "profile:" + email.trim().lowercase()
 }

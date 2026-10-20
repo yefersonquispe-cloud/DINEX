@@ -38,6 +38,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import dinex.shared.generated.resources.Res
 import dinex.shared.generated.resources.dinex_app_icon
 import dinex.shared.generated.resources.dinex_mascot_ai
@@ -60,9 +62,11 @@ internal fun DinexAppShell(
     onAdd: () -> Unit,
     onProfile: () -> Unit,
     onAssistant: () -> Unit,
+    onWalletClick: () -> Unit,
     streak: Int,
     name: String,
     email: String,
+    profilePhoto: String,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     BoxWithConstraints(Modifier.fillMaxSize().background(AppBg)) {
@@ -77,35 +81,34 @@ internal fun DinexAppShell(
                     onAssistant = onAssistant,
                     name = name,
                     email = email,
+                    profilePhoto = profilePhoto,
                 )
                 Column(Modifier.weight(1f).fillMaxHeight()) {
                     DinexDesktopTopBar(
                         streak = streak,
                         name = name,
                         email = email,
+                        profilePhoto = profilePhoto,
                         onProfile = onProfile,
                         onAdd = onAdd,
+                        onWalletClick = onWalletClick,
                     )
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         content(PaddingValues(0.dp))
                     }
                 }
             }
-            if (page != 4) {
-                Box(Modifier.fillMaxSize().padding(end = 24.dp, bottom = 24.dp), contentAlignment = Alignment.BottomEnd) {
-                    DinexAssistantBubble(onClick = onAssistant)
-                }
+            Box(Modifier.fillMaxSize().padding(end = 24.dp, bottom = 24.dp), contentAlignment = Alignment.BottomEnd) {
+                DinexAssistantBubble(onClick = onAssistant)
             }
         } else {
-            Scaffold(
-                containerColor = Color.Transparent,
-                topBar = { DinexTopBar(streak = streak, name = name, email = email, onProfile = onProfile) },
-                bottomBar = { BottomNavigation(page, onSelect = onSelectPage, onAdd = onAdd) },
-                floatingActionButton = { if (page != 4) DinexAssistantBubble(onClick = onAssistant) },
-                floatingActionButtonPosition = FabPosition.End,
-            ) { padding ->
-                content(padding)
+            Column(Modifier.fillMaxSize()) {
+                DinexTopBar(streak = streak, name = name, email = email, profilePhoto = profilePhoto, onProfile = onProfile, onWalletClick = onWalletClick)
+                // The dock floats over the page; scrollable screens add only end-of-list space.
+                Box(Modifier.weight(1f)) { content(PaddingValues(0.dp)) }
             }
+            Box(Modifier.align(Alignment.BottomCenter)) { BottomNavigation(page, onSelect = onSelectPage, onAdd = onAdd) }
+            Box(Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = 100.dp).navigationBarsPadding()) { DinexAssistantBubble(onClick = onAssistant) }
         }
     }
 }
@@ -118,17 +121,18 @@ internal fun DinexSidebar(
     onAssistant: () -> Unit,
     name: String,
     email: String,
+    profilePhoto: String,
 ) {
     Surface(
         modifier = Modifier.fillMaxHeight().width(228.dp)
-            .background(Brush.linearGradient(listOf(Color(0xF01B2B4A), Color(0xF0101B35), Card.copy(alpha = .94f)))),
+            .background(Brush.linearGradient(listOf(Card, CardRaised))),
         color = Color.Transparent,
-        border = BorderStroke(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .16f), NavigationAqua.copy(alpha = .08f), Color.White.copy(alpha = .03f)))),
+        border = BorderStroke(1.dp, Border),
     ) {
         Column(Modifier.fillMaxSize().padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Image(
-                    painter = painterResource(Res.drawable.dinex_app_icon),
+                    painter = painterResource(Res.drawable.dinex_mascot_ai),
                     contentDescription = "Logo Dinex",
                     modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)),
                     contentScale = ContentScale.Crop,
@@ -146,7 +150,7 @@ internal fun DinexSidebar(
             SidebarItem("Movimientos", "MO", page == 1) { onSelectPage(1) }
             SidebarItem("Plan", "PL", page == 2) { onSelectPage(2) }
             SidebarItem("Análisis", "AN", page == 3) { onSelectPage(3) }
-            SidebarItem("Asistente", "IA", page == 4) { onAssistant() }
+            SidebarItem("Dinex IA · asistente", "IA", false) { onAssistant() }
             Spacer(Modifier.height(10.dp))
             SidebarItem("Configuración", "CF", false) { onProfile() }
             Spacer(Modifier.weight(1f))
@@ -157,10 +161,7 @@ internal fun DinexSidebar(
                 border = BorderStroke(1.dp, Border),
             ) {
                 Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        Modifier.size(32.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Indigo, ElectricBlue))),
-                        contentAlignment = Alignment.Center,
-                    ) { Text(name.firstOrNull()?.uppercase() ?: "D", color = Color.White, fontWeight = FontWeight.Black, fontSize = 12.sp) }
+                    ProfilePhoto(name, profilePhoto, 32.dp)
                     Spacer(Modifier.width(8.dp))
                     Column(Modifier.weight(1f)) {
                         Text(name, color = Night, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -201,7 +202,7 @@ internal fun SidebarItem(label: String, code: String, selected: Boolean, onClick
 }
 
 @Composable
-internal fun DinexDesktopTopBar(streak: Int, name: String, email: String, onProfile: () -> Unit, onAdd: () -> Unit) {
+internal fun DinexDesktopTopBar(streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onAdd: () -> Unit, onWalletClick: () -> Unit) {
     val level = streakLevel(streak)
     Surface(color = AppBg.copy(alpha = .85f), border = BorderStroke(1.dp, Border.copy(alpha = .4f))) {
         Row(
@@ -212,24 +213,26 @@ internal fun DinexDesktopTopBar(streak: Int, name: String, email: String, onProf
                 Text("Hola, ${name.substringBefore(' ')}", color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                 Text(currentDateLabel(), color = Gray, fontSize = 11.sp)
             }
-            Surface(shape = RoundedCornerShape(20.dp), color = level.color.copy(alpha = .12f), border = BorderStroke(1.dp, level.color.copy(alpha = .32f))) {
+            Surface(
+                modifier = Modifier.clickable(onClickLabel = "Ver mi racha y ahorro", role = Role.Button, onClick = onWalletClick),
+                shape = RoundedCornerShape(20.dp),
+                color = level.color.copy(alpha = .12f),
+                border = BorderStroke(1.dp, level.color.copy(alpha = .32f)),
+            ) {
                 Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                     MiniWalletMedal(level.color, 22.dp)
                     Spacer(Modifier.width(6.dp))
-                    Text("$streak d · ${level.name}", color = level.color, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                    Text("$streak d · ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold, fontSize = 10.sp)
                 }
             }
             Spacer(Modifier.width(10.dp))
             Button(
                 onClick = onAdd,
                 shape = RoundedCornerShape(RadiusMd),
-                colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color(0xFF062018)),
+                colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
             ) { Text("+ Nuevo", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
             Spacer(Modifier.width(10.dp))
-            Box(
-                Modifier.size(34.dp).clip(CircleShape).background(Brush.linearGradient(listOf(Indigo, ElectricBlue))).clickable(onClick = onProfile),
-                contentAlignment = Alignment.Center,
-            ) { Text(name.firstOrNull()?.uppercase() ?: email.firstOrNull()?.uppercase() ?: "D", color = Color.White, fontWeight = FontWeight.Black, fontSize = 12.sp) }
+            ProfilePhoto(name, profilePhoto, 36.dp, Modifier.clickable(onClick = onProfile))
         }
     }
 }
@@ -240,17 +243,17 @@ internal fun DinexAssistantBubble(onClick: () -> Unit) {
     else rememberInfiniteTransition(label = "assistant invitation").animateFloat(1f, 1.07f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "halo")
     Box(Modifier.size(64.dp), contentAlignment = Alignment.Center) {
         Box(Modifier.size(63.dp).graphicsLayer { scaleX = pulse.value; scaleY = pulse.value }
-            .clip(CircleShape).background(Brush.linearGradient(listOf(Indigo.copy(alpha = .65f), Green.copy(alpha = .4f)))))
+            .clip(CircleShape).background(Brush.linearGradient(listOf(Green.copy(alpha = .22f), Mint))))
         Surface(
             modifier = Modifier.size(58.dp).clickable(onClick = onClick),
             shape = CircleShape,
-            color = Color(0xFF182746),
-            border = BorderStroke(1.dp, Color.White.copy(alpha = .30f)),
+            color = Card,
+            border = BorderStroke(1.dp, Green.copy(alpha = .28f)),
             shadowElevation = 12.dp,
         ) {
             Image(
                 painter = painterResource(Res.drawable.dinex_mascot_ai),
-                contentDescription = "Asistente Dinex IA",
+                contentDescription = "Abrir Dinex IA, tu guía de dinero",
                 modifier = Modifier.fillMaxSize().padding(4.dp),
                 contentScale = ContentScale.Fit,
             )
@@ -263,33 +266,35 @@ internal fun DinexAssistantBubble(onClick: () -> Unit) {
 }
 
 @Composable
-internal fun DinexTopBar(streak: Int, name: String, email: String, onProfile: () -> Unit) {
+internal fun DinexTopBar(streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit) {
     val level = streakLevel(streak)
     Surface(modifier = Modifier.statusBarsPadding(), color = AppBg.copy(alpha = .88f)) {
         Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             Image(
-                painter = painterResource(Res.drawable.dinex_app_icon),
+                painter = painterResource(Res.drawable.dinex_mascot_ai),
                 contentDescription = "Logo Dinex",
-                modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)),
-                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(38.dp),
+                contentScale = ContentScale.Fit,
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.2.sp)
                 Text(currentDateLabel(), color = Gray, fontSize = 10.sp)
             }
-            Surface(shape = RoundedCornerShape(16.dp), color = level.color.copy(alpha = .12f), border = BorderStroke(1.dp, level.color.copy(alpha = .32f))) {
+            Surface(
+                modifier = Modifier.clickable(onClickLabel = "Ver mi racha y ahorro", role = Role.Button, onClick = onWalletClick),
+                shape = RoundedCornerShape(16.dp),
+                color = level.color.copy(alpha = .12f),
+                border = BorderStroke(1.dp, level.color.copy(alpha = .32f)),
+            ) {
                 Row(Modifier.padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                     MiniWalletMedal(level.color, 22.dp)
                     Spacer(Modifier.width(5.dp))
-                    Text("$streak", color = level.color, fontWeight = FontWeight.Black, fontSize = 11.sp)
+                    Text("$streak", color = readableAccent(level.color), fontWeight = FontWeight.Black, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.width(8.dp))
-            Box(
-                Modifier.size(48.dp).clip(CircleShape).background(CardRaised).clickable(onClickLabel = "Abrir perfil y accesibilidad", onClick = onProfile),
-                contentAlignment = Alignment.Center,
-            ) { Text(name.firstOrNull()?.uppercase() ?: email.firstOrNull()?.uppercase() ?: "D", color = Color.White, fontWeight = FontWeight.Black, fontSize = 12.sp) }
+            ProfilePhoto(name, profilePhoto, 44.dp, Modifier.clickable(onClickLabel = "Abrir perfil y accesibilidad", onClick = onProfile))
         }
     }
 }
@@ -307,75 +312,159 @@ internal fun ProfileDialog(
     onReduceMotion: (Boolean) -> Unit,
     largeText: Boolean,
     onLargeText: (Boolean) -> Unit,
+    darkMode: Boolean,
+    onDarkMode: (Boolean) -> Unit,
+    budgetAlerts: Boolean,
+    onBudgetAlerts: (Boolean) -> Unit,
+    saveReminderEnabled: Boolean,
+    onSaveReminderEnabled: (Boolean) -> Unit,
+    saveReminderHour: Int,
+    onSaveReminderHour: (Int) -> Unit,
+    notificationsSupported: Boolean,
+    notificationsEnabled: Boolean,
+    onRequestNotifications: () -> Unit,
+    onOpenNotificationSettings: () -> Unit,
+    profilePhoto: String,
+    onProfilePhoto: (String?) -> Boolean,
     onAutomation: () -> Unit,
 ) {
     val income = movements.filter { it.income }.sumOf { it.amount }
     val expenses = movements.filterNot { it.income }.sumOf { it.amount }
     val level = streakLevel(streak)
     val next = nextStreakLevel(streak)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(24.dp),
-        containerColor = Card,
-        icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Mascota Dinex", Modifier.size(72.dp), contentScale = ContentScale.Fit) },
-        title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(name, fontWeight = FontWeight.Black, fontSize = 20.sp, color = Night)
-                Text(email, color = Gray, fontSize = 13.sp)
-            }
-        },
-        text = {
-            Column(Modifier.heightIn(max = 470.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(shape = RoundedCornerShape(RadiusMd), color = level.color.copy(alpha = .12f), border = BorderStroke(1.dp, level.color.copy(alpha = .28f))) {
-                    Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        MiniWalletMedal(level.color, 40.dp)
-                        Spacer(Modifier.width(10.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("Nivel ${level.name}", color = level.color, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            Text(if (next == null) "Completaste los 365 días" else "${next.startsAt - streak} días para ${next.name}", color = Gray, fontSize = 10.sp)
-                        }
-                        Text("$streak", color = Night, fontWeight = FontWeight.Black, fontSize = 20.sp)
-                    }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ProfileStat("SALDO", money(income - expenses), Lime, Modifier.weight(1f))
-                    ProfileStat("AHORRADO", money(savings), Green, Modifier.weight(1f))
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    ProfileStat("INGRESOS", money(income), GreenDark, Modifier.weight(1f))
-                    ProfileStat("EGRESOS", money(expenses), Red, Modifier.weight(1f))
-                }
-                Text("${movements.size} movimientos · datos en este dispositivo", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Reducir movimiento", color = Night, fontSize = 13.sp)
-                        Text("Entrada breve y transiciones suaves", color = Gray, fontSize = 11.sp)
-                    }
-                    Switch(checked = reduceMotion, onCheckedChange = onReduceMotion)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Texto más grande", color = Night, fontSize = 14.sp)
-                        Text("Aumenta un 20% y respeta el tamaño del sistema", color = Gray, fontSize = 12.sp)
-                    }
-                    Switch(checked = largeText, onCheckedChange = onLargeText)
-                }
-                OutlinedButton(onClick = onAutomation, modifier = Modifier.fillMaxWidth()) {
-                    Text("Voz y notificaciones")
-                }
-            }
-        },
-        confirmButton = { Button(onClick = onDismiss, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color(0xFF062018))) { Text("Volver") } },
-        dismissButton = { TextButton(onClick = onLogout) { Text("Cerrar sesión", color = Red) } },
+    var photoError by remember { mutableStateOf("") }
+    val files = rememberFileTransfer(
+        onImport = { file ->
+            if (file != null) runCatching { validatedProfilePhoto(file) }
+                .onSuccess { photoError = if (onProfilePhoto(it)) "" else "No se pudo guardar la foto. Prueba con una imagen más pequeña." }
+                .onFailure { photoError = it.message ?: "No pudimos leer la imagen." }
+        }, onSaved = {}, onError = { photoError = it },
     )
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxSize(), color = AppBg) {
+            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onDismiss) { Text("‹  Volver", color = GreenDark) }
+                    Spacer(Modifier.weight(1f))
+                    Text("MI ESPACIO", color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+                }
+                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(15.dp)) {
+                    Spacer(Modifier.height(4.dp))
+                    ProfilePhoto(name, profilePhoto, 100.dp)
+                    Text(name, fontWeight = FontWeight.Black, fontSize = 27.sp, color = Night)
+                    Text(email, color = Gray, fontSize = 13.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = { files.chooseImport() }) { Text(if (profilePhoto.isBlank()) "Agregar foto" else "Cambiar foto") }
+                        if (profilePhoto.isNotBlank()) TextButton(onClick = {
+                            photoError = if (onProfilePhoto(null)) "" else "No se pudo quitar la foto."
+                        }) { Text("Quitar", color = Red) }
+                    }
+                    if (photoError.isNotBlank()) Text(photoError, color = Red, fontSize = 12.sp)
+                    Text("Tu foto se guarda solo en este dispositivo.", color = Gray, fontSize = 11.sp)
+                    Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            MiniWalletMedal(level.color, 46.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text("Nivel ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold)
+                                Text(if (next == null) "Completaste los 365 días" else "${next.startsAt - streak} días para ${next.name}", color = Gray, fontSize = 12.sp)
+                            }
+                            Text("$streak días", color = Night, fontWeight = FontWeight.Black)
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ProfileStat("SALDO", money(income - expenses - savings), Lime, Modifier.weight(1f))
+                        ProfileStat("AHORRADO", money(savings), GreenDark, Modifier.weight(1f))
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        ProfileStat("INGRESOS", money(income), GreenDark, Modifier.weight(1f))
+                        ProfileStat("EGRESOS", money(expenses), Red, Modifier.weight(1f))
+                    }
+                    Text("${movements.size} movimientos · datos en este dispositivo", color = Gray, fontSize = 12.sp)
+                    Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                            Text("Preferencias", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            ProfileSetting("Modo oscuro", if (darkMode) "Verde bosque" else "Verde y blanco", darkMode, onDarkMode)
+                            ProfileSetting("Reducir movimiento", "Menos animaciones", reduceMotion, onReduceMotion)
+                            ProfileSetting("Texto más grande", "Respeta el tamaño del sistema", largeText, onLargeText)
+                        }
+                    }
+                    if (notificationsSupported) Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
+                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("Recordatorios", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                            Text("Te avisamos en el momento justo para cuidar tu presupuesto y tu racha.", color = Gray, fontSize = 11.sp)
+                            ProfileSetting("Aviso de presupuesto", "Cuando superes tu límite diario", budgetAlerts, onBudgetAlerts)
+                            ProfileSetting(
+                                "Recordatorio para ahorrar",
+                                if (saveReminderEnabled) "Si aún no ahorras, a las ${reminderHourLabel(saveReminderHour)}"
+                                else "Un aviso al día para no romper tu racha",
+                                saveReminderEnabled,
+                            ) { enabled ->
+                                onSaveReminderEnabled(enabled)
+                                if (enabled && !notificationsEnabled) onRequestNotifications()
+                            }
+                            if (saveReminderEnabled) {
+                                Text("Hora del recordatorio", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    listOf(18, 20, 21).forEach { hour ->
+                                        FilterChip(
+                                            selected = saveReminderHour == hour,
+                                            onClick = { onSaveReminderHour(hour) },
+                                            label = { Text(reminderHourLabel(hour), fontSize = 11.sp) },
+                                        )
+                                    }
+                                }
+                            }
+                            if (!notificationsEnabled) {
+                                Text(
+                                    "Las notificaciones están bloqueadas en Android. Actívalas para que Dinex pueda avisarte.",
+                                    color = Orange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                                )
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    TextButton(onClick = onRequestNotifications) {
+                                        Text("Permitir notificaciones", color = GreenDark, fontWeight = FontWeight.Bold)
+                                    }
+                                    TextButton(onClick = onOpenNotificationSettings) {
+                                        Text("Abrir ajustes", color = Gray, fontWeight = FontWeight.Bold)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    OutlinedButton(onClick = onAutomation, modifier = Modifier.fillMaxWidth()) { Text("Voz y notificaciones") }
+                    TextButton(onClick = onLogout) { Text("Cerrar sesión", color = Red) }
+                    Spacer(Modifier.height(18.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileSetting(label: String, detail: String, value: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = Night, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text(detail, color = Gray, fontSize = 11.sp)
+        }
+        Switch(value, onChange, modifier = Modifier.semantics { contentDescription = label })
+    }
 }
 
 @Composable
 internal fun ProfileStat(label: String, value: String, tint: Color, modifier: Modifier) {
-    Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = tint.copy(alpha = .10f), border = BorderStroke(1.dp, tint.copy(alpha = .18f))) {
-        Column(Modifier.padding(10.dp)) {
-            Text(label, color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            Text(value, color = tint, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 2)
+    val vivid = label == "INGRESOS" || label == "EGRESOS"
+    val foreground = when (label) {
+        "INGRESOS" -> if (DinexThemeState.dark) Color(0xFF56FF9C) else Color(0xFF087C40)
+        "EGRESOS" -> if (DinexThemeState.dark) Color(0xFFFF7182) else Color(0xFFD90F32)
+        else -> tint
+    }
+    Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = tint.copy(alpha = .09f),
+        border = BorderStroke(1.dp, foreground.copy(alpha = if (vivid) .35f else .25f))) {
+        Column(Modifier.fillMaxWidth().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Text(value, color = foreground, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = TextAlign.Center)
         }
     }
 }
@@ -399,29 +488,28 @@ internal fun MiniWalletMedal(tint: Color, size: androidx.compose.ui.unit.Dp) {
 @Composable
 internal fun BottomNavigation(page: Int, onSelect: (Int) -> Unit, onAdd: () -> Unit) {
     val shape = RoundedCornerShape(32.dp)
-    // Layered translucent tints and a reflective rim give a glass appearance
-    // without an expensive platform-specific backdrop filter on every frame.
+    // Soft white glass surface with a green rim and accessible contrast.
     Surface(
-        modifier = Modifier.navigationBarsPadding().padding(horizontal = 12.dp, vertical = 8.dp)
-            .shadow(18.dp, shape, ambientColor = Color.Black.copy(alpha = .35f), spotColor = NavigationAqua.copy(alpha = .10f))
+        modifier = Modifier.fillMaxWidth(.88f).widthIn(max = 540.dp).navigationBarsPadding().padding(bottom = 6.dp)
+            .shadow(18.dp, shape, ambientColor = Green.copy(alpha = .10f), spotColor = NavigationAqua.copy(alpha = .10f))
             .clip(shape)
-            .background(Brush.verticalGradient(listOf(Color(0xF0273D61), Color(0xEE111E37), Color(0xF213233F)))),
+            .background(Brush.verticalGradient(listOf(Card.copy(alpha = .90f), CardRaised.copy(alpha = .82f)))),
         shape = shape,
         color = Color.Transparent,
-        border = BorderStroke(1.dp, Brush.linearGradient(listOf(Color.White.copy(alpha = .32f), NavigationAqua.copy(alpha = .14f), Color.White.copy(alpha = .06f)))),
+        border = BorderStroke(1.dp, Brush.linearGradient(listOf(Green.copy(alpha = .28f), Border, Border))),
     ) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 82.dp).padding(horizontal = 7.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 70.dp).padding(horizontal = 6.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
             BottomItem(DinexNavigationIcons.Home, "Inicio", page == 0, Modifier.weight(1f)) { onSelect(0) }
             BottomItem(DinexNavigationIcons.Movements, "Movimientos", page == 1, Modifier.weight(1.3f)) { onSelect(1) }
             Box(Modifier.weight(1.05f), contentAlignment = Alignment.Center) {
                 Box(
-                    Modifier.size(58.dp).shadow(9.dp, CircleShape, spotColor = NavigationAqua.copy(alpha = .35f)).clip(CircleShape)
-                        .background(NavigationAqua)
+                    Modifier.size(54.dp).shadow(9.dp, CircleShape, spotColor = NavigationAqua.copy(alpha = .35f)).clip(CircleShape)
+                        .background(Green)
                         .semantics { contentDescription = "Registrar gasto, ingreso o ahorro" }
                         .clickable(role = Role.Button, onClick = onAdd),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(DinexNavigationIcons.Add, contentDescription = null, tint = Color(0xFF06212B), modifier = Modifier.size(29.dp))
+                    Icon(DinexNavigationIcons.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(29.dp))
                 }
             }
             BottomItem(DinexNavigationIcons.Plan, "Plan", page == 2, Modifier.weight(1f)) { onSelect(2) }
@@ -433,9 +521,9 @@ internal fun BottomNavigation(page: Int, onSelect: (Int) -> Unit, onAdd: () -> U
 @Composable
 internal fun BottomItem(icon: ImageVector, label: String, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val tint by animateColorAsState(if (selected) NavigationAqua else NavigationMuted, tween(if (LocalDinexReducedMotion.current) 0 else 160))
-    val highlight by animateColorAsState(if (selected) Color.White.copy(alpha = .075f) else Color.Transparent, tween(if (LocalDinexReducedMotion.current) 0 else 160))
+    val highlight by animateColorAsState(if (selected) Mint else Color.Transparent, tween(if (LocalDinexReducedMotion.current) 0 else 160))
     Column(
-        modifier.heightIn(min = 64.dp).clip(RoundedCornerShape(21.dp)).background(highlight)
+        modifier.heightIn(min = 58.dp).clip(RoundedCornerShape(21.dp)).background(highlight)
             .selectable(selected = selected, role = Role.Tab, onClick = onClick).padding(horizontal = 2.dp, vertical = 7.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
@@ -453,5 +541,5 @@ internal fun BottomItem(icon: ImageVector, label: String, selected: Boolean, mod
     }
 }
 
-private val NavigationAqua = Green
-private val NavigationMuted = Gray
+private val NavigationAqua get() = if (DinexThemeState.dark) GreenDark else Green
+private val NavigationMuted get() = Gray

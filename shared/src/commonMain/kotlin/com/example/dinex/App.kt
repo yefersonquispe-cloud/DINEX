@@ -7,14 +7,22 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -24,9 +32,11 @@ import kotlinx.coroutines.CancellationException
 
 /** View layer: navigation, screens and presentation-only dialog state. */
 @Composable
-fun App() {
+fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) {
     val model = viewModel { DinexViewModel() }
     val state by model.state.collectAsState()
+    SideEffect { onThemeChanged(state.darkMode) }
+    LaunchedEffect(state.email, state.data, state.darkMode) { onDataChanged() }
     val density = LocalDensity.current
     CompositionLocalProvider(
         LocalDensity provides Density(density.density, density.fontScale * if (state.largeText) 1.2f else 1f),
@@ -61,6 +71,8 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var movementToDelete by remember { mutableStateOf<Movement?>(null) }
     var reminderToResolve by remember { mutableStateOf<PaymentReminder?>(null) }
     var profileOpen by remember { mutableStateOf(false) }
+    var assistantOpen by remember { mutableStateOf(false) }
+    var welcomeGuideOpen by remember { mutableStateOf(false) }
     var savingDialog by remember { mutableStateOf(false) }
     var importDialog by remember { mutableStateOf(false) }
     var exportDialog by remember { mutableStateOf(false) }
@@ -70,6 +82,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var selectedGoalId by remember { mutableStateOf<Int?>(null) }
     var savingGoalId by remember { mutableStateOf<Int?>(null) }
     var goalToDelete by remember { mutableStateOf<SavingsGoal?>(null) }
+    var walletBubbleOpen by remember { mutableStateOf(false) }
     val illustrator = rememberGoalIllustrator()
     val goalScope = rememberCoroutineScope()
     var artworkBusy by remember { mutableStateOf(emptySet<Int>()) }
@@ -83,11 +96,15 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     val assistant = rememberGeminiAssistant()
     val automation = rememberDeviceAutomation()
     val owner = LocalLifecycleOwner.current
+    val permissionRevision = DinexNotificationPermission.revision
+    val notificationsSupported = automation.systemNotificationsSupported
+    val notificationsEnabled = remember(permissionRevision, automation) { automation.systemNotificationsEnabled }
     // A command can arrive while MainActivity is already alive. Consume on every resume.
     DisposableEffect(owner, automation, model) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
                 model.refreshProfile()
+                DinexNotificationPermission.refresh()
                 automation.consumePendingVoiceCommand()?.let { model.handleVoice(it, automation.currentLocationLabel()) }
             }
         }
@@ -97,48 +114,88 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     }
     val chatMessages = remember(assistant.isConfigured) {
         mutableStateListOf(ChatMessage(
-            if (assistant.isConfigured) "Hola, soy Dinex IA. Puedo ayudarte a entender tus gastos y planear tus ahorros."
+            if (assistant.isConfigured) "Hola, soy Dinex IA. Te ayudo a entender tus gastos y planear tus ahorros."
             else "Hola, soy Dinex IA. Configura Gemini para conversar sobre tus finanzas.",
             user = false,
         ))
     }
     val name = state.activeAccount?.name ?: state.email.orEmpty().substringBefore('@')
 
-    DinexAppShell(
-        page = state.page,
-        onSelectPage = model::selectPage,
-        onAdd = { quickAdd = true },
-        onProfile = { profileOpen = true },
-        onAssistant = { model.selectPage(4) },
-        streak = streak,
-        name = name,
-        email = state.email.orEmpty(),
-    ) { padding ->
-        Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
-            AnimatedContent(
-                targetState = state.page,
-                modifier = Modifier.fillMaxSize(),
-                transitionSpec = {
-                    (fadeIn(tween(if (state.reduceMotion) 0 else 260)) + slideInVertically(tween(if (state.reduceMotion) 0 else 320)) { if (state.reduceMotion) 0 else it / 35 }) togetherWith
-                        (fadeOut(tween(if (state.reduceMotion) 0 else 120)) + slideOutVertically(tween(if (state.reduceMotion) 0 else 180)) { if (state.reduceMotion) 0 else -it / 60 })
-                },
-                label = "page",
-            ) { page ->
-                when (page) {
-                    0 -> HomePage(movements, dailyLimit, streak, savedToday, savings, "${data.savingGoals().size} metas", data.savingGoals().sumOf { it.target },
-                        onDailyLimitChange = model::setDailyLimit, onSaveToday = { savingGoalId = null; savingDialog = true },
-                        onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
-                        goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true })
-                    1 -> HistoryPage(movements, onAdd = { quickAdd = true }, onDelete = { movementToDelete = it },
-                        onImport = { importDialog = true }, onExport = { exportDialog = true })
-                    2 -> PlanPage(movements.filter { it.isInCurrentMonth() }, dailyLimit, reminders, onDailyLimitChange = model::setDailyLimit,
-                        onAddReminder = { reminderDialog = true }, onDeleteReminder = { reminderToResolve = it }, categoryBudgets = data.categoryBudgets,
-                        onCategoryBudgetChange = { category, amount -> model.setCategoryBudget(category, amount) })
-                    3 -> InsightsPage(movements, onExport = { exportDialog = true })
-                    else -> AssistantPage(assistant, movements, dailyLimit, streak, savings, chatMessages, data.categoryBudgets)
+    Box(Modifier.fillMaxSize()) {
+        DinexAppShell(
+            page = state.page,
+            onSelectPage = model::selectPage,
+            onAdd = { quickAdd = true },
+            onProfile = { profileOpen = true },
+            onAssistant = { assistantOpen = true },
+            onWalletClick = { walletBubbleOpen = true },
+            streak = streak,
+            name = name,
+            email = state.email.orEmpty(),
+            profilePhoto = state.profilePhoto,
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.TopCenter) {
+                AnimatedContent(
+                    targetState = state.page,
+                    modifier = Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        (fadeIn(tween(if (state.reduceMotion) 0 else 260)) + slideInVertically(tween(if (state.reduceMotion) 0 else 320)) { if (state.reduceMotion) 0 else it / 35 }) togetherWith
+                            (fadeOut(tween(if (state.reduceMotion) 0 else 120)) + slideOutVertically(tween(if (state.reduceMotion) 0 else 180)) { if (state.reduceMotion) 0 else -it / 60 })
+                    },
+                    label = "page",
+                ) { page ->
+                    when (page) {
+                        0 -> HomePage(movements, dailyLimit, streak, savings, "${data.savingGoals().size} metas", data.savingGoals().sumOf { it.target },
+                            onDailyLimitChange = model::setDailyLimit,
+                            onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
+                            goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true },
+                            notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
+                            onEnableNotifications = { automation.requestSystemNotificationPermission() })
+                        1 -> HistoryPage(movements, onAdd = { quickAdd = true }, onDelete = { movementToDelete = it },
+                            onImport = { importDialog = true }, onExport = { exportDialog = true })
+                        2 -> PlanPage(movements.filter { it.isInCurrentMonth() }, dailyLimit, reminders, onDailyLimitChange = model::setDailyLimit,
+                            onAddReminder = { reminderDialog = true }, onDeleteReminder = { reminderToResolve = it }, categoryBudgets = data.categoryBudgets,
+                            historyMovements = movements,
+                            onCategoryBudgetsSave = { model.setCategoryBudgets(it) }, onCategoryBudgetsReset = model::resetCategoryBudgets)
+                        3 -> InsightsPage(movements, onExport = { exportDialog = true })
+                        else -> HomePage(movements, dailyLimit, streak, savings, "${data.savingGoals().size} metas", data.savingGoals().sumOf { it.target },
+                            onDailyLimitChange = model::setDailyLimit,
+                            onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
+                            goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true },
+                            notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
+                            onEnableNotifications = { automation.requestSystemNotificationPermission() })
+                    }
+                }
+                state.message?.let { InlineMessage(it, onDismiss = { model.showMessage(null) }) }
+            }
+        }
+
+        if (walletBubbleOpen) {
+            Box(Modifier.fillMaxSize()) {
+                Box(
+                    Modifier.fillMaxSize()
+                        .background(Color.Black.copy(alpha = .32f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                        ) { walletBubbleOpen = false },
+                )
+                Box(
+                    Modifier.fillMaxSize().statusBarsPadding().padding(top = 64.dp, start = 14.dp, end = 14.dp),
+                    contentAlignment = Alignment.TopEnd,
+                ) {
+                    SavingsBubble(
+                        streak = streak,
+                        savedToday = savedToday,
+                        onSaveToday = {
+                            walletBubbleOpen = false
+                            savingGoalId = null
+                            savingDialog = true
+                        },
+                        onClose = { walletBubbleOpen = false },
+                    )
                 }
             }
-            state.message?.let { InlineMessage(it, onDismiss = { model.showMessage(null) }) }
         }
     }
 
@@ -205,7 +262,23 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     }
     if (state.goalCelebration) GoalCelebrationDialog(state.celebrationGoal?.name ?: "tu meta", state.celebrationGoal?.saved ?: savings, onDismiss = model::dismissCelebrations)
     state.levelCelebration?.let { StreakLevelDialog(it, streak, onDismiss = model::dismissCelebrations) }
-    if (state.initialBalanceRequired) InitialBalanceDialog(onSave = model::setInitialBalance)
+    if (state.initialBalanceRequired) InitialBalanceDialog(onSave = { model.setInitialBalance(it); welcomeGuideOpen = true })
+    if (welcomeGuideOpen) WelcomeGuideDialog(onDismiss = { welcomeGuideOpen = false }, onTryAssistant = { welcomeGuideOpen = false; assistantOpen = true })
+    if (assistantOpen) Dialog(onDismissRequest = { assistantOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+            Surface(Modifier.fillMaxWidth().widthIn(max = 700.dp).heightIn(max = maxHeight - 24.dp).height(maxHeight.coerceAtMost(760.dp)),
+                shape = RoundedCornerShape(28.dp), color = Card, shadowElevation = 20.dp) {
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("Dinex IA · tu guía de dinero", color = Night, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { assistantOpen = false }) { Text("Cerrar") }
+                    }
+                    HorizontalDivider(color = Border)
+                    Box(Modifier.weight(1f)) { AssistantPage(assistant, movements, dailyLimit, streak, savings, chatMessages, data.categoryBudgets) }
+                }
+            }
+        }
+    }
     if (importDialog) ImportMovementsDialog(movements, onDismiss = { importDialog = false }, onImport = { model.importMovements(it); importDialog = false })
     if (exportDialog) ExportReportDialog(movements, name, onDismiss = { exportDialog = false })
     if (reminderDialog) ReminderDialog(model.nextReminderId(), onDismiss = { reminderDialog = false }, onSave = { model.saveReminder(it); reminderDialog = false })
@@ -225,9 +298,17 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     }
     if (profileOpen) ProfileDialog(
         name, state.email.orEmpty(), streak, savings, movements,
-        onDismiss = { profileOpen = false }, onLogout = { automation.setHotwordEnabled(false); model.logout() },
+        onDismiss = { profileOpen = false }, onLogout = { profileOpen = false; automation.setHotwordEnabled(false); model.logout() },
         reduceMotion = state.reduceMotion, onReduceMotion = model::setReduceMotion,
         largeText = state.largeText, onLargeText = model::setLargeText,
+        darkMode = state.darkMode, onDarkMode = model::setDarkMode,
+        budgetAlerts = state.budgetAlerts, onBudgetAlerts = model::setBudgetAlerts,
+        saveReminderEnabled = state.saveReminderEnabled, onSaveReminderEnabled = model::setSaveReminderEnabled,
+        saveReminderHour = state.saveReminderHour, onSaveReminderHour = model::setSaveReminderHour,
+        notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
+        onRequestNotifications = { automation.requestSystemNotificationPermission() },
+        onOpenNotificationSettings = { automation.openAppDetailsSettings() },
+        profilePhoto = state.profilePhoto, onProfilePhoto = model::setProfilePhoto,
         onAutomation = { profileOpen = false; automationDialog = true },
     )
     premiumLoading?.let { PremiumLoadingDialog(it) }

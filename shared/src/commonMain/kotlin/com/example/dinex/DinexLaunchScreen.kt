@@ -59,7 +59,7 @@ internal fun DinexLaunchScreen(
         DinexAuroraBackground()
         Canvas(Modifier.fillMaxSize().clearAndSetSemantics {}) {
             drawRect(Brush.radialGradient(
-                listOf(Color(0xFF16332E).copy(alpha = .6f), Color.Transparent),
+                listOf(Mint.copy(alpha = .75f), Color.Transparent),
                 Offset(size.width * .66f, size.height * .43f), size.maxDimension * .62f,
             ))
             // A restrained technical texture, without bitmap branding.
@@ -68,7 +68,7 @@ internal fun DinexLaunchScreen(
             while (x < size.width) {
                 var y = 0f
                 while (y < size.height) {
-                    drawCircle(Color.White.copy(alpha = .035f), 1f, Offset(x, y))
+                    drawCircle(Green.copy(alpha = .06f), 1f, Offset(x, y))
                     y += spacing
                 }
                 x += spacing
@@ -145,7 +145,7 @@ private fun DrawnDinex(writing: Float, finish: Float) {
         var tip = p(35f, 30f)
         strokes.forEachIndexed { index, path ->
             val measure = measures[index]
-            drawPath(path, Color.White.copy(alpha = .045f), style = Stroke(20f * scale, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(path, Green.copy(alpha = .07f), style = Stroke(20f * scale, cap = StrokeCap.Round, join = StrokeJoin.Round))
             val portion = budget.coerceIn(0f, measure.length)
             if (portion > 0f) {
                 val visible = Path()

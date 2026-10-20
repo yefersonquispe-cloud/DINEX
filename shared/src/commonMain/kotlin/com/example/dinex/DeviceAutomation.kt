@@ -20,8 +20,12 @@ interface DeviceAutomation {
     val supportsBackgroundVoice: Boolean get() = false
     val overlayAvailable: Boolean get() = false
     val notificationListenerConnected: Boolean get() = false
+    val systemNotificationsSupported: Boolean get() = false
+    val systemNotificationsEnabled: Boolean get() = false
 
     fun startVoice(onResult: (String) -> Unit, onError: (String) -> Unit)
+    /** Asks Android 13+ for POST_NOTIFICATIONS, or opens notification settings. */
+    fun requestSystemNotificationPermission() = openAppDetailsSettings()
     fun stopVoice()
     fun openNotificationSettings()
     fun openAppDetailsSettings() = Unit

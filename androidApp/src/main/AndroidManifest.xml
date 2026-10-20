@@ -65,6 +65,12 @@
                 android:name="android.service.notification.default_filter_types"
                 android:value="conversations|alerting|silent|ongoing" />
         </service>
+        <receiver android:name=".DinexBalanceWidget" android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/dinex_balance_widget_info" />
+        </receiver>
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

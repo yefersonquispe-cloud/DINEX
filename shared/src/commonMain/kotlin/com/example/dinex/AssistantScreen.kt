@@ -97,7 +97,7 @@ internal fun AssistantPage(
         scope.launch {
             val reply = runCatching {
                 assistant.ask(cleanQuestion, buildFinancialContext(movements, dailyLimit, streak, savings, categoryBudgets))
-            }.getOrElse { GeminiReply("Error de conexión con Dinex IA.", successful = false) }
+            }.getOrElse { GeminiReply("No pude conectarme. Inténtalo de nuevo.", successful = false) }
             messages.add(ChatMessage(reply.text, user = false, error = !reply.successful))
             loading = false
         }
@@ -129,7 +129,7 @@ internal fun AssistantPage(
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(46.dp).clip(RoundedCornerShape(17.dp)).background(CardRaised), contentAlignment = Alignment.Center) {
-                        Icon(DinexNavigationIcons.Sparkle, null, tint = Color.White, modifier = Modifier.size(25.dp))
+                        Icon(DinexNavigationIcons.Sparkle, null, tint = GreenDark, modifier = Modifier.size(25.dp))
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
@@ -221,7 +221,7 @@ internal fun ChatBubble(message: ChatMessage) {
                 bottomEnd = if (message.user) 5.dp else 19.dp,
             ),
             color = when {
-                message.user -> Mint
+                message.user -> Green
                 message.error -> Orange.copy(alpha = .12f)
                 else -> CardRaised
             },

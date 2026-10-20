@@ -9,16 +9,27 @@ import kotlin.test.assertTrue
 
 class DinexDesignTest {
     @Test fun bodyTextRemainsReadableOnTintedCards() {
-        val backgrounds = listOf(AppBg, Card, CardRaised, SurfaceHover) +
-            listOf(ElectricBlue, Indigo, Orange, Green).map { lerp(CardRaised, it, .06f) }
-        backgrounds.forEach { assertTrue(contrast(Gray, it) >= 4.5, "Secondary text must remain legible on $it") }
+        val previous = DinexThemeState.dark
+        try {
+            for (dark in listOf(false, true)) {
+                DinexThemeState.dark = dark
+                val backgrounds = listOf(AppBg, Card, CardRaised, SurfaceHover) +
+                    listOf(ElectricBlue, Indigo, Orange, Green).map { lerp(CardRaised, it, .06f) }
+                backgrounds.forEach { assertTrue(contrast(Gray, it) >= 4.5, "Secondary text must remain legible on $it in dark=$dark") }
+            }
+        } finally { DinexThemeState.dark = previous }
     }
 
     @Test fun chatAndPrimaryControlsHaveContrastingText() {
-        assertTrue(contrast(Color.White, Mint) >= 4.5)
-        assertTrue(contrast(colors.onPrimary, Green) >= 4.5)
-        assertTrue(contrast(colors.onPrimary, colors.primary) >= 4.5)
-        assertTrue(contrast(colors.onSecondary, colors.secondary) >= 4.5)
+        val previous = DinexThemeState.dark
+        try {
+            for (dark in listOf(false, true)) {
+                DinexThemeState.dark = dark
+                assertTrue(contrast(colors.onPrimaryContainer, Mint) >= 4.5)
+                assertTrue(contrast(colors.onPrimary, colors.primary) >= 4.5)
+                assertTrue(contrast(colors.onSecondary, colors.secondary) >= 4.5)
+            }
+        } finally { DinexThemeState.dark = previous }
     }
 
     @Test fun navigationIsVectorArtworkWithSquareViewports() {

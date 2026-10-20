@@ -37,11 +37,11 @@ internal fun DinexAuroraBackground(modifier: Modifier = Modifier) {
         drawRect(AppBg)
         val drift = motion.value
         drawRect(Brush.radialGradient(
-            listOf(Indigo.copy(alpha = .18f), Color.Transparent),
+            listOf(Green.copy(alpha = .055f), Color.Transparent),
             Offset(size.width * (.82f - drift * .12f), size.height * .05f), size.maxDimension * .63f,
         ))
         drawRect(Brush.radialGradient(
-            listOf(ElectricBlue.copy(alpha = .12f), Color.Transparent),
+            listOf(Lime.copy(alpha = .045f), Color.Transparent),
             Offset(size.width * (.04f + drift * .08f), size.height * .42f), size.maxDimension * .52f,
         ))
     }
@@ -61,7 +61,7 @@ internal fun Modifier.dinexEntrance(): Modifier {
 }
 
 @Composable
-internal fun DinexPageHeading(eyebrow: String, title: String, subtitle: String, accent: Color = ElectricBlue, modifier: Modifier = Modifier) {
+internal fun DinexPageHeading(eyebrow: String, title: String, subtitle: String, accent: Color = GreenDark, modifier: Modifier = Modifier) {
     Column(modifier.dinexEntrance(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Box(Modifier.size(6.dp).clip(CircleShape).background(accent))

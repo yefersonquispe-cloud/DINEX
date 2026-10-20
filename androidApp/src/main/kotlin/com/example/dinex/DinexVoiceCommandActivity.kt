@@ -33,7 +33,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.material3.darkColorScheme
+import androidx.core.view.WindowCompat
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -53,13 +55,20 @@ class DinexVoiceCommandActivity : ComponentActivity() {
     private var status by mutableStateOf("Preparando el micrófono…")
     private var error by mutableStateOf<String?>(null)
     private var level by mutableFloatStateOf(0.15f)
+    private var darkMode = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+        configureDinexStorage(this)
+        darkMode = isDinexDarkModeEnabled()
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = !darkMode
+            isAppearanceLightNavigationBars = !darkMode
+        }
         setContent { VoiceCommandScreen() }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             window.decorView.postDelayed(::startListening, 350)
@@ -86,23 +95,28 @@ class DinexVoiceCommandActivity : ComponentActivity() {
 
     @androidx.compose.runtime.Composable
     private fun VoiceCommandScreen() {
-        val colors = darkColorScheme(
-            primary = ComposeColor(0xFF33D6A5),
-            background = ComposeColor(0xFF07151F),
-            surface = ComposeColor(0xFF102431),
-            onSurface = ComposeColor(0xFFF4FBFF),
+        val background = if (darkMode) ComposeColor(0xFF101A15) else ComposeColor(0xFFF7FAF7)
+        val surface = if (darkMode) ComposeColor(0xFF19271F) else ComposeColor.White
+        val raised = if (darkMode) ComposeColor(0xFF23382B) else ComposeColor(0xFFF0F7F1)
+        val accent = if (darkMode) ComposeColor(0xFF9CE3B5) else ComposeColor(0xFF115B38)
+        val colors = if (darkMode) darkColorScheme(
+            primary = accent, onPrimary = ComposeColor(0xFF103C27),
+            background = background, surface = surface, onSurface = ComposeColor(0xFFF3F8F3),
+        ) else lightColorScheme(
+            primary = ComposeColor(0xFF176B43), onPrimary = ComposeColor.White,
+            background = background, surface = surface, onSurface = ComposeColor(0xFF183326),
         )
         MaterialTheme(colorScheme = colors) {
             Box(
                 Modifier.fillMaxSize().background(
-                    Brush.verticalGradient(listOf(ComposeColor(0xFF07151F), ComposeColor(0xFF0B2936)))
+                    Brush.verticalGradient(listOf(background, raised))
                 ).padding(24.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(32.dp),
-                    color = ComposeColor(0xFF102431),
+                    color = surface,
                     shadowElevation = 20.dp,
                 ) {
                     Column(
@@ -112,25 +126,25 @@ class DinexVoiceCommandActivity : ComponentActivity() {
                         Surface(
                             modifier = Modifier.size((84 + level * 24).dp),
                             shape = CircleShape,
-                            color = ComposeColor(0xFF33D6A5).copy(alpha = 0.13f),
+                            color = raised,
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(
                                     modifier = Modifier.size(58.dp),
-                                    color = ComposeColor(0xFF33D6A5),
+                                    color = accent,
                                     strokeWidth = 5.dp,
                                 )
-                                Text("D", color = ComposeColor.White, fontWeight = FontWeight.Black, fontSize = 24.sp)
+                                Text("D", color = accent, fontWeight = FontWeight.Black, fontSize = 24.sp)
                             }
                         }
                         Spacer(Modifier.height(20.dp))
                         Text("Dinex te escucha", fontWeight = FontWeight.Black, fontSize = 27.sp)
                         Spacer(Modifier.height(7.dp))
-                        Text(status, color = ComposeColor(0xFF8CF2D4), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+                        Text(status, color = accent, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
                         Spacer(Modifier.height(14.dp))
-                        Surface(shape = RoundedCornerShape(18.dp), color = ComposeColor(0xFF183344)) {
+                        Surface(shape = RoundedCornerShape(18.dp), color = raised) {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("Puedes decir:", color = ComposeColor(0xFF9CB4C2), fontSize = 11.sp)
+                                Text("Puedes decir:", color = colors.onSurfaceVariant, fontSize = 11.sp)
                                 Text("“Registra 20 soles en comida”", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 Text("“Recibí 150 soles por un trabajo”", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 Text("“Agenda pagar internet mañana por 50 soles”", fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -138,16 +152,16 @@ class DinexVoiceCommandActivity : ComponentActivity() {
                         }
                         error?.let {
                             Spacer(Modifier.height(14.dp))
-                            Text(it, color = ComposeColor(0xFFFF7180), textAlign = TextAlign.Center, fontSize = 12.sp)
+                            Text(it, color = colors.error, textAlign = TextAlign.Center, fontSize = 12.sp)
                             Spacer(Modifier.height(10.dp))
                             Button(
                                 onClick = ::startListening,
-                                colors = ButtonDefaults.buttonColors(containerColor = ComposeColor(0xFF36BFF2)),
+                                colors = ButtonDefaults.buttonColors(containerColor = ComposeColor(0xFF176B43), contentColor = ComposeColor.White),
                             ) { Text("Intentar otra vez", fontWeight = FontWeight.Bold) }
                         }
                         Spacer(Modifier.height(12.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                            TextButton(onClick = ::cancelAndFinish) { Text("Cancelar", color = ComposeColor(0xFF9CB4C2)) }
+                            TextButton(onClick = ::cancelAndFinish) { Text("Cancelar", color = colors.onSurfaceVariant) }
                         }
                     }
                 }
