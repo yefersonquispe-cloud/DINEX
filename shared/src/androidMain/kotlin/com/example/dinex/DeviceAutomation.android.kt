@@ -12,6 +12,7 @@ import android.location.Geocoder
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
+import android.location.LocationRequest
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -34,10 +35,22 @@ import java.util.Locale
 actual fun rememberDeviceAutomation(): DeviceAutomation {
     val context = androidx.compose.ui.platform.LocalContext.current
     val automation = remember(context) { AndroidDeviceAutomation(context) }
-    DisposableEffect(automation) {
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(automation, lifecycleOwner) {
         DinexLocationProvider.current = { automation.currentLocation() }
-        automation.refreshLocation()
+        // Follow the GPS only while Dinex is visible; the permission dialog also
+        // pauses and resumes the screen, so a new grant starts it right away.
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            when (event) {
+                androidx.lifecycle.Lifecycle.Event.ON_RESUME -> automation.startFollowingLocation()
+                androidx.lifecycle.Lifecycle.Event.ON_PAUSE -> automation.stopFollowingLocation()
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            automation.stopFollowingLocation()
             DinexLocationProvider.current = null
             automation.stopVoice()
         }
@@ -233,23 +246,51 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
 
     override fun currentLocationLabel(): String? {
         if (!locationAvailable) return null
-        val location = lastKnownLocation() ?: return "Ubicación GPS disponible"
+        val location = bestLocation() ?: return "Ubicación GPS disponible"
         return geocode(location).ifBlank { "Ubicación GPS disponible" }
     }
 
     override fun currentLocation(): DinexLocation? {
         if (!locationAvailable) return null
-        val location = lastKnownLocation() ?: return null
+        val location = bestLocation() ?: return null
         return DinexLocation(location.latitude, location.longitude, geocode(location))
     }
 
     @Volatile private var freshLocation: Location? = null
     private var lastRefreshAt = 0L
+    private var followingLocation = false
+    private val locationListener = object : LocationListener {
+        override fun onLocationChanged(location: Location) = keepBest(location)
+        @Deprecated("Deprecated in Java")
+        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+        override fun onProviderEnabled(provider: String) = Unit
+        override fun onProviderDisabled(provider: String) = Unit
+    }
 
     /**
-     * Asks Android for a new fix. getLastKnownLocation alone only returns what
-     * another app last requested, which can be hours old or in another city.
+     * While Dinex is on screen, follow the phone's GPS so each expense is tagged
+     * with where the person really is, not the last place another app asked for.
      */
+    @SuppressLint("MissingPermission")
+    fun startFollowingLocation() {
+        if (followingLocation || !locationAvailable) return
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return
+        locationProviders(manager).forEach { provider ->
+            runCatching { manager.requestLocationUpdates(provider, 10_000L, 5f, locationListener, Looper.getMainLooper()) }
+        }
+        followingLocation = true
+        lastRefreshAt = 0L
+        refreshLocation()
+    }
+
+    fun stopFollowingLocation() {
+        if (!followingLocation) return
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return
+        runCatching { manager.removeUpdates(locationListener) }
+        followingLocation = false
+    }
+
+    /** Asks Android for one new, high-accuracy fix right now. */
     @SuppressLint("MissingPermission")
     fun refreshLocation() {
         if (!locationAvailable) return
@@ -259,27 +300,38 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return
         locationProviders(manager).forEach { provider ->
             runCatching {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    manager.getCurrentLocation(provider, null, ContextCompat.getMainExecutor(context)) { location ->
-                        location?.let(::keepNewest)
+                when {
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                        val request = LocationRequest.Builder(0L).setQuality(LocationRequest.QUALITY_HIGH_ACCURACY).build()
+                        manager.getCurrentLocation(provider, request, null, ContextCompat.getMainExecutor(context)) { location ->
+                            location?.let(::keepBest)
+                        }
                     }
-                } else {
-                    @Suppress("DEPRECATION")
-                    manager.requestSingleUpdate(provider, object : LocationListener {
-                        override fun onLocationChanged(location: Location) = keepNewest(location)
-                        @Deprecated("Deprecated in Java")
-                        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
-                        override fun onProviderEnabled(provider: String) = Unit
-                        override fun onProviderDisabled(provider: String) = Unit
-                    }, Looper.getMainLooper())
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.R ->
+                        manager.getCurrentLocation(provider, null, ContextCompat.getMainExecutor(context)) { location ->
+                            location?.let(::keepBest)
+                        }
+                    else -> {
+                        @Suppress("DEPRECATION")
+                        manager.requestSingleUpdate(provider, locationListener, Looper.getMainLooper())
+                    }
                 }
             }
         }
     }
 
-    private fun keepNewest(location: Location) {
-        val current = freshLocation
-        if (current == null || location.elapsedRealtimeNanos > current.elapsedRealtimeNanos) freshLocation = location
+    private fun keepBest(location: Location) {
+        if (isBetterLocation(location, freshLocation)) freshLocation = location
+    }
+
+    /** Prefers a clearly newer fix; among fixes of about the same time, the more accurate one. */
+    private fun isBetterLocation(candidate: Location, current: Location?): Boolean {
+        if (current == null) return true
+        val twoMinutes = 2L * 60 * 1_000_000_000
+        val newer = candidate.elapsedRealtimeNanos - current.elapsedRealtimeNanos
+        if (newer > twoMinutes) return true
+        if (newer < -twoMinutes) return false
+        return candidate.accuracy <= current.accuracy || (newer > 0 && candidate.accuracy <= current.accuracy + 50f)
     }
 
     private fun locationProviders(manager: LocationManager): List<String> {
@@ -292,25 +344,32 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
         return wanted.filter { it in enabled }
     }
 
-    /** Newest known fix, ignoring anything older than two hours so a stale city is never saved. */
+    /** Best recent fix, ignoring anything older than 30 minutes so a stale city is never saved. */
     @SuppressLint("MissingPermission")
-    private fun lastKnownLocation(): Location? {
+    private fun bestLocation(): Location? {
         if (!locationAvailable) return null
         refreshLocation()
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
         val cached = locationProviders(manager)
             .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
-        val maxAgeNanos = 2L * 60 * 60 * 1_000_000_000
+        val maxAgeNanos = 30L * 60 * 1_000_000_000
         return (cached + listOfNotNull(freshLocation))
             .filter { SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos < maxAgeNanos }
-            .maxByOrNull { it.elapsedRealtimeNanos }
+            .fold(null as Location?) { best, location -> if (isBetterLocation(location, best)) location else best }
     }
 
+    /** Street and number when Android knows them, e.g. "Av. Ejército 1020, Yanahuara, Arequipa". */
     private fun geocode(location: Location): String = runCatching {
+        @Suppress("DEPRECATION")
         Geocoder(context, Locale("es", "PE")).getFromLocation(location.latitude, location.longitude, 1)
             ?.firstOrNull()
             ?.let { address ->
-                listOfNotNull(address.locality, address.thoroughfare).joinToString(", ").ifBlank { address.featureName }
+                val street = address.thoroughfare?.let { listOfNotNull(it, address.subThoroughfare).joinToString(" ") }
+                listOfNotNull(street, address.subLocality, address.locality)
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .joinToString(", ")
+                    .ifBlank { address.getAddressLine(0).orEmpty().ifBlank { address.featureName.orEmpty() } }
             }
             .orEmpty()
     }.getOrDefault("")

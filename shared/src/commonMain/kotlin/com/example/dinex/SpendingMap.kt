@@ -40,7 +40,7 @@ internal val HeatColors = listOf(
 )
 internal val HeatStops = listOf(0.15f, 0.35f, 0.6f, 0.85f, 1f)
 
-/** Groups geotagged expenses by a ~100 m grid so repeated visits add up. */
+/** Groups geotagged expenses by a ~11 m grid (same shop or door), so repeated visits add up. */
 internal fun spendingPlaces(movements: List<Movement>): List<SpendingPlace> {
     val grouped = movements.asSequence()
         .filter { !it.income }
@@ -50,7 +50,7 @@ internal fun spendingPlaces(movements: List<Movement>): List<SpendingPlace> {
             lat != null && lng != null && lat.isFinite() && lng.isFinite() &&
                 lat in -90.0..90.0 && lng in -180.0..180.0
         }
-        .groupBy { "${(it.latitude!! * 1000).roundToInt()}|${(it.longitude!! * 1000).roundToInt()}" }
+        .groupBy { "${(it.latitude!! * 10_000).roundToInt()}|${(it.longitude!! * 10_000).roundToInt()}" }
     return grouped.map { (_, items) ->
         val label = items.asSequence()
             .map { it.location.trim() }
@@ -62,8 +62,8 @@ internal fun spendingPlaces(movements: List<Movement>): List<SpendingPlace> {
             .orEmpty()
         SpendingPlace(
             label = label.ifBlank { "Lugar visitado" },
-            latitude = items.first().latitude!!,
-            longitude = items.first().longitude!!,
+            latitude = items.sumOf { it.latitude!! } / items.size,
+            longitude = items.sumOf { it.longitude!! } / items.size,
             total = items.sumOf { it.amount },
             visits = items.size,
         )

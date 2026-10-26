@@ -69,8 +69,11 @@ La sección **Análisis** incluye la tarjeta **¿Dónde gastas más?** con un ma
 calor de los lugares donde la persona gasta.
 
 - Cada gasto nuevo guarda la **latitud y longitud** del teléfono si el permiso de
-  ubicación está concedido. Se agrupan por una cuadrícula de ~100 m para sumar
-  visitas al mismo lugar. No se guarda ubicación en ingresos ni al editar.
+  ubicación está concedido. Mientras Dinex está en pantalla sigue el GPS del
+  celular, así que se guarda el punto exacto (y la calle, si Android la conoce).
+  Se agrupan por una cuadrícula de ~11 m para sumar visitas al mismo local.
+  No se guarda ubicación en ingresos ni al editar, ni si el último dato del GPS
+  tiene más de 30 minutos.
 - El mapa usa **OpenStreetMap + Leaflet** dentro de un WebView, sin clave de
   Google Maps. Necesita internet para las calles; la lista de lugares y montos
   debajo del mapa funciona sin conexión.
