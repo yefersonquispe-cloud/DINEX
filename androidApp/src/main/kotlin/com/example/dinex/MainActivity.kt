@@ -55,8 +55,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        // 7005 is the notification permission request from DeviceAutomation.
-        if (requestCode == 7005) DinexNotificationPermission.refresh()
+        // 7002 = ubicación; 7005 = notificaciones. Ambos refrescan el estado de permisos de la UI.
+        if (requestCode == 7002 || requestCode == 7005) DinexNotificationPermission.refresh()
     }
 }
 

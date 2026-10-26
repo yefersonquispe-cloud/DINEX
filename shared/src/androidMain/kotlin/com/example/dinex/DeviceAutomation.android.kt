@@ -1,6 +1,7 @@
 package com.example.dinex
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
@@ -8,10 +9,14 @@ import android.content.ContextWrapper
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.location.Geocoder
+import android.location.Location
+import android.location.LocationListener
 import android.location.LocationManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Looper
+import android.os.SystemClock
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.speech.RecognitionListener
@@ -29,7 +34,14 @@ import java.util.Locale
 actual fun rememberDeviceAutomation(): DeviceAutomation {
     val context = androidx.compose.ui.platform.LocalContext.current
     val automation = remember(context) { AndroidDeviceAutomation(context) }
-    DisposableEffect(automation) { onDispose { automation.stopVoice() } }
+    DisposableEffect(automation) {
+        DinexLocationProvider.current = { automation.currentLocation() }
+        automation.refreshLocation()
+        onDispose {
+            DinexLocationProvider.current = null
+            automation.stopVoice()
+        }
+    }
     return automation
 }
 
@@ -221,15 +233,87 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
 
     override fun currentLocationLabel(): String? {
         if (!locationAvailable) return null
-        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
-        val provider = listOf(LocationManager.NETWORK_PROVIDER, LocationManager.GPS_PROVIDER).firstOrNull { manager.isProviderEnabled(it) } ?: return null
-        val location = runCatching { manager.getLastKnownLocation(provider) }.getOrNull() ?: return "Ubicación GPS disponible"
-        return runCatching {
-            Geocoder(context, Locale("es", "PE")).getFromLocation(location.latitude, location.longitude, 1)?.firstOrNull()?.let {
-                listOfNotNull(it.locality, it.thoroughfare).joinToString(", ").ifBlank { "Ubicación GPS disponible" }
-            }
-        }.getOrNull() ?: "Ubicación GPS disponible"
+        val location = lastKnownLocation() ?: return "Ubicación GPS disponible"
+        return geocode(location).ifBlank { "Ubicación GPS disponible" }
     }
+
+    override fun currentLocation(): DinexLocation? {
+        if (!locationAvailable) return null
+        val location = lastKnownLocation() ?: return null
+        return DinexLocation(location.latitude, location.longitude, geocode(location))
+    }
+
+    @Volatile private var freshLocation: Location? = null
+    private var lastRefreshAt = 0L
+
+    /**
+     * Asks Android for a new fix. getLastKnownLocation alone only returns what
+     * another app last requested, which can be hours old or in another city.
+     */
+    @SuppressLint("MissingPermission")
+    fun refreshLocation() {
+        if (!locationAvailable) return
+        val now = SystemClock.elapsedRealtime()
+        if (now - lastRefreshAt < 15_000) return
+        lastRefreshAt = now
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return
+        locationProviders(manager).forEach { provider ->
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    manager.getCurrentLocation(provider, null, ContextCompat.getMainExecutor(context)) { location ->
+                        location?.let(::keepNewest)
+                    }
+                } else {
+                    @Suppress("DEPRECATION")
+                    manager.requestSingleUpdate(provider, object : LocationListener {
+                        override fun onLocationChanged(location: Location) = keepNewest(location)
+                        @Deprecated("Deprecated in Java")
+                        override fun onStatusChanged(provider: String?, status: Int, extras: Bundle?) = Unit
+                        override fun onProviderEnabled(provider: String) = Unit
+                        override fun onProviderDisabled(provider: String) = Unit
+                    }, Looper.getMainLooper())
+                }
+            }
+        }
+    }
+
+    private fun keepNewest(location: Location) {
+        val current = freshLocation
+        if (current == null || location.elapsedRealtimeNanos > current.elapsedRealtimeNanos) freshLocation = location
+    }
+
+    private fun locationProviders(manager: LocationManager): List<String> {
+        val wanted = buildList {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) add(LocationManager.FUSED_PROVIDER)
+            add(LocationManager.GPS_PROVIDER)
+            add(LocationManager.NETWORK_PROVIDER)
+        }
+        val enabled = runCatching { manager.getProviders(true) }.getOrDefault(emptyList())
+        return wanted.filter { it in enabled }
+    }
+
+    /** Newest known fix, ignoring anything older than two hours so a stale city is never saved. */
+    @SuppressLint("MissingPermission")
+    private fun lastKnownLocation(): Location? {
+        if (!locationAvailable) return null
+        refreshLocation()
+        val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
+        val cached = locationProviders(manager)
+            .mapNotNull { provider -> runCatching { manager.getLastKnownLocation(provider) }.getOrNull() }
+        val maxAgeNanos = 2L * 60 * 60 * 1_000_000_000
+        return (cached + listOfNotNull(freshLocation))
+            .filter { SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos < maxAgeNanos }
+            .maxByOrNull { it.elapsedRealtimeNanos }
+    }
+
+    private fun geocode(location: Location): String = runCatching {
+        Geocoder(context, Locale("es", "PE")).getFromLocation(location.latitude, location.longitude, 1)
+            ?.firstOrNull()
+            ?.let { address ->
+                listOfNotNull(address.locality, address.thoroughfare).joinToString(", ").ifBlank { address.featureName }
+            }
+            .orEmpty()
+    }.getOrDefault("")
 }
 
 /** Compose may hand a ContextThemeWrapper instead of the Activity itself. */

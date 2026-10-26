@@ -38,6 +38,7 @@ interface DeviceAutomation {
     fun requestLocationPermission()
     fun drainNotifications(): List<CapturedTransaction>
     fun currentLocationLabel(): String?
+    fun currentLocation(): DinexLocation? = null
 }
 
 @Composable
