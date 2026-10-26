@@ -26,7 +26,12 @@ internal data class PaymentReminder(
 
 internal data class CategoryInfo(val name: String, val code: String, val color: Color, val limit: Double)
 
-internal data class ChatMessage(val text: String, val user: Boolean, val error: Boolean = false)
+internal data class ChatMessage(
+    val text: String,
+    val user: Boolean,
+    val error: Boolean = false,
+    val engine: GeminiEngine? = null,
+)
 
 internal data class SavingEntry(val amount: Double, val purpose: String, val target: Double, val goalId: Int? = null)
 

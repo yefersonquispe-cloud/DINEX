@@ -45,6 +45,24 @@ Además del lector de notificaciones, Dinex publica sus propios avisos reales:
 - El recordatorio diario usa WorkManager. Si el sistema está en ahorro extremo
   de batería puede retrasarse, pero se reintenta y sobrevive reinicios.
 
+## Gemini Nano en el dispositivo
+
+Dinex IA intenta responder primero con **Gemini Nano**, el modelo local que
+AICore ejecuta en el teléfono, y cae a la API de Gemini en la nube si el equipo
+no lo soporta, falta el modelo o la inferencia local falla.
+
+- Usa la **Prompt API de ML Kit GenAI** (`com.google.mlkit:genai-prompt`).
+  Requiere Android 8.0 o superior (API 26) y un dispositivo compatible con AICore.
+- Abre **Dinex IA**. Si el modelo se puede descargar, aparece la tarjeta
+  **Gemini Nano en tu teléfono** con el botón **Descargar** y el progreso.
+  Cuando está listo, el estado cambia a **Gemini Nano · funciona sin internet**
+  y las respuestas muestran **DINEX IA · NANO**.
+- Con Nano, el contexto financiero se procesa en el dispositivo y no se envía
+  a la nube. Sin Nano, Dinex usa `GEMINI_API_KEY` de `local.properties` como antes.
+- El emulador y muchos teléfonos no incluyen AICore; en ese caso Dinex sigue
+  funcionando con Gemini en la nube sin mostrar errores.
+- La app subió su mínimo a Android 8.0 (API 26), que es el requisito de ML Kit GenAI.
+
 ## Mapa de calor de gastos
 
 La sección **Análisis** incluye la tarjeta **¿Dónde gastas más?** con un mapa de

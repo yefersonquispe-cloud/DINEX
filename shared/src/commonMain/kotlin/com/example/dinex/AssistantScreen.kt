@@ -78,7 +78,13 @@ internal fun AssistantPage(
     val chatListState = rememberLazyListState()
     var draft by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
+    var nanoBusy by remember { mutableStateOf(false) }
+    var nanoError by remember { mutableStateOf<String?>(null) }
     val reducedMotion = LocalDinexReducedMotion.current
+    val nanoStatus = assistant.nanoStatus
+    val nanoProgress = assistant.nanoProgress
+
+    LaunchedEffect(assistant) { assistant.refreshNanoStatus() }
 
     LaunchedEffect(messages.size, loading, reducedMotion) {
         if (messages.size <= 1 && !loading) return@LaunchedEffect
@@ -97,8 +103,8 @@ internal fun AssistantPage(
         scope.launch {
             val reply = runCatching {
                 assistant.ask(cleanQuestion, buildFinancialContext(movements, dailyLimit, streak, savings, categoryBudgets))
-            }.getOrElse { GeminiReply("No pude conectarme. Inténtalo de nuevo.", successful = false) }
-            messages.add(ChatMessage(reply.text, user = false, error = !reply.successful))
+            }.getOrElse { GeminiReply("No pude conectarme. Inténtalo de nuevo.", successful = false, engine = GeminiEngine.NONE) }
+            messages.add(ChatMessage(reply.text, user = false, error = !reply.successful, engine = reply.engine))
             loading = false
         }
     }
@@ -134,8 +140,45 @@ internal fun AssistantPage(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text("Dinex IA", color = Night, fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.5).sp)
-                        Text(if (assistant.isConfigured) "Disponible para ayudarte" else "Configura Gemini para conversar", color = if (assistant.isConfigured) GreenDark else Orange, fontSize = 12.sp)
+                        val subtitle = when (nanoStatus) {
+                            NanoStatus.AVAILABLE -> "Gemini Nano · funciona sin internet"
+                            NanoStatus.DOWNLOADING -> "Descargando Gemini Nano…"
+                            NanoStatus.DOWNLOADABLE -> "Gemini Nano disponible en tu teléfono"
+                            NanoStatus.CHECKING -> "Buscando Gemini Nano…"
+                            NanoStatus.UNAVAILABLE -> if (assistant.isConfigured) "Gemini en la nube · Nano no disponible"
+                            else "Configura Gemini para conversar"
+                        }
+                        val ready = assistant.isConfigured || nanoStatus == NanoStatus.AVAILABLE ||
+                            nanoStatus == NanoStatus.DOWNLOADABLE || nanoStatus == NanoStatus.DOWNLOADING
+                        Text(subtitle, color = if (ready) GreenDark else Orange, fontSize = 12.sp)
                     }
+                }
+                if (nanoStatus == NanoStatus.UNAVAILABLE && assistant.nanoDetail != null) {
+                    Text(
+                        "${assistant.nanoDevice.ifBlank { "Este dispositivo" }}: ${assistant.nanoDetail}",
+                        color = Gray,
+                        fontSize = 9.5.sp,
+                        lineHeight = 13.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+                if (nanoStatus == NanoStatus.DOWNLOADABLE || nanoStatus == NanoStatus.DOWNLOADING || nanoError != null) {
+                    Spacer(Modifier.height(10.dp))
+                    NanoDownloadCard(
+                        downloading = nanoStatus == NanoStatus.DOWNLOADING || nanoBusy,
+                        progress = nanoProgress,
+                        error = nanoError,
+                        onDownload = {
+                            scope.launch {
+                                nanoError = null
+                                nanoBusy = true
+                                nanoError = assistant.prepareNano()
+                                nanoBusy = false
+                            }
+                        },
+                    )
                 }
                 HorizontalDivider(color = Border.copy(alpha = .65f))
                 LazyColumn(
@@ -191,6 +234,46 @@ private fun AssistantContextLine(label: String, value: String, tint: Color) {
 }
 
 @Composable
+private fun NanoDownloadCard(downloading: Boolean, progress: Float?, error: String?, onDownload: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = ElectricBlue.copy(alpha = .10f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, ElectricBlue.copy(alpha = .30f)),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(DinexNavigationIcons.Sparkle, null, tint = ElectricBlue, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Gemini Nano en tu teléfono", color = Night, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(
+                        if (downloading) "Descargando el modelo para responder sin internet…"
+                        else "Responde sin internet y sin enviar tus datos a la nube.",
+                        color = Gray, fontSize = 10.sp,
+                    )
+                }
+                if (!downloading) TextButton(onClick = onDownload) {
+                    Text("Descargar", color = ElectricBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            if (downloading) {
+                Spacer(Modifier.height(8.dp))
+                if (progress != null) {
+                    DinexProgress(progress, ElectricBlue, height = 6.dp)
+                    Text("${(progress * 100).toInt()}% descargado", color = Gray, fontSize = 10.sp)
+                } else {
+                    Text("Preparando la descarga…", color = Gray, fontSize = 10.sp)
+                }
+            }
+            error?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, color = Red, fontSize = 10.sp)
+            }
+        }
+    }
+}
+
+@Composable
 private fun AssistantThinking() {
     val reducedMotionForDots = LocalDinexReducedMotion.current
     val phase: State<Float> = if (reducedMotionForDots) remember { mutableStateOf(.5f) }
@@ -233,7 +316,11 @@ internal fun ChatBubble(message: ChatMessage) {
             Column(Modifier.padding(horizontal = 14.dp, vertical = 11.dp)) {
                 if (!message.user) {
                     Text(
-                        if (message.error) "DINEX · AVISO" else "DINEX IA",
+                        when {
+                            message.error -> "DINEX · AVISO"
+                            message.engine == GeminiEngine.NANO -> "DINEX IA · NANO"
+                            else -> "DINEX IA"
+                        },
                         color = if (message.error) Orange else GreenDark,
                         fontWeight = FontWeight.Black,
                         fontSize = 10.sp,

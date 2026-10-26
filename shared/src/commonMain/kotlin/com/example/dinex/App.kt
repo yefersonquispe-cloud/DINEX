@@ -113,10 +113,9 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         automation.consumePendingVoiceCommand()?.let { model.handleVoice(it, automation.currentLocationLabel()) }
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
-    val chatMessages = remember(assistant.isConfigured) {
+    val chatMessages = remember {
         mutableStateListOf(ChatMessage(
-            if (assistant.isConfigured) "Hola, soy Dinex IA. Te ayudo a entender tus gastos y planear tus ahorros."
-            else "Hola, soy Dinex IA. Configura Gemini para conversar sobre tus finanzas.",
+            "Hola, soy Dinex IA. Te ayudo a entender tus gastos y planear tus ahorros.",
             user = false,
         ))
     }

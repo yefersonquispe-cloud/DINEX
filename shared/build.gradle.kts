@@ -63,6 +63,7 @@ kotlin {
             implementation("com.google.mlkit:text-recognition:16.0.1")
             implementation("com.google.mlkit:image-labeling:17.0.9")
             implementation("com.google.mlkit:barcode-scanning:17.3.0")
+            implementation(libs.mlkit.genai.prompt)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
