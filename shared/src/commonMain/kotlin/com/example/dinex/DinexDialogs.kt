@@ -54,7 +54,7 @@ import kotlin.math.max
 // Expense/income/saving forms, camera review, loading and notifications.
 // ═══════════════════════════════════════════════════════════════════════════
 @Composable
-internal fun QuickAddDialog(onDismiss: () -> Unit, onExpense: () -> Unit, onIncome: () -> Unit, onSaving: () -> Unit, onScan: () -> Unit, onAutomation: () -> Unit) {
+internal fun QuickAddDialog(onDismiss: () -> Unit, onExpense: () -> Unit, onIncome: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(24.dp),
@@ -69,9 +69,6 @@ internal fun QuickAddDialog(onDismiss: () -> Unit, onExpense: () -> Unit, onInco
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 DialogAction("−", "Registrar gasto", "Monto, categoría y listo", Red.copy(alpha = .10f), Red, onExpense)
                 DialogAction("+", "Registrar ingreso", "Aumenta tu saldo", Green.copy(alpha = .10f), GreenDark, onIncome)
-                DialogAction("AH", "Crear meta / ahorro", "Activa tu racha y suma a tu tarjeta", Mint, Lime, onSaving)
-                DialogAction("CAM", "Escanear comprobante", "Foto + reconocimiento automático", Indigo.copy(alpha = .12f), Indigo, onScan)
-                DialogAction("VOZ", "Voz y notificaciones", "Di un gasto o revisa alertas del teléfono", ElectricBlue.copy(alpha = .10f), ElectricBlue, onAutomation)
             }
         },
         confirmButton = {},

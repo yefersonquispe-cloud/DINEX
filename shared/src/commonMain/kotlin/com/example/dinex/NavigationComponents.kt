@@ -36,6 +36,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -63,6 +64,8 @@ internal fun DinexAppShell(
     onProfile: () -> Unit,
     onAssistant: () -> Unit,
     onWalletClick: () -> Unit,
+    darkMode: Boolean,
+    onToggleTheme: () -> Unit,
     streak: Int,
     name: String,
     email: String,
@@ -92,6 +95,8 @@ internal fun DinexAppShell(
                         onProfile = onProfile,
                         onAdd = onAdd,
                         onWalletClick = onWalletClick,
+                        darkMode = darkMode,
+                        onToggleTheme = onToggleTheme,
                     )
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         content(PaddingValues(0.dp))
@@ -103,7 +108,8 @@ internal fun DinexAppShell(
             }
         } else {
             Column(Modifier.fillMaxSize()) {
-                DinexTopBar(streak = streak, name = name, email = email, profilePhoto = profilePhoto, onProfile = onProfile, onWalletClick = onWalletClick)
+                DinexTopBar(streak = streak, name = name, email = email, profilePhoto = profilePhoto, onProfile = onProfile, onWalletClick = onWalletClick,
+                    darkMode = darkMode, onToggleTheme = onToggleTheme)
                 // The dock floats over the page; scrollable screens add only end-of-list space.
                 Box(Modifier.weight(1f)) { content(PaddingValues(0.dp)) }
             }
@@ -202,7 +208,10 @@ internal fun SidebarItem(label: String, code: String, selected: Boolean, onClick
 }
 
 @Composable
-internal fun DinexDesktopTopBar(streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onAdd: () -> Unit, onWalletClick: () -> Unit) {
+internal fun DinexDesktopTopBar(
+    streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onAdd: () -> Unit, onWalletClick: () -> Unit,
+    darkMode: Boolean, onToggleTheme: () -> Unit,
+) {
     val level = streakLevel(streak)
     Surface(color = AppBg.copy(alpha = .85f), border = BorderStroke(1.dp, Border.copy(alpha = .4f))) {
         Row(
@@ -231,6 +240,8 @@ internal fun DinexDesktopTopBar(streak: Int, name: String, email: String, profil
                 shape = RoundedCornerShape(RadiusMd),
                 colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
             ) { Text("+ Nuevo", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            Spacer(Modifier.width(10.dp))
+            ThemeToggle(darkMode, onToggleTheme, 36.dp)
             Spacer(Modifier.width(10.dp))
             ProfilePhoto(name, profilePhoto, 36.dp, Modifier.clickable(onClick = onProfile))
         }
@@ -266,7 +277,10 @@ internal fun DinexAssistantBubble(onClick: () -> Unit) {
 }
 
 @Composable
-internal fun DinexTopBar(streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit) {
+internal fun DinexTopBar(
+    streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit,
+    darkMode: Boolean, onToggleTheme: () -> Unit,
+) {
     val level = streakLevel(streak)
     Surface(modifier = Modifier.statusBarsPadding(), color = AppBg.copy(alpha = .88f)) {
         Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -293,9 +307,28 @@ internal fun DinexTopBar(streak: Int, name: String, email: String, profilePhoto:
                     Text("$streak", color = readableAccent(level.color), fontWeight = FontWeight.Black, fontSize = 11.sp)
                 }
             }
-            Spacer(Modifier.width(8.dp))
+            Spacer(Modifier.width(6.dp))
+            ThemeToggle(darkMode, onToggleTheme, 40.dp)
+            Spacer(Modifier.width(6.dp))
             ProfilePhoto(name, profilePhoto, 44.dp, Modifier.clickable(onClickLabel = "Abrir perfil y accesibilidad", onClick = onProfile))
         }
+    }
+}
+
+/** Moon in light mode, sun in dark mode: one tap switches the theme. */
+@Composable
+internal fun ThemeToggle(darkMode: Boolean, onToggle: () -> Unit, size: Dp) {
+    Box(
+        Modifier.size(size).clip(CircleShape)
+            .clickable(onClickLabel = if (darkMode) "Cambiar a modo claro" else "Cambiar a modo oscuro", role = Role.Button, onClick = onToggle),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            if (darkMode) DinexNavigationIcons.Sun else DinexNavigationIcons.Moon,
+            contentDescription = if (darkMode) "Modo claro" else "Modo oscuro",
+            tint = if (darkMode) Orange else Night,
+            modifier = Modifier.size(size * .58f),
+        )
     }
 }
 

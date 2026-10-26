@@ -44,6 +44,9 @@ internal fun HomePage(
     onGoalDetails: () -> Unit = {},
     goals: List<SavingsGoal> = emptyList(),
     onOpenGoal: (Int) -> Unit = {},
+    onScan: () -> Unit = {},
+    onVoice: () -> Unit = {},
+    onGoals: () -> Unit = {},
     notificationsSupported: Boolean = false,
     notificationsEnabled: Boolean = true,
     onEnableNotifications: () -> Unit = {},
@@ -78,6 +81,7 @@ internal fun HomePage(
                     SavingsHero(savings, streak, goalName, goalTarget, onClick = onGoalDetails)
                 }
             }
+            item { QuickActions(onScan = onScan, onVoice = onVoice, onGoals = onGoals, onHistory = onHistory) }
             item {
                 if (desktop) Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
                     Box(Modifier.weight(1f)) { SpendingOverview(monthly) }
@@ -113,6 +117,34 @@ internal fun NotificationsNudge(onEnable: () -> Unit) {
                 onClick = onEnable,
                 colors = ButtonDefaults.buttonColors(containerColor = Green),
             ) { Text("Activar", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+        }
+    }
+}
+
+@Composable
+private fun QuickActions(onScan: () -> Unit, onVoice: () -> Unit, onGoals: () -> Unit, onHistory: () -> Unit) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        QuickActionTile("Escanear", DinexNavigationIcons.Camera, Indigo, onScan, Modifier.weight(1f))
+        QuickActionTile("Voz", DinexNavigationIcons.Microphone, ElectricBlue, onVoice, Modifier.weight(1f))
+        QuickActionTile("Metas", DinexNavigationIcons.Sparkle, Orange, onGoals, Modifier.weight(1f))
+        QuickActionTile("Historial", DinexNavigationIcons.Movements, Lime, onHistory, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun QuickActionTile(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.clickable(onClickLabel = label, onClick = onClick),
+        shape = RoundedCornerShape(RadiusMd),
+        color = Card,
+        border = BorderStroke(1.dp, Border),
+    ) {
+        Column(Modifier.padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(label, color = Night, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
         }
     }
 }

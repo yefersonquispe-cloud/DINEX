@@ -129,6 +129,8 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             onProfile = { profileOpen = true },
             onAssistant = { assistantOpen = true },
             onWalletClick = { walletBubbleOpen = true },
+            darkMode = state.darkMode,
+            onToggleTheme = { model.setDarkMode(!state.darkMode) },
             streak = streak,
             name = name,
             email = state.email.orEmpty(),
@@ -149,6 +151,8 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                             onDailyLimitChange = model::setDailyLimit,
                             onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
                             goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true },
+                            onScan = { scanner() }, onVoice = { automationDialog = true },
+                            onGoals = { savingGoalId = null; savingDialog = true },
                             notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
                             onEnableNotifications = { automation.requestSystemNotificationPermission() })
                         1 -> HistoryPage(movements, onAdd = { quickAdd = true }, onDelete = { movementToDelete = it },
@@ -167,6 +171,8 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                             onDailyLimitChange = model::setDailyLimit,
                             onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
                             goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true },
+                            onScan = { scanner() }, onVoice = { automationDialog = true },
+                            onGoals = { savingGoalId = null; savingDialog = true },
                             notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
                             onEnableNotifications = { automation.requestSystemNotificationPermission() })
                     }
@@ -208,9 +214,6 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         onDismiss = { quickAdd = false },
         onExpense = { quickAdd = false; manualIncome = false },
         onIncome = { quickAdd = false; manualIncome = true },
-        onSaving = { quickAdd = false; savingGoalId = null; savingDialog = true },
-        onScan = { quickAdd = false; scanner() },
-        onAutomation = { quickAdd = false; automationDialog = true },
     )
     if (automationDialog) AutomationDialog(
         automation, onDismiss = { automationDialog = false },

@@ -113,6 +113,27 @@ internal object DinexNavigationIcons {
         moveTo(18.5f, 12.5f); lineTo(18.6f, 12.5f)
     }
 
+    val Moon = outline("DinexMoon") {
+        moveTo(20.5f, 14.5f)
+        curveTo(17.5f, 15.8f, 13.8f, 15.2f, 11.4f, 12.8f)
+        curveTo(9f, 10.4f, 8.3f, 6.6f, 9.7f, 3.6f)
+        curveTo(5.6f, 4.7f, 2.8f, 8.4f, 3f, 12.6f)
+        curveTo(3.2f, 17.4f, 7.1f, 21.1f, 11.9f, 21f)
+        curveTo(15.8f, 20.9f, 19.2f, 18.3f, 20.5f, 14.5f); close()
+    }
+    val Sun = outline("DinexSun") {
+        moveTo(16f, 12f); curveTo(16f, 17.3f, 8f, 17.3f, 8f, 12f)
+        curveTo(8f, 6.7f, 16f, 6.7f, 16f, 12f); close()
+        moveTo(12f, 2f); lineTo(12f, 3.5f)
+        moveTo(12f, 20.5f); lineTo(12f, 22f)
+        moveTo(2f, 12f); lineTo(3.5f, 12f)
+        moveTo(20.5f, 12f); lineTo(22f, 12f)
+        moveTo(4.9f, 4.9f); lineTo(6f, 6f)
+        moveTo(18f, 18f); lineTo(19.1f, 19.1f)
+        moveTo(4.9f, 19.1f); lineTo(6f, 18f)
+        moveTo(18f, 6f); lineTo(19.1f, 4.9f)
+    }
+
     fun forCode(code: String): ImageVector? = when (code) {
         "IN" -> Home
         "MO" -> Movements
