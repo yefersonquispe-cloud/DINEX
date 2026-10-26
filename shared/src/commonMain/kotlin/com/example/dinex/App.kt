@@ -97,6 +97,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     val automation = rememberDeviceAutomation()
     val owner = LocalLifecycleOwner.current
     val permissionRevision = DinexNotificationPermission.revision
+    val locationAvailable = remember(permissionRevision, automation) { automation.locationAvailable }
     val notificationsSupported = automation.systemNotificationsSupported
     val notificationsEnabled = remember(permissionRevision, automation) { automation.systemNotificationsEnabled }
     // A command can arrive while MainActivity is already alive. Consume on every resume.
@@ -157,7 +158,12 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                             onAddReminder = { reminderDialog = true }, onDeleteReminder = { reminderToResolve = it }, categoryBudgets = data.categoryBudgets,
                             historyMovements = movements,
                             onCategoryBudgetsSave = { model.setCategoryBudgets(it) }, onCategoryBudgetsReset = model::resetCategoryBudgets)
-                        3 -> InsightsPage(movements, onExport = { exportDialog = true })
+                        3 -> InsightsPage(
+                            movements,
+                            onExport = { exportDialog = true },
+                            locationAvailable = locationAvailable,
+                            onRequestLocation = { automation.requestLocationPermission() },
+                        )
                         else -> HomePage(movements, dailyLimit, streak, savings, "${data.savingGoals().size} metas", data.savingGoals().sumOf { it.target },
                             onDailyLimitChange = model::setDailyLimit,
                             onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },

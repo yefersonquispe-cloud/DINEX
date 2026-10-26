@@ -45,6 +45,27 @@ Además del lector de notificaciones, Dinex publica sus propios avisos reales:
 - El recordatorio diario usa WorkManager. Si el sistema está en ahorro extremo
   de batería puede retrasarse, pero se reintenta y sobrevive reinicios.
 
+## Mapa de calor de gastos
+
+La sección **Análisis** incluye la tarjeta **¿Dónde gastas más?** con un mapa de
+calor de los lugares donde la persona gasta.
+
+- Cada gasto nuevo guarda la **latitud y longitud** del teléfono si el permiso de
+  ubicación está concedido. Se agrupan por una cuadrícula de ~100 m para sumar
+  visitas al mismo lugar. No se guarda ubicación en ingresos ni al editar.
+- El mapa usa **OpenStreetMap + Leaflet** dentro de un WebView, sin clave de
+  Google Maps. Necesita internet para las calles; la lista de lugares y montos
+  debajo del mapa funciona sin conexión.
+- La lista muestra los 5 lugares con más gasto, número de visitas y una barra de
+  intensidad. Los gastos antiguos que solo tienen un nombre de lugar aparecen en
+  **Lugares por nombre**.
+- Si falta el permiso, la tarjeta ofrece **Permitir ubicación**. Solo se captura
+  la ubicación cuando se registra un gasto y el usuario dio permiso; los datos
+  quedan en el dispositivo.
+- El mapa se puede filtrar por mes o por últimos 7 días desde los controles de
+  Análisis. Para ver un mapa real en el emulador hace falta red; sin red se
+  muestra el fondo del mapa y la lista de lugares.
+
 ## Si Android/HyperOS deniega el acceso
 
 En APK instaladas fuera de una tienda, Android puede bloquear permisos especiales.

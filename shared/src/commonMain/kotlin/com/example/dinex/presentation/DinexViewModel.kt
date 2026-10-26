@@ -127,15 +127,25 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         if (!movement.amount.isFinite() || movement.amount <= 0) return
         val movements = value.data.movements
         val exists = movements.any { it.id == movement.id }
+        // Each new expense captures the current place so the heatmap fills up
+        // automatically. Edits and incomes keep their original location.
+        val located = if (!movement.income && !exists && movement.latitude == null) {
+            val current = runCatching { DinexLocationProvider.current?.invoke() }.getOrNull()
+            if (current != null && current.valid) movement.copy(
+                location = movement.location.ifBlank { current.label },
+                latitude = current.latitude,
+                longitude = current.longitude,
+            ) else movement
+        } else movement
         val before = movements.filter { !it.income && it.isToday() }.sumOf { it.amount }
         val previous = movements.firstOrNull { it.id == movement.id }?.takeIf { !it.income && it.isToday() }?.amount ?: 0.0
-        val after = before - previous + if (!movement.income && movement.isToday()) movement.amount else 0.0
+        val after = before - previous + if (!located.income && located.isToday()) located.amount else 0.0
         if (!confirmed && after > before && before >= value.data.dailyLimit && after > value.data.dailyLimit) {
-            mutableState.value = value.copy(pendingExpense = movement, pendingReminderId = reminderId)
+            mutableState.value = value.copy(pendingExpense = located, pendingReminderId = reminderId)
             return
         }
         persist(value.data.copy(
-            movements = if (exists) movements.map { if (it.id == movement.id) movement else it } else listOf(movement) + movements,
+            movements = if (exists) movements.map { if (it.id == located.id) located else it } else listOf(located) + movements,
             reminders = if (reminderId == null) value.data.reminders else value.data.reminders.filterNot { it.id == reminderId },
         ))
         val limit = value.data.dailyLimit.toDouble()
@@ -147,7 +157,7 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
             // every extra expense once the day is already over budget.
             if (value.budgetAlerts && before <= limit) DinexAlerts.budgetExceeded(after, limit)
         }
-        showMessage(if (movement.income) "Ingreso guardado" else "Gasto guardado")
+        showMessage(if (located.income) "Ingreso guardado" else "Gasto guardado")
     }
     fun dismissBudgetWarning() { mutableState.value = value.copy(budgetWarning = null) }
     fun cancelPendingExpense() { mutableState.value = value.copy(pendingExpense = null, pendingReminderId = null) }

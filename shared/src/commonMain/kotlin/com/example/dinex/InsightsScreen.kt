@@ -24,7 +24,12 @@ import androidx.compose.ui.unit.sp
 import kotlin.math.max
 
 @Composable
-internal fun InsightsPage(history: List<Movement>, onExport: () -> Unit = {}) {
+internal fun InsightsPage(
+    history: List<Movement>,
+    onExport: () -> Unit = {},
+    locationAvailable: Boolean = false,
+    onRequestLocation: () -> Unit = {},
+) {
     val months = history.map { it.dateIso().take(7) }.distinct().sortedDescending()
     val current = civilDateFromEpochDays()
     val currentKey = "${current.year}-${current.month.toString().padStart(2, '0')}"
@@ -79,6 +84,7 @@ internal fun InsightsPage(history: List<Movement>, onExport: () -> Unit = {}) {
             }
             item { MonthPass(income, expense, movements.size) }
             item { SpendingRhythm(expense, previousExpense, income, if (weekly) "la semana anterior" else "el mes anterior") }
+            item { SpendingPlacesSection(movements, locationAvailable, onRequestLocation) }
             if (!weekly && selectedMonth == currentKey) item { ForecastCard(income, expense) }
             item { PeriodCashFlow(movements, if (weekly) (0..6).map { dateIso(civilDateFromEpochDays(currentDayIndex() - 6 + it)) } else
                 (1..31).filter { validDate(selectedMonth.take(4).toInt(), selectedMonth.takeLast(2).toInt(), it) }.map { "$selectedMonth-${it.toString().padStart(2, '0')}" }) }

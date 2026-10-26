@@ -145,16 +145,27 @@ internal fun decodeAccounts(raw: String?): List<UserAccount> = raw?.lineSequence
 }?.toList().orEmpty()
 
 internal fun encodeMovements(items: List<Movement>): String = items.joinToString("\n") { item ->
-    "m3|" + listOf(item.id, transferEncodeField(item.title), transferEncodeField(item.category), item.amount, item.income, item.day, transferEncodeField(item.method), transferEncodeField(item.location), item.month, item.year).joinToString("|")
+    "m4|" + listOf(
+        item.id, transferEncodeField(item.title), transferEncodeField(item.category), item.amount, item.income, item.day,
+        transferEncodeField(item.method), transferEncodeField(item.location), item.month, item.year,
+        item.latitude?.toString().orEmpty(), item.longitude?.toString().orEmpty(),
+    ).joinToString("|")
 }
 internal fun decodeMovements(raw: String?): List<Movement> = raw?.lineSequence()?.mapNotNull { line ->
-    val escaped = line.startsWith("m3|")
-    val f = line.removePrefix("m3|").split('|'); if (f.size < 7) return@mapNotNull null
+    val escaped = line.startsWith("m3|") || line.startsWith("m4|")
+    val body = when {
+        line.startsWith("m4|") -> line.removePrefix("m4|")
+        line.startsWith("m3|") -> line.removePrefix("m3|")
+        else -> line
+    }
+    val f = body.split('|'); if (f.size < 7) return@mapNotNull null
     fun field(index: Int) = f.getOrNull(index).orEmpty().let { if (escaped) transferDecodeField(it) else it }
     Movement(f[0].toIntOrNull() ?: return@mapNotNull null, field(1), field(2), f[3].toDoubleOrNull() ?: return@mapNotNull null,
         f[4].toBooleanStrictOrNull() ?: return@mapNotNull null, f[5].toIntOrNull() ?: return@mapNotNull null, field(6), field(7),
         f.getOrNull(8)?.toIntOrNull() ?: civilDateFromEpochDays().month,
-        f.getOrNull(9)?.toIntOrNull() ?: civilDateFromEpochDays().year)
+        f.getOrNull(9)?.toIntOrNull() ?: civilDateFromEpochDays().year,
+        f.getOrNull(10)?.toDoubleOrNull()?.takeIf { it.isFinite() && it in -90.0..90.0 },
+        f.getOrNull(11)?.toDoubleOrNull()?.takeIf { it.isFinite() && it in -180.0..180.0 })
 }?.toList().orEmpty()
 
 private fun transferEncodeField(value: String) = value.replace("%", "%25").replace("|", "%7C").replace("\n", "%0A").replace("\r", "%0D")

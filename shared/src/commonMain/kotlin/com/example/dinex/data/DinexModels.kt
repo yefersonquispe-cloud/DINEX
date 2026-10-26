@@ -13,6 +13,8 @@ internal data class Movement(
     val location: String = "",
     val month: Int = civilDateFromEpochDays().month,
     val year: Int = civilDateFromEpochDays().year,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
 )
 
 internal data class PaymentReminder(
