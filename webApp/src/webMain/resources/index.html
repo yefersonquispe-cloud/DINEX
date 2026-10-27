@@ -6,17 +6,15 @@
     <meta name="theme-color" content="#F7FAF7">
     <meta name="description" content="Dinex: decide mejor, ahorra más. Control personal de ingresos, gastos y metas.">
     <title>Dinex · Decide mejor. Ahorra más.</title>
-    <link type="text/css" rel="stylesheet" href="styles.css?v=dinex-green-white">
+    <link type="text/css" rel="stylesheet" href="styles.css?v=dinex-web-2">
 </head>
-<body style="text-align: center; align-content: center">
-    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 50 50" role="presentation">
-        <circle cx="25" cy="25" r="20" stroke="#d4e4d8" stroke-width="4" fill="none"/>
-        <circle cx="25" cy="25" r="20" stroke="#176b43" stroke-width="4" fill="none" stroke-linecap="round"
-                stroke-dasharray="90 125">
-            <animateTransform attributeName="transform" type="rotate" from="0 25 25" to="360 25 25" dur="1s"
-                              repeatCount="indefinite"/>
-        </circle>
-    </svg>
+<body>
+    <!-- Shown until Compose draws its first frame; the canvas covers it afterwards. -->
+    <div id="dinex-loader" role="status" aria-label="Cargando Dinex">
+        <div class="loader-mark">DINEX</div>
+        <div class="loader-tagline">Decide mejor. Ahorra más.</div>
+        <div class="loader-bar"><span></span></div>
+    </div>
     <script src="dinex-files.js"></script>
     <script type="application/javascript" src="webApp.js?v=dinex-green-white"></script>
 </body>

@@ -150,7 +150,7 @@ internal fun AutomationDialog(
                         Spacer(Modifier.height(7.dp))
                         if (!notificationAccess) {
                             Text("Acceso todavía bloqueado", color = Orange, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                            Text("Si Android bloquea el acceso: abre Información de la app → menú ⋮ → Permitir ajustes restringidos (si aparece). Después habilita Dinex en Acceso a notificaciones. La ruta depende de tu teléfono.", color = Gray, fontSize = 13.sp)
+                            Text("Si Android bloquea el acceso: abre Información de la app > menú de tres puntos > Permitir ajustes restringidos (si aparece). Después habilita Dinex en Acceso a notificaciones. La ruta depende de tu teléfono.", color = Gray, fontSize = 13.sp)
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 TextButton(onClick = { automation.openAppDetailsSettings() }, modifier = Modifier.weight(1f)) {
                                     Text("1. Info de app", color = Orange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
@@ -477,9 +477,17 @@ internal fun GoalCelebrationDialog(goalName: String, amount: Double, onDismiss: 
         Surface(shape = RoundedCornerShape(32.dp), color = Card, border = androidx.compose.foundation.BorderStroke(2.dp, Orange.copy(alpha = .72f)), shadowElevation = 28.dp) {
             Box(Modifier.fillMaxWidth().background(Brush.radialGradient(listOf(Orange.copy(alpha = .26f), Color.Transparent)))) {
                 Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("✦  META CUMPLIDA  ✦", color = Orange, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.5.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Icon(DinexNavigationIcons.Sparkle, null, tint = Orange, modifier = Modifier.size(14.dp))
+                        Text("META CUMPLIDA", color = Orange, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.5.sp)
+                        Icon(DinexNavigationIcons.Sparkle, null, tint = Orange, modifier = Modifier.size(14.dp))
+                    }
                     Spacer(Modifier.height(5.dp))
-                    Text("🎉  ✨  🎊  ✨  🎉", fontSize = 22.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        listOf(Orange, Lime, Indigo, Lime, Orange).forEach { tint ->
+                            Icon(DinexNavigationIcons.Sparkle, null, tint = tint, modifier = Modifier.size(20.dp))
+                        }
+                    }
                     Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex celebra tu meta", Modifier.size(142.dp), contentScale = ContentScale.Fit)
                     Text("¡Enhorabuena!", color = Night, fontWeight = FontWeight.Black, fontSize = 27.sp)
                     Spacer(Modifier.height(5.dp))
@@ -573,10 +581,10 @@ internal fun InlineMessage(message: String, onDismiss: () -> Unit) {
             Box(
                 Modifier.size(28.dp).clip(CircleShape).background(Lime.copy(alpha = .14f)),
                 contentAlignment = Alignment.Center,
-            ) { Text("✓", color = Lime, fontWeight = FontWeight.Black, fontSize = 14.sp) }
+            ) { Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(16.dp)) }
             Spacer(Modifier.width(10.dp))
             Text(message, color = Night, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            Text("×", color = Gray, fontSize = 16.sp)
+            Icon(DinexNavigationIcons.Close, null, tint = Gray, modifier = Modifier.size(16.dp))
         }
     }
 }

@@ -81,7 +81,7 @@ internal fun HomePage(
                     SavingsHero(savings, streak, goalName, goalTarget, onClick = onGoalDetails)
                 }
             }
-            item { QuickActions(onScan = onScan, onVoice = onVoice, onGoals = onGoals, onHistory = onHistory) }
+            item { QuickActions(onScan = onScan, onVoice = onVoice, onGoals = onGoals, onHistory = onHistory, wide = desktop) }
             item {
                 if (desktop) Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
                     Box(Modifier.weight(1f)) { SpendingOverview(monthly) }
@@ -122,29 +122,54 @@ internal fun NotificationsNudge(onEnable: () -> Unit) {
 }
 
 @Composable
-private fun QuickActions(onScan: () -> Unit, onVoice: () -> Unit, onGoals: () -> Unit, onHistory: () -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        QuickActionTile("Escanear", DinexNavigationIcons.Camera, Indigo, onScan, Modifier.weight(1f))
-        QuickActionTile("Voz", DinexNavigationIcons.Microphone, ElectricBlue, onVoice, Modifier.weight(1f))
-        QuickActionTile("Metas", DinexNavigationIcons.Sparkle, Orange, onGoals, Modifier.weight(1f))
-        QuickActionTile("Historial", DinexNavigationIcons.Movements, Lime, onHistory, Modifier.weight(1f))
+private fun QuickActions(onScan: () -> Unit, onVoice: () -> Unit, onGoals: () -> Unit, onHistory: () -> Unit, wide: Boolean = false) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (wide) 16.dp else 10.dp)) {
+        QuickActionTile("Escanear", "Foto del comprobante", DinexNavigationIcons.Camera, Indigo, onScan, wide, Modifier.weight(1f))
+        QuickActionTile("Voz", "Dicta un gasto", DinexNavigationIcons.Microphone, ElectricBlue, onVoice, wide, Modifier.weight(1f))
+        QuickActionTile("Metas", "Ahorra para algo", DinexNavigationIcons.Sparkle, Orange, onGoals, wide, Modifier.weight(1f))
+        QuickActionTile("Historial", "Todos tus movimientos", DinexNavigationIcons.Movements, Lime, onHistory, wide, Modifier.weight(1f))
     }
 }
 
 @Composable
-private fun QuickActionTile(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, tint: Color, onClick: () -> Unit, modifier: Modifier = Modifier) {
+private fun QuickActionTile(
+    label: String,
+    hint: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    onClick: () -> Unit,
+    wide: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
     Surface(
-        modifier = modifier.clickable(onClickLabel = label, onClick = onClick),
+        modifier = modifier.clip(RoundedCornerShape(RadiusMd)).hoverable(interaction).clickable(onClickLabel = label, onClick = onClick),
         shape = RoundedCornerShape(RadiusMd),
-        color = Card,
-        border = BorderStroke(1.dp, Border),
+        color = if (hovered) SurfaceHover else Card,
+        border = BorderStroke(1.dp, if (hovered) tint.copy(alpha = .35f) else Border),
     ) {
-        Column(Modifier.padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        val badge: @Composable () -> Unit = {
             Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
                 Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
             }
-            Spacer(Modifier.height(8.dp))
-            Text(label, color = Night, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+        }
+        if (wide) {
+            // Desktop: one compact row with a hint, instead of a tall, mostly empty tile.
+            Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                badge()
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(label, color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                    Text(hint, color = Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        } else {
+            Column(Modifier.padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                badge()
+                Spacer(Modifier.height(8.dp))
+                Text(label, color = Night, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+            }
         }
     }
 }
@@ -277,7 +302,10 @@ internal fun SavingsHero(savings: Double, streak: Int, goalName: String = "", go
         }
         Spacer(Modifier.height(6.dp))
         DinexProgress(progress, Green, height = 8.dp)
-        if (onClick != null) Text("Ver mi meta y su imagen →", color = Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
+        if (onClick != null) Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("Ver mi meta y su imagen", color = Gray, fontSize = 12.sp)
+            Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(14.dp))
+        }
     }
 }
 
@@ -319,7 +347,8 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
                         Modifier.size(22.dp).clip(RoundedCornerShape(7.dp)).background(if (complete) level.color else CardRaised),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Text(if (complete) "✓" else day, color = if (complete) Color.White else Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        if (complete) Icon(DinexNavigationIcons.Check, null, tint = Color.White, modifier = Modifier.size(12.dp))
+                        else Text(day, color = Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -334,7 +363,8 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
                     MiniWalletMedal(if (unlocked) item.color else Border, 34.dp)
                     Spacer(Modifier.height(4.dp))
                     Text(item.name, color = if (unlocked) readableAccent(item.color) else Gray.copy(alpha = .75f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                    Text(if (unlocked) "✓" else "${item.startsAt}d", color = Gray, fontSize = 7.sp)
+                    if (unlocked) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(10.dp))
+                    else Text("${item.startsAt}d", color = Gray, fontSize = 7.sp)
                 }
             }
         }

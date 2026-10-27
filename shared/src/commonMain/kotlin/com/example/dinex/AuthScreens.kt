@@ -83,27 +83,35 @@ internal fun AuthFlow(
     BoxWithConstraints(Modifier.fillMaxSize().background(AppBg).statusBarsPadding().navigationBarsPadding()) {
         val wideLayout = maxWidth >= DesktopBreakpoint
         DinexAuroraBackground()
+        val formSide = maxWidth * .54f
         if (wideLayout) {
             AuthBrandStory(
-                modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().fillMaxWidth(.47f),
+                modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().width(maxWidth - formSide),
             )
         }
         LazyColumn(
             modifier = Modifier
                 .align(if (wideLayout) Alignment.CenterEnd else Alignment.TopCenter)
                 .fillMaxHeight()
-                .then(if (wideLayout) Modifier.width(minOf(560.dp, maxWidth * .53f)) else Modifier.widthIn(max = 500.dp).fillMaxWidth())
+                .then(if (wideLayout) Modifier.width(formSide) else Modifier.widthIn(max = 500.dp).fillMaxWidth())
                 .imePadding(),
-            contentPadding = PaddingValues(horizontal = 26.dp, vertical = 28.dp),
+            // On desktop the form sits centered in its half, at a comfortable reading width.
+            contentPadding = PaddingValues(
+                horizontal = if (wideLayout) maxOf(32.dp, (formSide - 440.dp) / 2) else 26.dp,
+                vertical = 28.dp,
+            ),
+            verticalArrangement = if (wideLayout) Arrangement.Center else Arrangement.Top,
         ) {
             item {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column {
-                        Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 24.sp, letterSpacing = 2.sp)
-                        Text("Decide mejor. Ahorra más.", color = Gray, fontSize = 11.sp)
+                if (!wideLayout) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column {
+                            Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 24.sp, letterSpacing = 2.sp)
+                            Text("Decide mejor. Ahorra más.", color = Gray, fontSize = 11.sp)
+                        }
                     }
+                    Spacer(Modifier.height(30.dp))
                 }
-                Spacer(Modifier.height(30.dp))
                 Text(if (createMode) "Crea tu cuenta" else "Bienvenido de nuevo", color = Night, fontWeight = FontWeight.Black, fontSize = 30.sp)
                 Text(
                     if (createMode) "Un espacio financiero personal, privado y hecho para ti."
@@ -115,9 +123,9 @@ internal fun AuthFlow(
                 Spacer(Modifier.height(22.dp))
                 Surface(
                     shape = RoundedCornerShape(22.dp),
-                    color = Card.copy(alpha = .92f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .32f)),
-                    shadowElevation = 10.dp,
+                    color = Card.copy(alpha = .96f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Border),
+                    shadowElevation = 6.dp,
                 ) {
                     Column(Modifier.padding(20.dp)) {
                         if (createMode) {
@@ -130,7 +138,7 @@ internal fun AuthFlow(
                                 placeholder = { Text("Juan Pérez") },
                                 singleLine = true,
                                 isError = attempted && !nameValid,
-                                trailingIcon = { if (nameValid) Text("✓", color = Lime, fontWeight = FontWeight.Black) },
+                                trailingIcon = { if (nameValid) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(18.dp)) },
                                 shape = RoundedCornerShape(15.dp),
                             )
                             if (attempted && !nameValid) ValidationHint("Escribe un nombre válido", false)
@@ -147,7 +155,7 @@ internal fun AuthFlow(
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             isError = (attempted || email.isNotBlank()) && !emailValid,
-                            trailingIcon = { if (emailValid) Text("✓", color = Lime, fontWeight = FontWeight.Black) },
+                            trailingIcon = { if (emailValid) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(18.dp)) },
                             shape = RoundedCornerShape(15.dp),
                         )
                         if ((attempted || email.isNotBlank()) && !emailValid) ValidationHint("Ingresa un email válido", false)
@@ -190,7 +198,7 @@ internal fun AuthFlow(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                                 visualTransformation = PasswordVisualTransformation(),
                                 isError = attempted && confirmation != password,
-                                trailingIcon = { if (confirmation.isNotBlank() && confirmation == password) Text("✓", color = Lime, fontWeight = FontWeight.Black) },
+                                trailingIcon = { if (confirmation.isNotBlank() && confirmation == password) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(18.dp)) },
                                 shape = RoundedCornerShape(15.dp),
                             )
                             if (attempted && confirmation != password) ValidationHint("Las contraseñas deben coincidir", false)
@@ -226,7 +234,7 @@ internal fun AuthFlow(
                             onClick = { createMode = !createMode; attempted = false; error = null; password = ""; confirmation = "" },
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         ) {
-                            Text(if (createMode) "¿Ya tienes cuenta? Iniciar sesión" else "¿Primera vez? Crear nueva cuenta", color = GreenDark, fontSize = 10.sp)
+                            Text(if (createMode) "¿Ya tienes cuenta? Iniciar sesión" else "¿Primera vez? Crear nueva cuenta", color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -239,69 +247,70 @@ internal fun AuthFlow(
 
 @Composable
 private fun AuthBrandStory(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(start = 64.dp, end = 38.dp),
-        verticalArrangement = Arrangement.Center,
+    // Brand panel: the same deep green as the balance card, in light and dark mode.
+    Box(
+        modifier.background(Brush.linearGradient(listOf(Color(0xFF0B4229), Color(0xFF145E3A), Color(0xFF2B8456)))),
     ) {
-        Surface(
-            shape = RoundedCornerShape(30.dp),
-            color = CardRaised.copy(alpha = .84f),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .4f)),
-            shadowElevation = 18.dp,
-        ) {
-            Column(Modifier.padding(34.dp)) {
-                Surface(
-                    shape = CircleShape,
-                    color = Green.copy(alpha = .13f),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .3f)),
+        Box(
+            Modifier.align(Alignment.TopEnd).padding(top = 40.dp, end = 30.dp).size(260.dp).clip(CircleShape)
+                .background(Brush.radialGradient(listOf(Color.White.copy(alpha = .10f), Color.Transparent))),
+        )
+        Column(Modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 44.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(Color.White.copy(alpha = .14f)),
+                    contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        "DINEX / EXPERIENCIA PERSONAL",
-                        modifier = Modifier.padding(horizontal = 13.dp, vertical = 8.dp),
-                        color = GreenDark,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 9.sp,
-                        letterSpacing = 1.sp,
-                    )
+                    Image(painterResource(Res.drawable.dinex_mascot_ai), "Logo Dinex", Modifier.size(40.dp), contentScale = ContentScale.Fit)
                 }
-                Spacer(Modifier.height(24.dp))
-                Text(
-                    "Convierte cada sol\nen una mejor decisión.",
-                    color = Night,
-                    fontWeight = FontWeight.Black,
-                    fontSize = 34.sp,
-                    lineHeight = 39.sp,
-                    letterSpacing = (-.5).sp,
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    "Controla tus gastos, crea metas y deja que Dinex te acompañe con una visión clara de tu dinero.",
-                    color = Gray,
-                    fontSize = 13.sp,
-                    lineHeight = 20.sp,
-                )
-                Spacer(Modifier.height(28.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    AuthBenefit("01", "Privado", "Tus datos permanecen contigo", Modifier.weight(1f))
-                    AuthBenefit("02", "Inteligente", "Decisiones con contexto", Modifier.weight(1f))
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("DINEX", color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = 2.sp)
+                    Text("Decide mejor. Ahorra más.", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
                 }
             }
+            Spacer(Modifier.weight(1f))
+            Text(
+                "Convierte cada sol\nen una mejor decisión.",
+                color = Color.White,
+                fontWeight = FontWeight.Black,
+                fontSize = 40.sp,
+                lineHeight = 46.sp,
+                letterSpacing = (-.6).sp,
+            )
+            Spacer(Modifier.height(14.dp))
+            Text(
+                "Controla tus gastos, crea metas y deja que Dinex te acompañe con una visión clara de tu dinero.",
+                color = Color.White.copy(alpha = .8f),
+                fontSize = 15.sp,
+                lineHeight = 23.sp,
+                modifier = Modifier.widthIn(max = 460.dp),
+            )
+            Spacer(Modifier.height(30.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.widthIn(max = 460.dp)) {
+                AuthBenefit(DinexNavigationIcons.Wallet, "Privado", "Tus datos se quedan en tu dispositivo.")
+                AuthBenefit(DinexNavigationIcons.Analysis, "Claro", "Ve en qué gastas y cuánto puedes ahorrar.")
+                AuthBenefit(DinexNavigationIcons.Sparkle, "Inteligente", "Dinex IA te da consejos con tu contexto.")
+            }
+            Spacer(Modifier.weight(1f))
+            Text("Tus finanzas, en soles y a tu ritmo.", color = Color.White.copy(alpha = .6f), fontSize = 12.sp)
         }
     }
 }
 
 @Composable
-private fun AuthBenefit(index: String, title: String, body: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(RadiusMd),
-        color = Green.copy(alpha = .055f),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Border),
-    ) {
-        Column(Modifier.padding(13.dp)) {
-            Text(index, color = Green, fontWeight = FontWeight.Black, fontSize = 9.sp)
-            Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            Text(body, color = Gray, fontSize = 9.sp, lineHeight = 13.sp)
+private fun AuthBenefit(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, body: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(
+            Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = .13f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, null, tint = Color.White, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column {
+            Text(title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+            Text(body, color = Color.White.copy(alpha = .72f), fontSize = 13.sp, lineHeight = 18.sp)
         }
     }
 }

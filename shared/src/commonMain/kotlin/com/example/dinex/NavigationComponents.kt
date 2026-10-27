@@ -80,6 +80,7 @@ internal fun DinexAppShell(
                 DinexSidebar(
                     page = page,
                     onSelectPage = onSelectPage,
+                    onAdd = onAdd,
                     onProfile = onProfile,
                     onAssistant = onAssistant,
                     name = name,
@@ -93,7 +94,6 @@ internal fun DinexAppShell(
                         email = email,
                         profilePhoto = profilePhoto,
                         onProfile = onProfile,
-                        onAdd = onAdd,
                         onWalletClick = onWalletClick,
                         darkMode = darkMode,
                         onToggleTheme = onToggleTheme,
@@ -123,60 +123,89 @@ internal fun DinexAppShell(
 internal fun DinexSidebar(
     page: Int,
     onSelectPage: (Int) -> Unit,
+    onAdd: () -> Unit,
     onProfile: () -> Unit,
     onAssistant: () -> Unit,
     name: String,
     email: String,
     profilePhoto: String,
 ) {
-    Surface(
-        modifier = Modifier.fillMaxHeight().width(228.dp)
-            .background(Brush.linearGradient(listOf(Card, CardRaised))),
-        color = Color.Transparent,
-        border = BorderStroke(1.dp, Border),
-    ) {
-        Column(Modifier.fillMaxSize().padding(14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(
-                    painter = painterResource(Res.drawable.dinex_mascot_ai),
-                    contentDescription = "Logo Dinex",
-                    modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp)),
-                    contentScale = ContentScale.Crop,
-                )
-                Spacer(Modifier.width(10.dp))
+    Row(Modifier.fillMaxHeight()) {
+        Column(
+            Modifier.fillMaxHeight().width(256.dp).background(Card.copy(alpha = .94f))
+                .padding(horizontal = 16.dp, vertical = 20.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
+                Box(
+                    Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(Mint),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(
+                        painter = painterResource(Res.drawable.dinex_mascot_ai),
+                        contentDescription = "Logo Dinex",
+                        modifier = Modifier.size(36.dp),
+                        contentScale = ContentScale.Fit,
+                    )
+                }
+                Spacer(Modifier.width(11.dp))
                 Column {
-                    Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.2.sp)
-                    Text("Decide mejor. Ahorra más.", color = Gray, fontSize = 9.sp)
+                    Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp, letterSpacing = 1.6.sp)
+                    Text("Decide mejor. Ahorra más.", color = Gray, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.height(22.dp))
-            Text("MENÚ", color = Gray, fontWeight = FontWeight.Bold, fontSize = 9.sp, letterSpacing = 1.1.sp)
-            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = onAdd,
+                modifier = Modifier.fillMaxWidth().height(46.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
+                elevation = ButtonDefaults.buttonElevation(defaultElevation = 0.dp, hoveredElevation = 3.dp),
+            ) {
+                Icon(DinexNavigationIcons.Add, null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Registrar movimiento", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+            Spacer(Modifier.height(24.dp))
+            SidebarSection("Menú")
             SidebarItem("Inicio", "IN", page == 0) { onSelectPage(0) }
             SidebarItem("Movimientos", "MO", page == 1) { onSelectPage(1) }
             SidebarItem("Plan", "PL", page == 2) { onSelectPage(2) }
             SidebarItem("Análisis", "AN", page == 3) { onSelectPage(3) }
-            SidebarItem("Dinex IA · asistente", "IA", false) { onAssistant() }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(18.dp))
+            SidebarSection("Más")
+            SidebarItem("Dinex IA", "IA", false) { onAssistant() }
             SidebarItem("Configuración", "CF", false) { onProfile() }
             Spacer(Modifier.weight(1f))
             Surface(
-                modifier = Modifier.fillMaxWidth().clickable(onClick = onProfile),
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(RadiusMd)).clickable(onClickLabel = "Abrir perfil", onClick = onProfile),
                 shape = RoundedCornerShape(RadiusMd),
                 color = CardRaised,
-                border = BorderStroke(1.dp, Border),
             ) {
-                Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ProfilePhoto(name, profilePhoto, 32.dp)
-                    Spacer(Modifier.width(8.dp))
+                Row(Modifier.padding(horizontal = 12.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ProfilePhoto(name, profilePhoto, 36.dp)
+                    Spacer(Modifier.width(10.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(name, color = Night, fontWeight = FontWeight.Bold, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(email, color = Gray, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(name, color = Night, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(email, color = Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                    Icon(DinexNavigationIcons.Settings, null, tint = Gray, modifier = Modifier.size(18.dp))
                 }
             }
         }
+        Box(Modifier.fillMaxHeight().width(1.dp).background(Border.copy(alpha = .7f)))
     }
+}
+
+@Composable
+private fun SidebarSection(title: String) {
+    Text(
+        title.uppercase(),
+        color = Gray.copy(alpha = .8f),
+        fontWeight = FontWeight.Bold,
+        fontSize = 10.sp,
+        letterSpacing = 1.2.sp,
+        modifier = Modifier.padding(start = 12.dp, bottom = 6.dp),
+    )
 }
 
 @Composable
@@ -185,66 +214,70 @@ internal fun SidebarItem(label: String, code: String, selected: Boolean, onClick
     val hovered by interaction.collectIsHoveredAsState()
     val bg by animateColorAsState(
         when {
-            selected -> Green.copy(alpha = .12f)
+            selected -> Green.copy(alpha = .13f)
             hovered -> SurfaceHover
             else -> Color.Transparent
         },
         tween(if (LocalDinexReducedMotion.current) 0 else 140),
     )
     Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(RadiusSm)).background(bg)
-            .hoverable(interaction).selectable(selected = selected, role = Role.Tab, onClick = onClick).padding(horizontal = 10.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().padding(vertical = 2.dp).height(44.dp).clip(RoundedCornerShape(12.dp)).background(bg)
+            .hoverable(interaction).selectable(selected = selected, role = Role.Tab, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        // A short accent bar marks the current page without relying on color alone.
+        Box(
+            Modifier.width(4.dp).height(20.dp).clip(RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp))
+                .background(if (selected) GreenDark else Color.Transparent),
+        )
+        Spacer(Modifier.width(10.dp))
         val icon = DinexNavigationIcons.forCode(code)
         if (icon != null) {
-            Icon(icon, contentDescription = null, tint = if (selected) NavigationAqua else NavigationMuted, modifier = Modifier.size(24.dp))
+            Icon(icon, contentDescription = null, tint = if (selected) GreenDark else NavigationMuted, modifier = Modifier.size(21.dp))
             Spacer(Modifier.width(12.dp))
         } else {
-            Text(code, color = if (selected) GreenDark else Gray, fontWeight = FontWeight.Black, fontSize = 9.sp, modifier = Modifier.width(36.dp))
+            Text(code, color = if (selected) GreenDark else Gray, fontWeight = FontWeight.Black, fontSize = 9.sp, modifier = Modifier.width(33.dp))
         }
-        Text(label, color = if (selected) Night else Gray, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, fontSize = 13.sp)
+        Text(label, color = if (selected) Night else NightSoft, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, fontSize = 14.sp)
     }
 }
 
 @Composable
 internal fun DinexDesktopTopBar(
-    streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onAdd: () -> Unit, onWalletClick: () -> Unit,
+    streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit,
     darkMode: Boolean, onToggleTheme: () -> Unit,
 ) {
     val level = streakLevel(streak)
-    Surface(color = AppBg.copy(alpha = .85f), border = BorderStroke(1.dp, Border.copy(alpha = .4f))) {
+    Column {
         Row(
-            Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 22.dp),
+            Modifier.fillMaxWidth().height(72.dp).padding(horizontal = 28.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Hola, ${name.substringBefore(' ')}", color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(currentDateLabel(), color = Gray, fontSize = 11.sp)
+                Text("Hola, ${name.substringBefore(' ')}", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(currentDateLabel(), color = Gray, fontSize = 12.sp)
             }
             Surface(
-                modifier = Modifier.clickable(onClickLabel = "Ver mi racha y ahorro", role = Role.Button, onClick = onWalletClick),
+                modifier = Modifier.height(40.dp).clip(RoundedCornerShape(20.dp))
+                    .clickable(onClickLabel = "Ver mi racha y ahorro", role = Role.Button, onClick = onWalletClick),
                 shape = RoundedCornerShape(20.dp),
                 color = level.color.copy(alpha = .12f),
                 border = BorderStroke(1.dp, level.color.copy(alpha = .32f)),
             ) {
-                Row(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MiniWalletMedal(level.color, 22.dp)
-                    Spacer(Modifier.width(6.dp))
-                    Text("$streak d · ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    MiniWalletMedal(level.color, 24.dp)
+                    Spacer(Modifier.width(7.dp))
+                    Text("$streak d · ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
             }
             Spacer(Modifier.width(10.dp))
-            Button(
-                onClick = onAdd,
-                shape = RoundedCornerShape(RadiusMd),
-                colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
-            ) { Text("+ Nuevo", fontWeight = FontWeight.Bold, fontSize = 12.sp) }
+            Surface(shape = CircleShape, color = Card, border = BorderStroke(1.dp, Border)) {
+                ThemeToggle(darkMode, onToggleTheme, 40.dp)
+            }
             Spacer(Modifier.width(10.dp))
-            ThemeToggle(darkMode, onToggleTheme, 36.dp)
-            Spacer(Modifier.width(10.dp))
-            ProfilePhoto(name, profilePhoto, 36.dp, Modifier.clickable(onClick = onProfile))
+            ProfilePhoto(name, profilePhoto, 40.dp, Modifier.clip(CircleShape).clickable(onClickLabel = "Abrir perfil", onClick = onProfile))
         }
+        Box(Modifier.fillMaxWidth().height(1.dp).background(Border.copy(alpha = .55f)))
     }
 }
 

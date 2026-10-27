@@ -113,6 +113,15 @@ internal object DinexNavigationIcons {
         moveTo(18.5f, 12.5f); lineTo(18.6f, 12.5f)
     }
 
+    // The web canvas font has no ✓ × → glyphs, so these are drawn as vectors everywhere.
+    val Check = outline("DinexCheck", strokeWidth = 2.4f) {
+        moveTo(4.5f, 12.5f); lineTo(9.5f, 17.5f); lineTo(19.5f, 6.5f)
+    }
+    val Close = outline("DinexClose", strokeWidth = 2f) {
+        moveTo(6f, 6f); lineTo(18f, 18f)
+        moveTo(18f, 6f); lineTo(6f, 18f)
+    }
+
     val Moon = outline("DinexMoon") {
         moveTo(20.5f, 14.5f)
         curveTo(17.5f, 15.8f, 13.8f, 15.2f, 11.4f, 12.8f)
