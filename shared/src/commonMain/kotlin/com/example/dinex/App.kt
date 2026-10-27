@@ -72,6 +72,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var reminderToResolve by remember { mutableStateOf<PaymentReminder?>(null) }
     var profileOpen by remember { mutableStateOf(false) }
     var assistantOpen by remember { mutableStateOf(false) }
+    var marketOpen by remember { mutableStateOf(false) }
     var welcomeGuideOpen by remember { mutableStateOf(false) }
     var savingDialog by remember { mutableStateOf(false) }
     var importDialog by remember { mutableStateOf(false) }
@@ -129,6 +130,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             onProfile = { profileOpen = true },
             onAssistant = { assistantOpen = true },
             onWalletClick = { walletBubbleOpen = true },
+            onMarket = { marketOpen = true },
             darkMode = state.darkMode,
             onToggleTheme = { model.setDarkMode(!state.darkMode) },
             streak = streak,
@@ -286,6 +288,12 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 }
             }
         }
+    }
+    if (marketOpen) Dialog(
+        onDismissRequest = { marketOpen = false },
+        properties = fullScreenDialogProperties(),
+    ) {
+        MarketScreen(onClose = { marketOpen = false })
     }
     if (importDialog) ImportMovementsDialog(movements, onDismiss = { importDialog = false }, onImport = { model.importMovements(it); importDialog = false })
     if (exportDialog) ExportReportDialog(movements, name, onDismiss = { exportDialog = false })

@@ -38,3 +38,15 @@ globalThis.dinexFiles = {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 };
+
+/* Read-only GET for public market prices (CoinGecko). Sends no user data. */
+globalThis.dinexHttp = {
+  get: function (url, onText, onError) {
+    fetch(url, { headers: { Accept: 'application/json' } })
+      .then(function (response) {
+        if (!response.ok) throw new Error('El mercado respondió ' + response.status);
+        return response.text();
+      })
+      .then(onText, function (error) { onError(String((error && error.message) || error)); });
+  }
+};

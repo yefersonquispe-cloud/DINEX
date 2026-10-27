@@ -64,6 +64,7 @@ internal fun DinexAppShell(
     onProfile: () -> Unit,
     onAssistant: () -> Unit,
     onWalletClick: () -> Unit,
+    onMarket: () -> Unit,
     darkMode: Boolean,
     onToggleTheme: () -> Unit,
     streak: Int,
@@ -95,6 +96,7 @@ internal fun DinexAppShell(
                         profilePhoto = profilePhoto,
                         onProfile = onProfile,
                         onWalletClick = onWalletClick,
+                        onMarket = onMarket,
                         darkMode = darkMode,
                         onToggleTheme = onToggleTheme,
                     )
@@ -109,7 +111,7 @@ internal fun DinexAppShell(
         } else {
             Column(Modifier.fillMaxSize()) {
                 DinexTopBar(streak = streak, name = name, email = email, profilePhoto = profilePhoto, onProfile = onProfile, onWalletClick = onWalletClick,
-                    darkMode = darkMode, onToggleTheme = onToggleTheme)
+                    onMarket = onMarket, darkMode = darkMode, onToggleTheme = onToggleTheme)
                 // The dock floats over the page; scrollable screens add only end-of-list space.
                 Box(Modifier.weight(1f)) { content(PaddingValues(0.dp)) }
             }
@@ -245,7 +247,7 @@ internal fun SidebarItem(label: String, code: String, selected: Boolean, onClick
 @Composable
 internal fun DinexDesktopTopBar(
     streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit,
-    darkMode: Boolean, onToggleTheme: () -> Unit,
+    onMarket: () -> Unit, darkMode: Boolean, onToggleTheme: () -> Unit,
 ) {
     val level = streakLevel(streak)
     Column {
@@ -269,6 +271,10 @@ internal fun DinexDesktopTopBar(
                     Spacer(Modifier.width(7.dp))
                     Text("$streak d · ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
+            }
+            Spacer(Modifier.width(10.dp))
+            Surface(shape = CircleShape, color = Card, border = BorderStroke(1.dp, Border)) {
+                MarketButton(onMarket, 40.dp)
             }
             Spacer(Modifier.width(10.dp))
             Surface(shape = CircleShape, color = Card, border = BorderStroke(1.dp, Border)) {
@@ -312,7 +318,7 @@ internal fun DinexAssistantBubble(onClick: () -> Unit) {
 @Composable
 internal fun DinexTopBar(
     streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit,
-    darkMode: Boolean, onToggleTheme: () -> Unit,
+    onMarket: () -> Unit, darkMode: Boolean, onToggleTheme: () -> Unit,
 ) {
     val level = streakLevel(streak)
     Surface(modifier = Modifier.statusBarsPadding(), color = AppBg.copy(alpha = .88f)) {
@@ -340,11 +346,24 @@ internal fun DinexTopBar(
                     Text("$streak", color = readableAccent(level.color), fontWeight = FontWeight.Black, fontSize = 11.sp)
                 }
             }
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(4.dp))
+            MarketButton(onMarket, 40.dp)
             ThemeToggle(darkMode, onToggleTheme, 40.dp)
-            Spacer(Modifier.width(6.dp))
+            Spacer(Modifier.width(4.dp))
             ProfilePhoto(name, profilePhoto, 44.dp, Modifier.clickable(onClickLabel = "Abrir perfil y accesibilidad", onClick = onProfile))
         }
+    }
+}
+
+/** Opens the full-screen live market (exchange rate, metals, crypto). */
+@Composable
+internal fun MarketButton(onClick: () -> Unit, size: Dp) {
+    Box(
+        Modifier.size(size).clip(CircleShape)
+            .clickable(onClickLabel = "Abrir mercado en vivo", role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(DinexNavigationIcons.Market, contentDescription = "Mercado en vivo", tint = GreenDark, modifier = Modifier.size(size * .56f))
     }
 }
 

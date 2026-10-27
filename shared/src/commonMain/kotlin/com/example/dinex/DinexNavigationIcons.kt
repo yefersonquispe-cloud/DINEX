@@ -122,6 +122,22 @@ internal object DinexNavigationIcons {
         moveTo(18f, 6f); lineTo(6f, 18f)
     }
 
+    val Back = outline("DinexBack") {
+        moveTo(15f, 5f); lineTo(8f, 12f); lineTo(15f, 19f)
+    }
+    /** Rising line with an arrow head: opens the live market screen. */
+    val Market = outline("DinexMarket") {
+        moveTo(3f, 17f); lineTo(9f, 11f); lineTo(13f, 15f); lineTo(21f, 7f)
+        moveTo(15f, 7f); lineTo(21f, 7f); lineTo(21f, 13f)
+    }
+    val Refresh = outline("DinexRefresh") {
+        moveTo(20f, 12f); curveTo(20f, 16.4f, 16.4f, 20f, 12f, 20f)
+        curveTo(7.6f, 20f, 4f, 16.4f, 4f, 12f)
+        curveTo(4f, 7.6f, 7.6f, 4f, 12f, 4f)
+        curveTo(14.6f, 4f, 16.9f, 5.2f, 18.4f, 7.2f)
+        moveTo(19f, 3f); lineTo(19f, 7.6f); lineTo(14.4f, 7.6f)
+    }
+
     val Moon = outline("DinexMoon") {
         moveTo(20.5f, 14.5f)
         curveTo(17.5f, 15.8f, 13.8f, 15.2f, 11.4f, 12.8f)
