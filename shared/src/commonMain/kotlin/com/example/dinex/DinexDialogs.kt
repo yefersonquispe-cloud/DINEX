@@ -120,122 +120,211 @@ internal fun AutomationDialog(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer); automation.stopVoice() }
     }
     val overlayAccess = accessRefresh.let { automation.overlayAvailable }
+    val listenerConnected = accessRefresh.let { automation.notificationListenerConnected }
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
-        icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex voz", Modifier.size(70.dp), contentScale = ContentScale.Fit) },
+        containerColor = Card,
+        icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex voz", Modifier.size(64.dp), contentScale = ContentScale.Fit) },
         title = { Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Registro automático", fontWeight = FontWeight.Black)
-            Text("Voz, alertas y ubicación opcional", color = Gray, fontSize = 10.sp, textAlign = TextAlign.Center)
+            Text("Registro automático", color = Night, fontWeight = FontWeight.Black)
+            Text("Registra sin escribir: con tu voz o con las alertas de tu banco", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, lineHeight = 16.sp)
         } },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Surface(shape = RoundedCornerShape(18.dp), color = ElectricBlue.copy(alpha = .10f), border = androidx.compose.foundation.BorderStroke(1.dp, ElectricBlue.copy(alpha = .28f))) {
-                    Column(Modifier.padding(13.dp)) {
-                        Text("Comando de voz", color = ElectricBlue, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                        Text("Di: “Dinex registra 20 soles en comida”", color = Gray, fontSize = 10.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Button(
-                            onClick = { listening = true; error = null; automation.startVoice(onResult = { listening = false; onVoice(it) }, onError = { listening = false; error = it }) },
-                            enabled = automation.voiceAvailable && !listening,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
-                        ) { Text(if (listening) "Escuchando…" else "Hablar con Dinex", fontWeight = FontWeight.Bold) }
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                AutomationSection(
+                    icon = DinexNavigationIcons.Microphone, tint = ElectricBlue, title = "Comando de voz",
+                    subtitle = "Dicta un gasto o ingreso",
+                    status = if (automation.voiceAvailable) "Listo" to true else "No disponible" to false,
+                ) {
+                    Surface(shape = RoundedCornerShape(12.dp), color = ElectricBlue.copy(alpha = .08f)) {
+                        Text("“Dinex, registra 20 soles en comida”", color = NightSoft, fontSize = 13.sp,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp))
+                    }
+                    Button(
+                        onClick = { listening = true; error = null; automation.startVoice(onResult = { listening = false; onVoice(it) }, onError = { listening = false; error = it }) },
+                        enabled = automation.voiceAvailable && !listening,
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
+                    ) {
+                        Icon(DinexNavigationIcons.Microphone, null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(if (listening) "Escuchando..." else "Hablar con Dinex", fontWeight = FontWeight.Bold)
                     }
                 }
-                Surface(shape = RoundedCornerShape(18.dp), color = CardRaised, border = androidx.compose.foundation.BorderStroke(1.dp, Border)) {
-                    Column(Modifier.padding(13.dp)) {
-                        Text("Notificaciones del teléfono", color = GreenDark, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                        Text("Detecta ingresos (“te yapearon”, “te envió”, “recibiste”, “abono”) y gastos (“yapeaste”, “compraste”, “pagaste”) cuando la alerta incluye un monto en soles.", color = Gray, fontSize = 12.sp)
-                        Spacer(Modifier.height(7.dp))
-                        if (!notificationAccess) {
-                            Text("Acceso todavía bloqueado", color = Orange, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                            Text("Si Android bloquea el acceso: abre Información de la app > menú de tres puntos > Permitir ajustes restringidos (si aparece). Después habilita Dinex en Acceso a notificaciones. La ruta depende de tu teléfono.", color = Gray, fontSize = 13.sp)
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                TextButton(onClick = { automation.openAppDetailsSettings() }, modifier = Modifier.weight(1f)) {
-                                    Text("1. Info de app", color = Orange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
-                                TextButton(onClick = { automation.openNotificationSettings() }, modifier = Modifier.weight(1f)) {
-                                    Text("2. Dar acceso", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                }
+
+                AutomationSection(
+                    icon = DinexNavigationIcons.Wallet, tint = GreenDark, title = "Alertas del teléfono",
+                    subtitle = "Yape, Plin y tu banco",
+                    status = when {
+                        !notificationAccess -> "Bloqueado" to false
+                        listenerConnected -> "Activo" to true
+                        else -> "Conectando" to false
+                    },
+                ) {
+                    Text(
+                        "Detecta ingresos (“te yapearon”, “recibiste”) y gastos (“yapeaste”, “pagaste”) cuando la alerta trae un monto en soles.",
+                        color = Gray, fontSize = 13.sp, lineHeight = 18.sp,
+                    )
+                    if (!notificationAccess) {
+                        Surface(shape = RoundedCornerShape(12.dp), color = Orange.copy(alpha = .09f), border = androidx.compose.foundation.BorderStroke(1.dp, Orange.copy(alpha = .25f))) {
+                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text("Para activarlo", color = Orange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                AutomationStep("1", "Abre Información de la app y, en el menú de tres puntos, toca Permitir ajustes restringidos (si aparece).")
+                                AutomationStep("2", "Entra a Acceso a notificaciones y habilita Dinex.")
                             }
-                            TextButton(onClick = { accessRefresh++ }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Ya lo activé · comprobar", color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                            }
-                        } else {
-                            Text("Acceso autorizado. ${if (automation.notificationListenerConnected) "Lector conectado." else "Esperando conexión del lector."}", color = Lime, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            if (!automation.notificationListenerConnected) {
-                                TextButton(onClick = { automation.reconnectNotifications(); accessRefresh++ }) {
-                                    Text("Reconectar lector", fontSize = 12.sp)
-                                }
+                        }
+                        OutlinedButton(onClick = { automation.openAppDetailsSettings() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                            Text("1. Abrir información de la app", color = Orange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        OutlinedButton(onClick = { automation.openNotificationSettings() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                            Text("2. Dar acceso a notificaciones", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                        TextButton(onClick = { accessRefresh++ }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Ya lo activé, comprobar", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    } else {
+                        if (!listenerConnected) {
+                            TextButton(onClick = { automation.reconnectNotifications(); accessRefresh++ }) {
+                                Text("Reconectar lector", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                         Button(
                             onClick = { accessRefresh++; captured = automation.drainNotifications() },
-                            enabled = notificationAccess,
-                            modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = Indigo),
+                            modifier = Modifier.fillMaxWidth().height(46.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Green),
                         ) { Text("Revisar alertas detectadas", fontWeight = FontWeight.Bold) }
-                        if (captured.isNotEmpty()) {
-                            Spacer(Modifier.height(7.dp))
-                            captured.take(4).forEach { item ->
-                                Text("${item.source} · ${money(item.amount)} · ${if (item.income) "ingreso" else "gasto"}", color = Night, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            TextButton(onClick = { onImport(captured) }) { Text("Registrar ${captured.size} alertas", color = Lime, fontWeight = FontWeight.Bold) }
-                        }
                     }
-                }
-                if (automation.supportsBackgroundVoice) Surface(shape = RoundedCornerShape(18.dp), color = Green.copy(alpha = .09f), border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .30f))) {
-                    Column(Modifier.padding(13.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("Oye Dinex", color = GreenDark, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                                Text(if (hotwordActive) "Activo fuera de la aplicación" else "Actívalo para llamar a Dinex por voz", color = if (hotwordActive) Lime else Gray, fontSize = 9.sp)
+                    if (captured.isNotEmpty()) {
+                        captured.take(4).forEach { item ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(item.source, color = Night, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(
+                                    "${if (item.income) "+" else "−"} ${money(item.amount)}",
+                                    color = if (item.income) GreenDark else Red, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                                )
                             }
-                            Text(if (hotwordActive) "ACTIVO" else "APAGADO", color = if (hotwordActive) Lime else Gray, fontWeight = FontWeight.Black, fontSize = 8.sp)
                         }
-                        Spacer(Modifier.height(7.dp))
-                        Text("Con la pantalla desbloqueada di “Oye Dinex”. Se abrirá una interfaz para registrar gastos, ingresos o recordatorios. Android mostrará una notificación permanente mientras escucha.", color = Gray, fontSize = 9.sp)
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            if (overlayAccess) "Burbuja lista: al salir de Dinex, podrás arrastrarla, hablar o desactivar la voz."
-                            else "Activa la burbuja para registrar por voz sin abrir la aplicación.",
-                            color = if (overlayAccess) GreenDark else Gray, fontSize = 12.sp,
-                        )
-                        if (!overlayAccess) OutlinedButton(
-                            onClick = { automation.openOverlaySettings() },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                        ) { Text("Permitir burbuja flotante", fontSize = 12.sp) }
-                        Spacer(Modifier.height(8.dp))
                         Button(
-                            onClick = {
-                                val requested = !hotwordActive
-                                val result = automation.setHotwordEnabled(requested)
-                                error = result
-                                hotwordActive = if (result == null) requested else automation.hotwordEnabled
-                            },
+                            onClick = { onImport(captured) },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = ButtonDefaults.buttonColors(containerColor = if (hotwordActive) Red.copy(alpha = .85f) else Green),
-                        ) { Text(if (hotwordActive) "Desactivar Oye Dinex" else "Activar Oye Dinex", fontWeight = FontWeight.Bold) }
-                        if (hotwordActive) {
-                            TextButton(onClick = { automation.openBatterySettings() }, modifier = Modifier.fillMaxWidth()) {
-                                Text("Revisar batería e inicio automático", color = Orange, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
+                            shape = RoundedCornerShape(14.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Green),
+                        ) { Text("Registrar ${captured.size} ${if (captured.size == 1) "alerta" else "alertas"}", fontWeight = FontWeight.Bold) }
+                    }
+                }
+
+                if (automation.supportsBackgroundVoice) AutomationSection(
+                    icon = DinexNavigationIcons.Sparkle, tint = Lime, title = "Oye Dinex",
+                    subtitle = "Sin abrir la app",
+                    status = if (hotwordActive) "Activo" to true else "Apagado" to false,
+                ) {
+                    Text(
+                        "Con la pantalla desbloqueada di “Oye Dinex” para registrar gastos, ingresos o recordatorios. Android muestra una notificación mientras escucha.",
+                        color = Gray, fontSize = 13.sp, lineHeight = 18.sp,
+                    )
+                    if (overlayAccess) {
+                        Text("Burbuja lista: al salir de Dinex podrás arrastrarla y hablarle.", color = GreenDark, fontSize = 13.sp)
+                    } else {
+                        OutlinedButton(
+                            onClick = { automation.openOverlaySettings() },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                        ) { Text("Permitir burbuja flotante", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                    }
+                    Button(
+                        onClick = {
+                            val requested = !hotwordActive
+                            val result = automation.setHotwordEnabled(requested)
+                            error = result
+                            hotwordActive = if (result == null) requested else automation.hotwordEnabled
+                        },
+                        modifier = Modifier.fillMaxWidth().height(46.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = if (hotwordActive) ButtonDefaults.buttonColors(containerColor = Red.copy(alpha = .12f), contentColor = Red)
+                        else ButtonDefaults.buttonColors(containerColor = Green),
+                    ) { Text(if (hotwordActive) "Desactivar Oye Dinex" else "Activar Oye Dinex", fontWeight = FontWeight.Bold) }
+                    if (hotwordActive) {
+                        TextButton(onClick = { automation.openBatterySettings() }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Revisar batería e inicio automático", color = Orange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
-                if (automation.locationAvailable) Text("Ubicación: ${automation.currentLocationLabel() ?: "disponible al registrar"}", color = Lime, fontSize = 9.sp)
-                else {
-                    Text("La ubicación es opcional y solo se solicita en Android con tu permiso.", color = Gray, fontSize = 9.sp)
-                    TextButton(onClick = { automation.requestLocationPermission() }) { Text("Activar ubicación opcional", color = GreenDark, fontSize = 10.sp) }
+
+                AutomationSection(
+                    icon = DinexNavigationIcons.Analysis, tint = Orange, title = "Ubicación",
+                    subtitle = "Opcional, para tu mapa de gastos",
+                    status = if (automation.locationAvailable) "Activa" to true else "Apagada" to false,
+                ) {
+                    if (automation.locationAvailable) {
+                        Text("Estás en: ${automation.currentLocationLabel() ?: "se guardará al registrar"}", color = NightSoft, fontSize = 13.sp)
+                    } else {
+                        Text("Solo se pide con tu permiso y se guarda en tu teléfono.", color = Gray, fontSize = 13.sp)
+                        OutlinedButton(onClick = { automation.requestLocationPermission() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                            Text("Activar ubicación", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
+                    }
                 }
-                error?.let { Text(it, color = Red, fontSize = 9.sp) }
-                Text("Dinex solo lee alertas después de tu autorización. “Oye Dinex” usa el micrófono únicamente mientras el modo visible está activo.", color = Gray, fontSize = 9.sp, textAlign = TextAlign.Center)
+
+                error?.let {
+                    Surface(shape = RoundedCornerShape(12.dp), color = Red.copy(alpha = .10f)) {
+                        Text(it, color = Red, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(10.dp))
+                    }
+                }
+                Text(
+                    "Dinex solo lee alertas con tu autorización. “Oye Dinex” usa el micrófono únicamente mientras está activo.",
+                    color = Gray, fontSize = 11.sp, lineHeight = 15.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
+                )
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = { automation.stopVoice(); onDismiss() }) { Text("Cerrar") } },
+        dismissButton = { TextButton(onClick = { automation.stopVoice(); onDismiss() }) { Text("Cerrar", color = GreenDark, fontWeight = FontWeight.Bold) } },
     )
+}
+
+/** One block of the automation dialog: icon, title, a status pill, then its controls. */
+@Composable
+private fun AutomationSection(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    title: String,
+    subtitle: String,
+    status: Pair<String, Boolean>,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(shape = RoundedCornerShape(18.dp), color = CardRaised, border = androidx.compose.foundation.BorderStroke(1.dp, Border)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
+                    Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(subtitle, color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+                val (label, good) = status
+                Surface(shape = RoundedCornerShape(50), color = (if (good) Lime else Orange).copy(alpha = .14f)) {
+                    Text(label, color = if (good) Lime else Orange, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                        modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp))
+                }
+            }
+            content()
+        }
+    }
+}
+
+@Composable
+private fun AutomationStep(number: String, text: String) {
+    Row {
+        Box(Modifier.size(20.dp).clip(CircleShape).background(Orange.copy(alpha = .18f)), contentAlignment = Alignment.Center) {
+            Text(number, color = Orange, fontWeight = FontWeight.Black, fontSize = 11.sp)
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(text, color = NightSoft, fontSize = 13.sp, lineHeight = 18.sp)
+    }
 }
 
 @Composable
