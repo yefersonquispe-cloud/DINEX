@@ -73,6 +73,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var profileOpen by remember { mutableStateOf(false) }
     var assistantOpen by remember { mutableStateOf(false) }
     var marketOpen by remember { mutableStateOf(false) }
+    var tipsOpen by remember { mutableStateOf(false) }
     var welcomeGuideOpen by remember { mutableStateOf(false) }
     var savingDialog by remember { mutableStateOf(false) }
     var importDialog by remember { mutableStateOf(false) }
@@ -131,6 +132,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             onAssistant = { assistantOpen = true },
             onWalletClick = { walletBubbleOpen = true },
             onMarket = { marketOpen = true },
+            onTips = { tipsOpen = true },
             darkMode = state.darkMode,
             onToggleTheme = { model.setDarkMode(!state.darkMode) },
             streak = streak,
@@ -294,6 +296,21 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         properties = fullScreenDialogProperties(),
     ) {
         MarketScreen(onClose = { marketOpen = false })
+    }
+    if (tipsOpen) Dialog(
+        onDismissRequest = { tipsOpen = false },
+        properties = fullScreenDialogProperties(),
+    ) {
+        TipsScreen(data, onClose = { tipsOpen = false }, onAction = { action ->
+            tipsOpen = false
+            when (action) {
+                TipAction.AddMovement -> quickAdd = true
+                TipAction.Save -> { savingGoalId = null; savingDialog = true }
+                TipAction.Plan -> model.selectPage(2)
+                TipAction.Analysis -> model.selectPage(3)
+                TipAction.Assistant -> assistantOpen = true
+            }
+        })
     }
     if (importDialog) ImportMovementsDialog(movements, onDismiss = { importDialog = false }, onImport = { model.importMovements(it); importDialog = false })
     if (exportDialog) ExportReportDialog(movements, name, onDismiss = { exportDialog = false })

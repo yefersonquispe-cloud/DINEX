@@ -149,6 +149,18 @@ internal object DinexNavigationIcons {
         moveTo(20f, 16f); lineTo(5f, 16f); moveTo(9f, 12f); lineTo(5f, 16f); lineTo(9f, 20f)
     }
 
+    /** Light bulb: opens the financial tips screen. */
+    val Tips = outline("DinexTips") {
+        moveTo(9f, 18f); lineTo(15f, 18f)
+        moveTo(10f, 21.5f); lineTo(14f, 21.5f)
+        moveTo(9f, 18f); lineTo(9f, 15.5f)
+        curveTo(6.5f, 14f, 5f, 11.8f, 5f, 9.3f)
+        curveTo(5f, 5.3f, 8.1f, 2.5f, 12f, 2.5f)
+        curveTo(15.9f, 2.5f, 19f, 5.3f, 19f, 9.3f)
+        curveTo(19f, 11.8f, 17.5f, 14f, 15f, 15.5f)
+        lineTo(15f, 18f)
+    }
+
     val Moon = outline("DinexMoon") {
         moveTo(20.5f, 14.5f)
         curveTo(17.5f, 15.8f, 13.8f, 15.2f, 11.4f, 12.8f)
@@ -176,6 +188,7 @@ internal object DinexNavigationIcons {
         "PL" -> Plan
         "AN" -> Analysis
         "IA" -> Sparkle
+        "TI" -> Tips
         "CF" -> Settings
         else -> null
     }

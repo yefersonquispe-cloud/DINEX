@@ -64,6 +64,7 @@ internal fun DinexAppShell(
     onAssistant: () -> Unit,
     onWalletClick: () -> Unit,
     onMarket: () -> Unit,
+    onTips: () -> Unit,
     darkMode: Boolean,
     onToggleTheme: () -> Unit,
     streak: Int,
@@ -83,6 +84,7 @@ internal fun DinexAppShell(
                     onAdd = onAdd,
                     onProfile = onProfile,
                     onAssistant = onAssistant,
+                    onTips = onTips,
                     name = name,
                     email = email,
                     profilePhoto = profilePhoto,
@@ -96,6 +98,7 @@ internal fun DinexAppShell(
                         onProfile = onProfile,
                         onWalletClick = onWalletClick,
                         onMarket = onMarket,
+                        onTips = onTips,
                         darkMode = darkMode,
                         onToggleTheme = onToggleTheme,
                     )
@@ -110,7 +113,7 @@ internal fun DinexAppShell(
         } else {
             Column(Modifier.fillMaxSize()) {
                 DinexTopBar(streak = streak, name = name, email = email, profilePhoto = profilePhoto, onProfile = onProfile, onWalletClick = onWalletClick,
-                    onMarket = onMarket, darkMode = darkMode, onToggleTheme = onToggleTheme)
+                    onMarket = onMarket, onTips = onTips, darkMode = darkMode, onToggleTheme = onToggleTheme)
                 // The dock floats over the page; scrollable screens add only end-of-list space.
                 Box(Modifier.weight(1f)) { content(PaddingValues(0.dp)) }
             }
@@ -127,6 +130,7 @@ internal fun DinexSidebar(
     onAdd: () -> Unit,
     onProfile: () -> Unit,
     onAssistant: () -> Unit,
+    onTips: () -> Unit,
     name: String,
     email: String,
     profilePhoto: String,
@@ -175,6 +179,7 @@ internal fun DinexSidebar(
             Spacer(Modifier.height(18.dp))
             SidebarSection("Más")
             SidebarItem("Dinex IA", "IA", false) { onAssistant() }
+            SidebarItem("Consejos", "TI", false) { onTips() }
             SidebarItem("Configuración", "CF", false) { onProfile() }
             Spacer(Modifier.weight(1f))
             Surface(
@@ -246,7 +251,7 @@ internal fun SidebarItem(label: String, code: String, selected: Boolean, onClick
 @Composable
 internal fun DinexDesktopTopBar(
     streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit,
-    onMarket: () -> Unit, darkMode: Boolean, onToggleTheme: () -> Unit,
+    onMarket: () -> Unit, onTips: () -> Unit, darkMode: Boolean, onToggleTheme: () -> Unit,
 ) {
     val level = streakLevel(streak)
     Column {
@@ -270,6 +275,10 @@ internal fun DinexDesktopTopBar(
                     Spacer(Modifier.width(7.dp))
                     Text("$streak d · ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
+            }
+            Spacer(Modifier.width(10.dp))
+            Surface(shape = CircleShape, color = Card, border = BorderStroke(1.dp, Border)) {
+                TipsButton(onTips, 40.dp)
             }
             Spacer(Modifier.width(10.dp))
             Surface(shape = CircleShape, color = Card, border = BorderStroke(1.dp, Border)) {
@@ -317,7 +326,7 @@ internal fun DinexAssistantBubble(onClick: () -> Unit) {
 @Composable
 internal fun DinexTopBar(
     streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit,
-    onMarket: () -> Unit, darkMode: Boolean, onToggleTheme: () -> Unit,
+    onMarket: () -> Unit, onTips: () -> Unit, darkMode: Boolean, onToggleTheme: () -> Unit,
 ) {
     val level = streakLevel(streak)
     Surface(modifier = Modifier.statusBarsPadding(), color = AppBg.copy(alpha = .88f)) {
@@ -346,11 +355,24 @@ internal fun DinexTopBar(
                 }
             }
             Spacer(Modifier.width(4.dp))
+            TipsButton(onTips, 40.dp)
             MarketButton(onMarket, 40.dp)
             ThemeToggle(darkMode, onToggleTheme, 40.dp)
             Spacer(Modifier.width(4.dp))
             ProfilePhoto(name, profilePhoto, 44.dp, Modifier.clickable(onClickLabel = "Abrir perfil y accesibilidad", onClick = onProfile))
         }
+    }
+}
+
+/** Opens the personal financial tips screen. */
+@Composable
+internal fun TipsButton(onClick: () -> Unit, size: Dp) {
+    Box(
+        Modifier.size(size).clip(CircleShape)
+            .clickable(onClickLabel = "Abrir consejos financieros", role = Role.Button, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(DinexNavigationIcons.Tips, contentDescription = "Consejos financieros", tint = Orange, modifier = Modifier.size(size * .56f))
     }
 }
 
