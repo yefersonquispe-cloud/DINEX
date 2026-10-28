@@ -1,6 +1,6 @@
 package com.example.dinex
 
-/** One live price shown in the market screen. Prices are in soles (PEN). */
+/** One live price shown in the market screen. */
 internal data class MarketQuote(
     val id: String,
     val symbol: String,
@@ -9,11 +9,18 @@ internal data class MarketQuote(
     val priceUsd: Double,
     /** Percent change over 24 h, or null when the source does not give one. */
     val change24h: Double? = null,
-    /** Last 7 days of prices, oldest first, for the small trend line. */
+    /** Hourly prices in US$ for the last 7 days, oldest first. */
     val trend: List<Double> = emptyList(),
+    val change7d: Double? = null,
+    val rank: Int? = null,
+    val marketCapUsd: Double? = null,
+    val volumeUsd: Double? = null,
+    val high24hUsd: Double? = null,
+    val low24hUsd: Double? = null,
 )
 
 internal data class MarketSnapshot(
+    val penPerUsd: Double,
     val currencies: List<MarketQuote>,
     val metals: List<MarketQuote>,
     val crypto: List<MarketQuote>,
@@ -26,13 +33,32 @@ internal expect fun fullScreenDialogProperties(): androidx.compose.ui.window.Dia
 internal expect suspend fun fetchMarketText(url: String): String
 
 private const val CoinGecko = "https://api.coingecko.com/api/v3"
-private val CryptoIds = listOf("bitcoin", "ethereum", "solana", "ripple", "dogecoin")
+private const val CryptoCount = 30
 
-/** Loads every price from CoinGecko's free public API (no key needed). */
+/** Currencies people in Peru compare against, in display order (code to Spanish name). */
+private val Currencies = listOf(
+    "usd" to "Dólar estadounidense",
+    "eur" to "Euro",
+    "gbp" to "Libra esterlina",
+    "jpy" to "Yen japonés",
+    "cny" to "Yuan chino",
+    "cad" to "Dólar canadiense",
+    "chf" to "Franco suizo",
+    "brl" to "Real brasileño",
+    "mxn" to "Peso mexicano",
+    "clp" to "Peso chileno",
+    "cop" to "Peso colombiano",
+    "ars" to "Peso argentino",
+    "bob" to "Boliviano",
+    "uyu" to "Peso uruguayo",
+)
+
+/** Loads every price from CoinGecko's free public API (no key needed): two calls per refresh. */
 internal suspend fun loadMarketSnapshot(): MarketSnapshot {
     val rates = fetchMarketText("$CoinGecko/exchange_rates")
     val coins = fetchMarketText(
-        "$CoinGecko/coins/markets?vs_currency=usd&ids=${CryptoIds.joinToString(",")}&sparkline=true&price_change_percentage=24h",
+        "$CoinGecko/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=$CryptoCount&page=1" +
+            "&sparkline=true&price_change_percentage=24h,7d",
     )
     return parseMarketSnapshot(rates, coins)
 }
@@ -42,35 +68,27 @@ internal suspend fun loadMarketSnapshot(): MarketSnapshot {
  * pair is a ratio: USD→PEN = pen / usd, one ounce of gold in USD = usd / xau.
  */
 internal fun parseMarketSnapshot(ratesJson: String, coinsJson: String): MarketSnapshot {
-    @Suppress("UNCHECKED_CAST")
-    val rates = ((parseJson(ratesJson) as? Map<String, Any?>)?.get("rates") as? Map<String, Any?>)
+    val rates = ((parseJson(ratesJson) as? Map<*, *>)?.get("rates") as? Map<*, *>)
         ?: error("Respuesta de tipos de cambio inválida")
-    fun rate(code: String): Double =
-        ((rates[code] as? Map<*, *>)?.get("value") as? Double)?.takeIf { it > 0 } ?: error("Falta el valor de $code")
+    fun rateOrNull(code: String): Double? = ((rates[code] as? Map<*, *>)?.get("value") as? Double)?.takeIf { it > 0 }
+    fun rate(code: String): Double = rateOrNull(code) ?: error("Falta el valor de $code")
     val pen = rate("pen")
-    val usd = rate("usd")
-    val penPerUsd = pen / usd
+    val penPerUsd = pen / rate("usd")
 
-    fun perUnit(code: String, symbol: String, name: String): MarketQuote {
-        val inPen = pen / rate(code)
+    fun perUnit(code: String, symbol: String, name: String): MarketQuote? {
+        val inPen = pen / (rateOrNull(code) ?: return null)
         return MarketQuote(code, symbol, name, inPen, inPen / penPerUsd)
     }
-    val currencies = listOf(
-        perUnit("usd", "USD", "Dólar estadounidense"),
-        perUnit("eur", "EUR", "Euro"),
-    )
-    val metals = listOf(
-        perUnit("xau", "Au", "Oro · onza"),
-        perUnit("xag", "Ag", "Plata · onza"),
+    val currencies = Currencies.mapNotNull { (code, name) -> perUnit(code, code.uppercase(), name) }
+    val metals = listOfNotNull(
+        perUnit("xau", "Au", "Oro"),
+        perUnit("xag", "Ag", "Plata"),
     )
 
     val coins = (parseJson(coinsJson) as? List<*>) ?: error("Respuesta de criptomonedas inválida")
-    val byId = coins.filterIsInstance<Map<*, *>>().associateBy { it["id"] as? String }
-    val crypto = CryptoIds.mapNotNull { id ->
-        val coin = byId[id] ?: return@mapNotNull null
+    val crypto = coins.filterIsInstance<Map<*, *>>().mapNotNull { coin ->
+        val id = coin["id"] as? String ?: return@mapNotNull null
         val priceUsd = coin["current_price"] as? Double ?: return@mapNotNull null
-        val trend = ((coin["sparkline_in_7d"] as? Map<*, *>)?.get("price") as? List<*>)
-            ?.filterIsInstance<Double>().orEmpty()
         MarketQuote(
             id = id,
             symbol = (coin["symbol"] as? String).orEmpty().uppercase(),
@@ -78,10 +96,16 @@ internal fun parseMarketSnapshot(ratesJson: String, coinsJson: String): MarketSn
             pricePen = priceUsd * penPerUsd,
             priceUsd = priceUsd,
             change24h = coin["price_change_percentage_24h"] as? Double,
-            trend = trend,
+            trend = ((coin["sparkline_in_7d"] as? Map<*, *>)?.get("price") as? List<*>)?.filterIsInstance<Double>().orEmpty(),
+            change7d = coin["price_change_percentage_7d_in_currency"] as? Double,
+            rank = (coin["market_cap_rank"] as? Double)?.toInt(),
+            marketCapUsd = coin["market_cap"] as? Double,
+            volumeUsd = coin["total_volume"] as? Double,
+            high24hUsd = coin["high_24h"] as? Double,
+            low24hUsd = coin["low_24h"] as? Double,
         )
     }
-    return MarketSnapshot(currencies, metals, crypto)
+    return MarketSnapshot(penPerUsd, currencies, metals, crypto)
 }
 
 /**

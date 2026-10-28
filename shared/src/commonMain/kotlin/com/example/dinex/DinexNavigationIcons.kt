@@ -138,6 +138,17 @@ internal object DinexNavigationIcons {
         moveTo(19f, 3f); lineTo(19f, 7.6f); lineTo(14.4f, 7.6f)
     }
 
+    val Search = outline("DinexSearch") {
+        moveTo(17f, 10.5f); curveTo(17f, 19.2f, 4f, 19.2f, 4f, 10.5f)
+        curveTo(4f, 1.8f, 17f, 1.8f, 17f, 10.5f); close()
+        moveTo(15.5f, 15.5f); lineTo(20.5f, 20.5f)
+    }
+    /** Two opposite arrows: swaps the converter direction. */
+    val Swap = outline("DinexSwap") {
+        moveTo(4f, 8f); lineTo(19f, 8f); moveTo(15f, 4f); lineTo(19f, 8f); lineTo(15f, 12f)
+        moveTo(20f, 16f); lineTo(5f, 16f); moveTo(9f, 12f); lineTo(5f, 16f); lineTo(9f, 20f)
+    }
+
     val Moon = outline("DinexMoon") {
         moveTo(20.5f, 14.5f)
         curveTo(17.5f, 15.8f, 13.8f, 15.2f, 11.4f, 12.8f)
