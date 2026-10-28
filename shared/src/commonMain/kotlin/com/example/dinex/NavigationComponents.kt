@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import dinex.shared.generated.resources.Res
-import dinex.shared.generated.resources.dinex_app_icon
 import dinex.shared.generated.resources.dinex_mascot_ai
 import org.jetbrains.compose.resources.painterResource
 

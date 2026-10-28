@@ -30,6 +30,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import java.util.Locale
+import java.util.concurrent.Executors
 
 @Composable
 actual fun rememberDeviceAutomation(): DeviceAutomation {
@@ -102,12 +103,10 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     private fun openSystemNotificationSettings() {
         val appDetails = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}"))
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val notifications = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        } else null
-        runCatching { context.startActivity(notifications ?: appDetails) }
+        val notifications = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+            .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        runCatching { context.startActivity(notifications) }
             .recoverCatching { context.startActivity(appDetails) }
     }
 
@@ -239,7 +238,7 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     }
 
     override fun requestLocationPermission() {
-        (context as? Activity)?.let { ActivityCompat.requestPermissions(it, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 7002) }
+        context.findActivity()?.let { ActivityCompat.requestPermissions(it, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 7002) }
     }
 
     override fun drainNotifications(): List<CapturedTransaction> = DinexNotificationStore.drain(context)
@@ -247,13 +246,41 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     override fun currentLocationLabel(): String? {
         if (!locationAvailable) return null
         val location = bestLocation() ?: return "Ubicación GPS disponible"
-        return geocode(location).ifBlank { "Ubicación GPS disponible" }
+        return labelFor(location).ifBlank { "Ubicación GPS disponible" }
     }
 
     override fun currentLocation(): DinexLocation? {
         if (!locationAvailable) return null
         val location = bestLocation() ?: return null
-        return DinexLocation(location.latitude, location.longitude, geocode(location))
+        return DinexLocation(location.latitude, location.longitude, labelFor(location))
+    }
+
+    /**
+     * Street name of the latest fix. The Geocoder can go online and take seconds,
+     * so it runs in the background whenever a new fix arrives; saving an expense
+     * or drawing a dialog only reads the cached answer and never waits.
+     */
+    @Volatile private var placeLabel: Pair<Location, String>? = null
+    @Volatile private var geocoding: Location? = null
+
+    private fun labelFor(location: Location): String {
+        val known = placeLabel
+        if (known != null && known.first.distanceTo(location) <= SamePlaceMeters) return known.second
+        resolveLabel(location)
+        return ""
+    }
+
+    private fun resolveLabel(location: Location) {
+        val known = placeLabel
+        if (known != null && known.first.distanceTo(location) <= SamePlaceMeters) return
+        val pending = geocoding
+        if (pending != null && pending.distanceTo(location) <= SamePlaceMeters) return
+        geocoding = location
+        GeocodeExecutor.execute {
+            val label = geocode(location)
+            if (label.isNotBlank()) placeLabel = location to label
+            geocoding = null
+        }
     }
 
     @Volatile private var freshLocation: Location? = null
@@ -321,7 +348,9 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     }
 
     private fun keepBest(location: Location) {
-        if (isBetterLocation(location, freshLocation)) freshLocation = location
+        if (!isBetterLocation(location, freshLocation)) return
+        freshLocation = location
+        resolveLabel(location)
     }
 
     /** Prefers a clearly newer fix; among fixes of about the same time, the more accurate one. */
@@ -361,7 +390,7 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     /** Street and number when Android knows them, e.g. "Av. Ejército 1020, Yanahuara, Arequipa". */
     private fun geocode(location: Location): String = runCatching {
         @Suppress("DEPRECATION")
-        Geocoder(context, Locale("es", "PE")).getFromLocation(location.latitude, location.longitude, 1)
+        Geocoder(context, Locale.forLanguageTag("es-PE")).getFromLocation(location.latitude, location.longitude, 1)
             ?.firstOrNull()
             ?.let { address ->
                 val street = address.thoroughfare?.let { listOfNotNull(it, address.subThoroughfare).joinToString(" ") }
@@ -374,6 +403,9 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
             .orEmpty()
     }.getOrDefault("")
 }
+
+private const val SamePlaceMeters = 30f
+private val GeocodeExecutor = Executors.newSingleThreadExecutor()
 
 /** Compose may hand a ContextThemeWrapper instead of the Activity itself. */
 private fun Context.findActivity(): Activity? {

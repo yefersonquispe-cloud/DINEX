@@ -61,7 +61,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     val movements = data.movements
     val reminders = data.reminders
     val dailyLimit = data.dailyLimit
-    val streak = data.streak
+    val streak = data.activeStreak()
     val savings = data.savings
     val savedToday = data.streakDay == currentDayIndex()
     var quickAdd by remember { mutableStateOf(false) }

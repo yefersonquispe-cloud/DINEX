@@ -34,24 +34,6 @@ internal val categories = listOf(
     CategoryInfo("Otros", "OT", Color(0xFF71827A), 200.0),
 )
 
-internal fun seedMovements() = listOf(
-    Movement(id = 1, title = "Propina mensual", category = "Ingreso", amount = 850.0, income = true, day = 1, method = "Yape"),
-    Movement(2, "Trabajo freelance", "Ingreso", 420.0, true, 4, "Transferencia"),
-    Movement(3, "Almuerzo en Tecsup", "Comida", 14.5, false, 12, "Yape"),
-    Movement(4, "Pasajes de la semana", "Transporte", 36.0, false, 11, "Efectivo"),
-    Movement(5, "Materiales del curso", "Estudios", 58.9, false, 10, "Tarjeta"),
-    Movement(6, "Salida con amigos", "Entretenimiento", 72.0, false, 8, "Yape"),
-    Movement(7, "Desayuno", "Comida", 9.5, false, 7, "Efectivo"),
-    Movement(8, "Videojuego en oferta", "Entretenimiento", 29.9, false, 5, "Tarjeta"),
-    Movement(9, "Venta de audífonos", "Ingreso", 110.0, true, 3, "Plin"),
-)
-
-internal fun seedReminders() = listOf(
-    PaymentReminder(1, "Internet móvil", "HOY", 39.9),
-    PaymentReminder(2, "Spotify", "18 SEP", 20.9),
-    PaymentReminder(3, "Pensión", "25 SEP", 420.0),
-)
-
 internal val colors get() = if (DinexThemeState.dark) darkColorScheme(
     primary = GreenDark,
     onPrimary = Color(0xFF103C27),
@@ -71,6 +53,12 @@ internal val colors get() = if (DinexThemeState.dark) darkColorScheme(
     onSurface = Night,
     surfaceVariant = CardRaised,
     onSurfaceVariant = Gray,
+    // Dialogs, menus and sheets use these tones; without them Material falls back to its lilac defaults.
+    surfaceContainerLowest = Card,
+    surfaceContainerLow = Card,
+    surfaceContainer = Card,
+    surfaceContainerHigh = Card,
+    surfaceContainerHighest = CardRaised,
     outline = Border,
     error = Red,
     onError = Color(0xFF3E1821),
@@ -93,6 +81,12 @@ internal val colors get() = if (DinexThemeState.dark) darkColorScheme(
     onSurface = Night,
     surfaceVariant = CardRaised,
     onSurfaceVariant = Gray,
+    // Dialogs, menus and sheets use these tones; without them Material falls back to its lilac defaults.
+    surfaceContainerLowest = Card,
+    surfaceContainerLow = Card,
+    surfaceContainer = Card,
+    surfaceContainerHigh = Card,
+    surfaceContainerHighest = CardRaised,
     outline = Border,
     error = Red,
     onError = Color.White,

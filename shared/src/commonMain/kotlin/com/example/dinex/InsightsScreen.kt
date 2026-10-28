@@ -179,7 +179,6 @@ internal fun ForecastCard(income: Double, expense: Double) {
 @Composable
 internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpochDays().year, month: Int = civilDateFromEpochDays().month) {
     val currentDay = currentDayOfMonth()
-    val maxMovementDay = movements.filterNot { it.income }.maxOfOrNull { it.day } ?: currentDay
     val days = (1..31).filter { validDate(year, month, it) }
     val values = days.map { day -> movements.filter { !it.income && it.day == day }.sumOf { it.amount } }
     val peak = values.maxOrNull()?.takeIf { it > 0 } ?: 1.0

@@ -33,6 +33,10 @@ internal fun FinancialData.savingGoals(): List<SavingsGoal> = goals.ifEmpty {
     if (savings > 0 || goalName.isNotBlank()) listOf(SavingsGoal(1, goalName.ifBlank { "Mi ahorro" }, goalTarget, savings, goalArtwork)) else emptyList()
 }
 
+/** The stored streak only lives while the last saving was today or yesterday; after a missed day it is 0. */
+internal fun FinancialData.activeStreak(today: Int = currentDayIndex()): Int =
+    if (streakDay == today || streakDay == today - 1) streak else 0
+
 internal fun FinancialData.availableBalance(): Double = movements.sumOf { if (it.income) it.amount else -it.amount } - savings
 
 /** Each profile is one atomic SQLite row, preventing partial saves and account mixing. */

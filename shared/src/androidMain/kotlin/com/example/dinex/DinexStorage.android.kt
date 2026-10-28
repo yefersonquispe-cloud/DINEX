@@ -23,27 +23,11 @@ internal actual fun writeLocalValue(key: String, value: String?) {
 
 internal actual fun loadSavedMovements(): String? = dinexDatabase?.read("movements")
 
-internal actual fun saveSavedMovements(data: String) {
-    dinexDatabase?.write("movements", data)
-}
-
 internal actual fun loadSavedStreak(): Int? = dinexDatabase?.read("streak")?.toIntOrNull()
-
-internal actual fun saveSavedStreak(days: Int) {
-    dinexDatabase?.write("streak", days.toString())
-}
 
 internal actual fun loadSavedSavings(): Double? = dinexDatabase?.read("savings")?.toDoubleOrNull()
 
-internal actual fun saveSavedSavings(amount: Double) {
-    dinexDatabase?.write("savings", amount.toString())
-}
-
 internal actual fun loadSavedStreakDay(): Int? = dinexDatabase?.read("streak_day")?.toIntOrNull()
-
-internal actual fun saveSavedStreakDay(day: Int) {
-    dinexDatabase?.write("streak_day", day.toString())
-}
 
 internal actual fun currentDayIndex(): Int {
     val now = System.currentTimeMillis()
@@ -52,32 +36,14 @@ internal actual fun currentDayIndex(): Int {
 
 internal actual fun loadSavedReminders(): String? = dinexDatabase?.read("reminders")
 
-internal actual fun saveSavedReminders(data: String) {
-    dinexDatabase?.write("reminders", data)
-}
-
 internal actual fun loadSavedEmail(): String? = dinexDatabase?.read("authenticated_email")
-
-internal actual fun saveSavedEmail(email: String?) {
-    if (email == null) dinexDatabase?.delete("authenticated_email")
-    else dinexDatabase?.write("authenticated_email", email)
-}
 
 internal actual fun loadSavedAccounts(): String? = dinexDatabase?.read("accounts")
 
-internal actual fun saveSavedAccounts(data: String) {
-    dinexDatabase?.write("accounts", data)
-}
-
 internal actual fun loadSavedOnboardingCompleted(): Boolean = dinexDatabase?.read("onboarding_completed") == "true"
 
-internal actual fun saveSavedOnboardingCompleted(completed: Boolean) {
-    dinexDatabase?.write("onboarding_completed", completed.toString())
-}
 internal actual fun loadSavedGoalName(): String? = dinexDatabase?.read("goal_name")
-internal actual fun saveSavedGoalName(name: String) { dinexDatabase?.write("goal_name", name) }
 internal actual fun loadSavedGoalTarget(): Double? = dinexDatabase?.read("goal_target")?.toDoubleOrNull()
-internal actual fun saveSavedGoalTarget(target: Double) { dinexDatabase?.write("goal_target", target.toString()) }
 
 private class DinexDatabase(context: Context) : SQLiteOpenHelper(context, "dinex.db", null, 1) {
     init { setWriteAheadLoggingEnabled(true) }

@@ -6,42 +6,24 @@ internal expect fun writeLocalValue(key: String, value: String?)
 
 internal expect fun loadSavedMovements(): String?
 
-internal expect fun saveSavedMovements(data: String)
-
 internal expect fun loadSavedStreak(): Int?
-
-internal expect fun saveSavedStreak(days: Int)
 
 internal expect fun loadSavedSavings(): Double?
 
-internal expect fun saveSavedSavings(amount: Double)
-
 internal expect fun loadSavedStreakDay(): Int?
-
-internal expect fun saveSavedStreakDay(day: Int)
 
 internal expect fun currentDayIndex(): Int
 
 internal expect fun loadSavedReminders(): String?
 
-internal expect fun saveSavedReminders(data: String)
-
 internal expect fun loadSavedEmail(): String?
-
-internal expect fun saveSavedEmail(email: String?)
 
 internal expect fun loadSavedAccounts(): String?
 
-internal expect fun saveSavedAccounts(data: String)
-
 internal expect fun loadSavedOnboardingCompleted(): Boolean
 
-internal expect fun saveSavedOnboardingCompleted(completed: Boolean)
-
 internal expect fun loadSavedGoalName(): String?
-internal expect fun saveSavedGoalName(name: String)
 internal expect fun loadSavedGoalTarget(): Double?
-internal expect fun saveSavedGoalTarget(target: Double)
 
 data class DinexDate(val year: Int, val month: Int, val day: Int)
 

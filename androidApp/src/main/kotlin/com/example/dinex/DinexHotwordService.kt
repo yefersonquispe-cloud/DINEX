@@ -8,7 +8,6 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -261,13 +260,12 @@ class DinexHotwordService : Service() {
     }
 
     private fun isWakePhrase(value: String): Boolean {
-        val normalized = Normalizer.normalize(value.lowercase(Locale("es", "PE")), Normalizer.Form.NFD)
+        val normalized = Normalizer.normalize(value.lowercase(Locale.forLanguageTag("es-PE")), Normalizer.Form.NFD)
             .replace(Regex("\\p{Mn}+"), "")
         return listOf("oye dinex", "hey dinex", "oye dines", "oye inex", "hola dinex").any(normalized::contains)
     }
 
     private fun createChannels() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(
             NotificationChannel(

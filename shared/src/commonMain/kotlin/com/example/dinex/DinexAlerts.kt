@@ -114,7 +114,7 @@ fun readDinexReminderSnapshot(): DinexReminderSnapshot {
     return DinexReminderSnapshot(
         signedIn = email != null && data.onboardingCompleted,
         savedToday = data.streakDay == currentDayIndex(),
-        streak = data.streak,
+        streak = data.activeStreak(),
         goalName = goal?.name.orEmpty(),
         goalSaved = goal?.saved ?: data.savings,
         goalTarget = goal?.target ?: data.goalTarget,

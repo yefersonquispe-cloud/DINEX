@@ -39,7 +39,6 @@ internal object DinexNotificationCenter {
     }
 
     fun ensureChannels(context: Context) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.createNotificationChannel(
             NotificationChannel(BUDGET_CHANNEL, "Presupuesto diario", NotificationManager.IMPORTANCE_HIGH).apply {

@@ -57,6 +57,14 @@ class DinexViewModelTest {
         assertEquals(3, model.state.value.data.movements.size)
     }
 
+    @Test fun streakIsZeroOnceADayIsMissed() {
+        val data = FinancialData(streak = 7, streakDay = 100)
+        assertEquals(7, data.activeStreak(today = 100))
+        assertEquals(7, data.activeStreak(today = 101))
+        assertEquals(0, data.activeStreak(today = 102))
+        assertEquals(0, FinancialData(streak = 3).activeStreak(today = 5))
+    }
+
     @Test fun savingsCountConsecutiveDaysNotDeposits() {
         val model = DinexViewModel(repository())
         model.createAccount(account())

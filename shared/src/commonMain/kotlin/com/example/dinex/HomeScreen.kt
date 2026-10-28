@@ -228,46 +228,6 @@ internal fun MiniStat(label: String, value: String, tint: Color, modifier: Modif
 }
 
 @Composable
-internal fun MonthSummary(income: Double, expenses: Double, balance: Double, savingRate: Int) {
-    DinexCard {
-        SectionHeader("Resumen de este mes", currentMonthYearLabel())
-        Spacer(Modifier.height(12.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SummaryCell("Ingresos", money(income), Green, Modifier.weight(1f))
-            SummaryCell("Gastos", money(expenses), Red, Modifier.weight(1f))
-            SummaryCell("Balance", money(balance), Night, Modifier.weight(1f))
-            SummaryCell("% ahorro", "$savingRate%", Lime, Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-internal fun SummaryCell(label: String, value: String, tint: Color, modifier: Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.Start) {
-        Text(label, color = Gray, fontSize = 9.sp)
-        Spacer(Modifier.height(2.dp))
-        Text(value, color = tint, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-internal fun ProgressSection(
-    streak: Int,
-    savedToday: Boolean,
-    savings: Double,
-    goalName: String,
-    goalTarget: Double,
-    onSaveToday: () -> Unit,
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Tu progreso", color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-        SavingsStreak(streak, savedToday, onSaveToday)
-        SavingsHero(savings, streak, goalName, goalTarget)
-        if (goalName.isNotBlank() && goalTarget > 0) SavingsGoalCard(goalName, savings, goalTarget)
-    }
-}
-
-@Composable
 internal fun SavingsGoalCard(name: String, saved: Double, target: Double, onClick: (() -> Unit)? = null) {
     val progress = if (target > 0) (saved / target).toFloat().coerceIn(0f, 1f) else 0f
     DinexCard(accent = Orange, onClick = onClick) {
