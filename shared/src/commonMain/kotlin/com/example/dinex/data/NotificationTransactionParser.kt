@@ -11,7 +11,7 @@ fun parseDinexTransactionNotification(source: String, text: String): CapturedTra
     )
     if (ignored.any(normalized::contains)) return null
     val expenseWords = listOf(
-        "gastaste", "compraste", "pagaste", "pago realizado", "pago exitoso", "compra aprobada",
+        "gastaste", "compraste", "pagaste", "pago realizado", "pago exitoso", "pago de", "compra aprobada",
         "realizaste una compra", "realizaste un consumo", "consumo por", "retiro realizado",
         "cargo realizado", "cobro realizado", "operación realizada", "operacion realizada",
         "transferencia enviada", "transferiste", "enviaste", "enviado", "debito",
@@ -23,12 +23,14 @@ fun parseDinexTransactionNotification(source: String, text: String): CapturedTra
         "te envio", "te enviaron", "te ha enviado", "te han enviado", "te pago", "te pagaron",
         "te transfirio", "te transfirieron", "transferencia recibida", "devolucion recibida",
         "deposito recibido", "deposito a tu cuenta", "deposito en tu cuenta",
-        "dinero recibido", "pago recibido", "pago de", "acredito en tu cuenta",
+        "dinero recibido", "pago recibido", "acredito en tu cuenta",
     )
     val incomingPosition = incomeWords.map { normalized.indexOf(it) }.filter { it >= 0 }.minOrNull()
     // "Depósito" alone can be an incoming alert, but "depositaste" is an expense.
     val genericDeposit = "deposito" in normalized && expenseWords.none(normalized::contains)
-    val outgoingPosition = expenseWords.filterNot { it.startsWith("operaci") }
+    // "Pago de" por sí solo indica un gasto, pero también aparece en abonos
+    // como "pago de Juan recibido". No debe ganar a una señal explícita de ingreso.
+    val outgoingPosition = expenseWords.filterNot { it.startsWith("operaci") || it == "pago de" }
         .map { normalized.indexOf(it) }.filter { it >= 0 }.minOrNull()
     val income = when {
         incomingPosition != null && (outgoingPosition == null || incomingPosition < outgoingPosition) -> true

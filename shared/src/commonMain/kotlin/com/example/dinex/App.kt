@@ -151,14 +151,6 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                     label = "page",
                 ) { page ->
                     when (page) {
-                        0 -> HomePage(movements, dailyLimit, streak, savings, "${data.savingGoals().size} metas", data.savingGoals().sumOf { it.target },
-                            onDailyLimitChange = model::setDailyLimit,
-                            onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
-                            goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true },
-                            onScan = { scanner() }, onVoice = { automationDialog = true },
-                            onGoals = { savingGoalId = null; savingDialog = true },
-                            notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
-                            onEnableNotifications = { automation.requestSystemNotificationPermission() })
                         1 -> HistoryPage(movements, onAdd = { quickAdd = true }, onDelete = { movementToDelete = it },
                             onImport = { importDialog = true }, onExport = { exportDialog = true })
                         2 -> PlanPage(movements.filter { it.isInCurrentMonth() }, dailyLimit, reminders, onDailyLimitChange = model::setDailyLimit,

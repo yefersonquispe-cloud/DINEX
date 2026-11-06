@@ -67,7 +67,11 @@ internal object DinexNotificationCenter {
             .setPriority(if (budget) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
             .setColor(if (budget) 0xFFB84754.toInt() else 0xFF176B43.toInt())
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(id, notification) }
+        try {
+            NotificationManagerCompat.from(context).notify(id, notification)
+        } catch (_: SecurityException) {
+            // El permiso puede revocarse entre la comprobación y el envío.
+        }
     }
 
     fun cancel(context: Context, id: Int) {

@@ -12,6 +12,7 @@ class NotificationIncomeTest {
             "Carlos te envió un pago de PEN 50.00",
             "Recibiste S/ 50.00 de Luis",
             "Nuevo pago recibido · S/ 50.00",
+            "Pago de Juan recibido · S/ 50.00",
             "Te han enviado S/ 50.00"
         ).forEach { text ->
             val item = assertNotNull(parseDinexTransactionNotification("Yape", text), text)
@@ -35,7 +36,7 @@ class NotificationIncomeTest {
     }
 
     @Test fun outgoingYapesAndDepositsStayExpenses() {
-        listOf("Yapeaste S/ 20 a Juan", "Enviaste S/ 20", "Depositaste S/ 20", "Depósito realizado S/ 20", "Pagaste S/ 20", "Compra aprobada S/ 20")
+        listOf("Yapeaste S/ 20 a Juan", "Enviaste S/ 20", "Depositaste S/ 20", "Depósito realizado S/ 20", "Pagaste S/ 20", "Compra aprobada S/ 20", "Pago de S/ 20 realizado en tienda")
             .forEach { text -> assertFalse(assertNotNull(parseDinexTransactionNotification("Yape", text), text).income, text) }
     }
 
