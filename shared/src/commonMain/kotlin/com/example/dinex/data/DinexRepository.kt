@@ -71,7 +71,20 @@ internal class DinexRepository(
     fun session(): String? = store.get("session")?.takeIf { it.isNotBlank() }
     fun setSession(email: String?) = store.put("session", email.orEmpty())
     fun profile(email: String): FinancialData = unpackProfile(store.get(profileKey(email)))
-    fun saveProfile(email: String, data: FinancialData) = store.put(profileKey(email), packProfile(data))
+    fun saveProfile(email: String, data: FinancialData, updatedAt: Long = epochMillis()) {
+        store.put(profileKey(email), packProfile(data))
+        store.put("profile_at:" + email.trim().lowercase(), updatedAt.toString())
+    }
+    /** Momento del último cambio local; 0 si el perfil nunca se guardó en este equipo. */
+    fun profileUpdatedAt(email: String): Long = store.get("profile_at:" + email.trim().lowercase())?.toLongOrNull()
+        ?: if (store.get(profileKey(email)) != null) 1L else 0L
+    /** Sesión de Firebase (uid, correo y token de renovación). Nunca se guarda la contraseña. */
+    fun cloudSession(): CloudSession? {
+        val fields = store.get("cloud_session")?.split('|')?.takeIf { it.size == 3 && it.none(String::isBlank) } ?: return null
+        return CloudSession(uid = fields[0], email = fields[1], idToken = "", refreshToken = fields[2], expiresAt = 0)
+    }
+    fun setCloudSession(session: CloudSession?) =
+        store.put("cloud_session", session?.let { "${it.uid}|${it.email}|${it.refreshToken}" })
     fun reduceMotion(): Boolean = store.get("reduce_motion") == "true"
     fun setReduceMotion(value: Boolean) = store.put("reduce_motion", value.toString())
     fun largeText(): Boolean = store.get("large_text") == "true"
@@ -108,7 +121,7 @@ private fun unpackFields(raw: String?): List<String>? {
     return result
 }
 
-private fun packProfile(data: FinancialData): String = packFields(listOf(
+internal fun packProfile(data: FinancialData): String = packFields(listOf(
     "4", encodeMovements(data.movements), encodeReminders(data.reminders),
     data.savings.toString(), data.streak.toString(), data.streakDay?.toString().orEmpty(),
     data.goalName, data.goalTarget.toString(), data.dailyLimit.toString(),
@@ -118,9 +131,12 @@ private fun packProfile(data: FinancialData): String = packFields(listOf(
     data.nextGoalId.toString(),
 ))
 
-private fun unpackProfile(raw: String?): FinancialData {
-    val fields = unpackFields(raw) ?: return FinancialData()
-    if (!(fields.size == 10 && fields[0] == "2") && !(fields.size == 12 && fields[0] == "3") && !(fields.size == 14 && fields[0] == "4")) return FinancialData()
+internal fun unpackProfile(raw: String?): FinancialData = unpackProfileOrNull(raw) ?: FinancialData()
+
+/** null cuando el texto no es un perfil válido (por ejemplo, datos dañados en la nube). */
+internal fun unpackProfileOrNull(raw: String?): FinancialData? {
+    val fields = unpackFields(raw) ?: return null
+    if (!(fields.size == 10 && fields[0] == "2") && !(fields.size == 12 && fields[0] == "3") && !(fields.size == 14 && fields[0] == "4")) return null
     return FinancialData(
         movements = decodeMovements(fields[1]),
         reminders = decodeReminders(fields[2]),
@@ -145,4 +161,16 @@ private fun unpackProfile(raw: String?): FinancialData {
         }.distinctBy { it.id },
         nextGoalId = fields.getOrNull(13)?.toIntOrNull()?.coerceAtLeast(1) ?: 1,
     )
+}
+
+/** Copia para la nube: sin ilustraciones de metas (pesan mucho y Firestore admite hasta 1 MB por documento). */
+internal fun cloudProfileText(data: FinancialData): String =
+    packProfile(data.copy(goalArtwork = "", goals = data.goals.map { it.copy(artwork = "") }))
+
+/** Al bajar datos de la nube, conserva las ilustraciones que ya estaban en este equipo. */
+internal fun mergeCloudProfile(cloud: FinancialData, local: FinancialData): FinancialData {
+    val art = local.goals.associate { it.id to it.artwork }
+    val goals = cloud.goals.map { goal -> if (goal.artwork.isBlank()) goal.copy(artwork = art[goal.id].orEmpty()) else goal }
+    val lastArtwork = goals.lastOrNull { it.name == cloud.goalName }?.artwork ?: local.goalArtwork.takeIf { local.goalName == cloud.goalName }.orEmpty()
+    return cloud.copy(goals = goals, goalArtwork = cloud.goalArtwork.ifBlank { lastArtwork })
 }

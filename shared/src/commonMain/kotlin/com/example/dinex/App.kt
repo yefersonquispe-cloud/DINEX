@@ -33,7 +33,7 @@ import kotlinx.coroutines.CancellationException
 /** View layer: navigation, screens and presentation-only dialog state. */
 @Composable
 fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) {
-    val model = viewModel { DinexViewModel() }
+    val model = viewModel { DinexViewModel(cloud = DinexCloud()) }
     val state by model.state.collectAsState()
     SideEffect { onThemeChanged(state.darkMode) }
     LaunchedEffect(state.email, state.data, state.darkMode) { onDataChanged() }
@@ -47,7 +47,16 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) 
             if (launchVisible) {
                 DinexLaunchScreen(reduceMotion = state.reduceMotion, onReduceMotion = model::setReduceMotion) { launchVisible = false }
             } else if (state.email == null) {
-                AuthFlow(state.accounts, onCreateAccount = model::createAccount, onAuthenticated = model::authenticate)
+                AuthFlow(
+                    accounts = state.accounts,
+                    busy = state.authBusy,
+                    serverError = state.authError,
+                    notice = state.authNotice,
+                    onRegister = model::register,
+                    onSignIn = model::signIn,
+                    onForgotPassword = model::sendPasswordReset,
+                    onClearMessages = model::clearAuthMessages,
+                )
             } else {
                 key(state.email) { DinexSignedInView(model, state) }
             }
