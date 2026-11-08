@@ -113,6 +113,30 @@ internal object DinexNavigationIcons {
         moveTo(18.5f, 12.5f); lineTo(18.6f, 12.5f)
     }
 
+    val Eye = outline("DinexEye") {
+        moveTo(2.5f, 12f); quadTo(12f, 3f, 21.5f, 12f); quadTo(12f, 21f, 2.5f, 12f); close()
+        moveTo(15f, 12f); arcTo(3f, 3f, 0f, true, true, 9f, 12f); arcTo(3f, 3f, 0f, true, true, 15f, 12f)
+    }
+    val EyeOff = outline("DinexEyeOff") {
+        moveTo(2.5f, 12f); quadTo(12f, 3f, 21.5f, 12f); quadTo(12f, 21f, 2.5f, 12f); close()
+        moveTo(15f, 12f); arcTo(3f, 3f, 0f, true, true, 9f, 12f); arcTo(3f, 3f, 0f, true, true, 15f, 12f)
+        moveTo(4f, 4f); lineTo(20f, 20f)
+    }
+    val Shield = outline("DinexShield") {
+        moveTo(12f, 3f); lineTo(20f, 6f); lineTo(20f, 11f); quadTo(20f, 18f, 12f, 21f)
+        quadTo(4f, 18f, 4f, 11f); lineTo(4f, 6f); close()
+        moveTo(8.5f, 12f); lineTo(11f, 14.5f); lineTo(15.5f, 9.5f)
+    }
+    val MapPin = outline("DinexMapPin") {
+        moveTo(12f, 21f); quadTo(5f, 14f, 5f, 9.5f); arcTo(7f, 7f, 0f, false, true, 19f, 9.5f); quadTo(19f, 14f, 12f, 21f); close()
+        moveTo(14.5f, 9.5f); arcTo(2.5f, 2.5f, 0f, true, true, 9.5f, 9.5f); arcTo(2.5f, 2.5f, 0f, true, true, 14.5f, 9.5f)
+    }
+    val Bell = outline("DinexBell") {
+        moveTo(6f, 16f); lineTo(6f, 11f); arcTo(6f, 6f, 0f, false, true, 18f, 11f); lineTo(18f, 16f)
+        lineTo(20f, 18f); lineTo(4f, 18f); close()
+        moveTo(10f, 21f); lineTo(14f, 21f)
+    }
+
     // The web canvas font has no ✓ × → glyphs, so these are drawn as vectors everywhere.
     val Check = outline("DinexCheck", strokeWidth = 2.4f) {
         moveTo(4.5f, 12.5f); lineTo(9.5f, 17.5f); lineTo(19.5f, 6.5f)

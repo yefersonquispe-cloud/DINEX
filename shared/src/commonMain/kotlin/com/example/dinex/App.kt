@@ -84,6 +84,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var marketOpen by remember { mutableStateOf(false) }
     var tipsOpen by remember { mutableStateOf(false) }
     var welcomeGuideOpen by remember { mutableStateOf(false) }
+    var legalTab by remember { mutableStateOf<Int?>(null) }
     var savingDialog by remember { mutableStateOf(false) }
     var importDialog by remember { mutableStateOf(false) }
     var exportDialog by remember { mutableStateOf(false) }
@@ -276,7 +277,20 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     if (state.goalCelebration) GoalCelebrationDialog(state.celebrationGoal?.name ?: "tu meta", state.celebrationGoal?.saved ?: savings, onDismiss = model::dismissCelebrations)
     state.levelCelebration?.let { StreakLevelDialog(it, streak, onDismiss = model::dismissCelebrations) }
     if (state.initialBalanceRequired) InitialBalanceDialog(onSave = { model.setInitialBalance(it); welcomeGuideOpen = true })
-    if (welcomeGuideOpen) WelcomeGuideDialog(onDismiss = { welcomeGuideOpen = false }, onTryAssistant = { welcomeGuideOpen = false; assistantOpen = true })
+    if (welcomeGuideOpen) WelcomeGuideDialog(
+        name = state.activeAccount?.name.orEmpty(),
+        onDismiss = { welcomeGuideOpen = false },
+        onAction = { action ->
+            welcomeGuideOpen = false
+            when (action) {
+                GuideAction.Automation -> automationDialog = true
+                GuideAction.Market -> marketOpen = true
+                GuideAction.Tips -> tipsOpen = true
+                GuideAction.Assistant -> assistantOpen = true
+            }
+        },
+    )
+    legalTab?.let { LegalDialog(it) { legalTab = null } }
     if (assistantOpen) Dialog(onDismissRequest = { assistantOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
             Surface(Modifier.fillMaxWidth().widthIn(max = 700.dp).heightIn(max = maxHeight - 24.dp).height(maxHeight.coerceAtMost(760.dp)),
@@ -344,6 +358,9 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         onOpenNotificationSettings = { automation.openAppDetailsSettings() },
         profilePhoto = state.profilePhoto, onProfilePhoto = model::setProfilePhoto,
         onAutomation = { profileOpen = false; automationDialog = true },
+        onOpenGuide = { profileOpen = false; welcomeGuideOpen = true },
+        onOpenLegal = { legalTab = it },
+        onDeleteAccount = { done -> model.deleteAccount { error -> if (error == null) automation.setHotwordEnabled(false); done(error) } },
     )
     premiumLoading?.let { PremiumLoadingDialog(it) }
 }

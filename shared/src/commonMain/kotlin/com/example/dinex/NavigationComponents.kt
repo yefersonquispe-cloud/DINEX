@@ -433,7 +433,13 @@ internal fun ProfileDialog(
     profilePhoto: String,
     onProfilePhoto: (String?) -> Boolean,
     onAutomation: () -> Unit,
+    onOpenGuide: () -> Unit,
+    onOpenLegal: (Int) -> Unit,
+    onDeleteAccount: (onDone: (String?) -> Unit) -> Unit,
 ) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    var deleting by remember { mutableStateOf(false) }
+    var deleteError by remember { mutableStateOf<String?>(null) }
     val income = movements.filter { it.income }.sumOf { it.amount }
     val expenses = movements.filterNot { it.income }.sumOf { it.amount }
     val level = streakLevel(streak)
@@ -487,7 +493,7 @@ internal fun ProfileDialog(
                         ProfileStat("INGRESOS", money(income), GreenDark, Modifier.weight(1f))
                         ProfileStat("EGRESOS", money(expenses), Red, Modifier.weight(1f))
                     }
-                    Text("${movements.size} movimientos · datos en este dispositivo", color = Gray, fontSize = 12.sp)
+                    Text("${movements.size} movimientos · sincronizados con tu cuenta", color = Gray, fontSize = 12.sp)
                     Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Text("Preferencias", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
@@ -539,11 +545,56 @@ internal fun ProfileDialog(
                         }
                     }
                     OutlinedButton(onClick = onAutomation, modifier = Modifier.fillMaxWidth()) { Text("Voz y notificaciones") }
+                    Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
+                        Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+                            Text("Ayuda y privacidad", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                            ProfileLink("Ver guía de Dinex", "Repasa todas las funciones", onOpenGuide)
+                            ProfileLink("Términos y condiciones", "Reglas de uso de la app", { onOpenLegal(0) })
+                            ProfileLink("Política de privacidad", "Cómo cuidamos tus datos (Ley N.° 29733)", { onOpenLegal(1) })
+                            ProfileLink("Eliminar mi cuenta", "Borra tu cuenta y todos tus datos", { deleteError = null; confirmDelete = true }, danger = true)
+                        }
+                    }
                     TextButton(onClick = onLogout) { Text("Cerrar sesión", color = Red) }
                     Spacer(Modifier.height(18.dp))
                 }
             }
         }
+    }
+    if (confirmDelete) AlertDialog(
+        onDismissRequest = { if (!deleting) confirmDelete = false },
+        title = { Text("¿Eliminar tu cuenta?", fontWeight = FontWeight.Black) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Se borrarán tu cuenta, tus movimientos, metas y recordatorios de la nube y de este equipo. No se puede deshacer.")
+                Text("Si quieres guardar una copia, primero exporta tu reporte desde Movimientos.", color = Gray, fontSize = 12.sp)
+                deleteError?.let { Text(it, color = Red, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            }
+        },
+        confirmButton = {
+            Button(
+                enabled = !deleting,
+                onClick = {
+                    deleting = true
+                    onDeleteAccount { error -> deleting = false; deleteError = error; if (error == null) confirmDelete = false }
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = Red, contentColor = Color.White),
+            ) { Text(if (deleting) "Eliminando…" else "Eliminar para siempre") }
+        },
+        dismissButton = { TextButton(enabled = !deleting, onClick = { confirmDelete = false }) { Text("Cancelar") } },
+    )
+}
+
+@Composable
+private fun ProfileLink(label: String, detail: String, onClick: () -> Unit, danger: Boolean = false) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(label, color = if (danger) Red else Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(detail, color = Gray, fontSize = 11.sp)
+        }
+        Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(18.dp))
     }
 }
 

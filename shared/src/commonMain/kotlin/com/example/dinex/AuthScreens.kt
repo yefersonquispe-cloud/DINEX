@@ -49,6 +49,9 @@ internal fun AuthFlow(
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
+    var showConfirmation by remember { mutableStateOf(false) }
+    var acceptedTerms by remember { mutableStateOf(false) }
+    var legalTab by remember { mutableStateOf<Int?>(null) }
     var attempted by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -156,15 +159,7 @@ internal fun AuthFlow(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                             isError = attempted && (password.isBlank() || (createMode && !passwordValid)),
-                            trailingIcon = {
-                                Text(
-                                    if (showPassword) "OCULTAR" else "VER",
-                                    color = GreenDark,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    modifier = Modifier.heightIn(min = 48.dp).clickable(onClickLabel = if (showPassword) "Ocultar contraseña" else "Mostrar contraseña") { showPassword = !showPassword }.wrapContentHeight().padding(6.dp),
-                                )
-                            },
+                            trailingIcon = { PasswordEye(showPassword) { showPassword = !showPassword } },
                             shape = RoundedCornerShape(15.dp),
                         )
                         if (createMode) {
@@ -180,12 +175,38 @@ internal fun AuthFlow(
                                 placeholder = { Text("Repítela") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                visualTransformation = PasswordVisualTransformation(),
+                                visualTransformation = if (showConfirmation) VisualTransformation.None else PasswordVisualTransformation(),
                                 isError = attempted && confirmation != password,
-                                trailingIcon = { if (confirmation.isNotBlank() && confirmation == password) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(18.dp)) },
+                                trailingIcon = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (confirmation.isNotBlank() && confirmation == password) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(18.dp))
+                                        PasswordEye(showConfirmation) { showConfirmation = !showConfirmation }
+                                    }
+                                },
                                 shape = RoundedCornerShape(15.dp),
                             )
                             if (attempted && confirmation != password) ValidationHint("Las contraseñas deben coincidir", false)
+                            Spacer(Modifier.height(12.dp))
+                            // Consentimiento expreso y por escrito (Ley N.° 29733): la casilla empieza sin marcar.
+                            Surface(
+                                shape = RoundedCornerShape(15.dp),
+                                color = if (attempted && !acceptedTerms) Red.copy(alpha = .08f) else CardRaised,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (attempted && !acceptedTerms) Red.copy(alpha = .5f) else Border),
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(end = 10.dp), verticalAlignment = Alignment.Top) {
+                                    Checkbox(checked = acceptedTerms, onCheckedChange = { acceptedTerms = it; error = null })
+                                    Column(Modifier.padding(top = 12.dp)) {
+                                        Text(
+                                            "Leí y acepto los Términos y la Política de Privacidad, y autorizo a Dinex a tratar mis datos personales y financieros según la Ley N.° 29733.",
+                                            color = NightSoft, fontSize = 11.sp, lineHeight = 15.sp,
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                            LegalLink("Ver términos") { legalTab = 0 }
+                                            LegalLink("Ver privacidad") { legalTab = 1 }
+                                        }
+                                    }
+                                }
+                            }
                         }
 
                         (error ?: serverError)?.let {
@@ -209,6 +230,7 @@ internal fun AuthFlow(
                                 if (createMode) {
                                     when {
                                         !nameValid || !emailValid || !passwordValid || confirmation != password -> error = "Revisa los campos marcados antes de continuar."
+                                        !acceptedTerms -> error = "Para crear tu cuenta acepta los Términos y la Política de Privacidad."
                                         accounts.any { it.email == normalizedEmail } -> error = "Ya existe una cuenta con este correo. Inicia sesión."
                                         else -> onRegister(name.trim(), normalizedEmail, password)
                                     }
@@ -243,9 +265,31 @@ internal fun AuthFlow(
                     }
                 }
                 Spacer(Modifier.height(15.dp))
+                if (!createMode) {
+                    Text("Al iniciar sesión aceptas los Términos y la Política de Privacidad vigentes.", color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally)) {
+                        LegalLink("Términos") { legalTab = 0 }
+                        LegalLink("Privacidad") { legalTab = 1 }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
                 Text("Tu cuenta está protegida con Firebase de Google: tu contraseña nunca se guarda en el equipo y tus datos se sincronizan de forma privada entre tu celular y la web.", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
         }
+    }
+    legalTab?.let { LegalDialog(it) { legalTab = null } }
+}
+
+/** Ojito para mostrar u ocultar la contraseña. */
+@Composable
+private fun PasswordEye(visible: Boolean, onToggle: () -> Unit) {
+    IconButton(onClick = onToggle) {
+        Icon(
+            if (visible) DinexNavigationIcons.EyeOff else DinexNavigationIcons.Eye,
+            contentDescription = if (visible) "Ocultar contraseña" else "Mostrar contraseña",
+            tint = if (visible) GreenDark else Gray,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 

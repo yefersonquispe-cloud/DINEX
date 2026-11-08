@@ -36,7 +36,16 @@ internal data class CloudSession(
     fun fresh(now: Long = epochMillis()) = idToken.isNotBlank() && now < expiresAt - 60_000
 }
 
-internal data class CloudProfile(val name: String, val email: String, val profile: String, val updatedAt: Long)
+internal data class CloudProfile(
+    val name: String,
+    val email: String,
+    val profile: String,
+    val updatedAt: Long,
+    /** Constancia del consentimiento (Ley N.° 29733): versión aceptada y cuándo. */
+    val terms: TermsConsent? = null,
+)
+
+internal data class TermsConsent(val version: String, val acceptedAt: Long)
 
 internal class DinexCloud(
     private val apiKey: String = FirebaseConfig.API_KEY,
@@ -88,6 +97,9 @@ internal class DinexCloud(
             email = fields.obj("email")?.text("stringValue").orEmpty(),
             profile = fields.obj("profile")?.text("stringValue").orEmpty(),
             updatedAt = fields.obj("updatedAt")?.text("integerValue")?.toLongOrNull() ?: 0L,
+            terms = fields.obj("termsVersion")?.text("stringValue")?.let { version ->
+                TermsConsent(version, fields.obj("termsAcceptedAt")?.text("integerValue")?.toLongOrNull() ?: 0L)
+            },
         )
     }
 
@@ -96,8 +108,17 @@ internal class DinexCloud(
             "\"name\":{\"stringValue\":${jsonString(profile.name)}}," +
             "\"email\":{\"stringValue\":${jsonString(profile.email)}}," +
             "\"profile\":{\"stringValue\":${jsonString(profile.profile)}}," +
-            "\"updatedAt\":{\"integerValue\":\"${profile.updatedAt}\"}}}"
+            "\"updatedAt\":{\"integerValue\":\"${profile.updatedAt}\"}" +
+            (profile.terms?.let { ",\"termsVersion\":{\"stringValue\":${jsonString(it.version)}},\"termsAcceptedAt\":{\"integerValue\":\"${it.acceptedAt}\"}" } ?: "") +
+            "}}"
         parseObject(http("PATCH", documentUrl(session.uid), body, session.idToken))
+    }
+
+    /** Derecho de cancelación: borra el documento en Firestore y luego la cuenta de Firebase. */
+    suspend fun deleteAccount(session: CloudSession) {
+        val removed = http("DELETE", documentUrl(session.uid), null, session.idToken)
+        if (removed.status != 404) parseObject(removed)
+        parseObject(http("POST", "$identity:delete?key=$apiKey", jsonObject("idToken" to session.idToken), null))
     }
 
     private fun documentUrl(uid: String) =

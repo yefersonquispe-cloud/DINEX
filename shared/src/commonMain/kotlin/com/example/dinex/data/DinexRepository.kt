@@ -78,6 +78,16 @@ internal class DinexRepository(
     /** Momento del último cambio local; 0 si el perfil nunca se guardó en este equipo. */
     fun profileUpdatedAt(email: String): Long = store.get("profile_at:" + email.trim().lowercase())?.toLongOrNull()
         ?: if (store.get(profileKey(email)) != null) 1L else 0L
+    fun termsConsent(email: String): TermsConsent? = store.get("terms:" + email.trim().lowercase())
+        ?.split('|')?.takeIf { it.size == 2 }?.let { TermsConsent(it[0], it[1].toLongOrNull() ?: 0L) }
+    fun setTermsConsent(email: String, consent: TermsConsent?) =
+        store.put("terms:" + email.trim().lowercase(), consent?.let { "${it.version}|${it.acceptedAt}" })
+    /** Borra todo lo que este equipo guarda de una cuenta. */
+    fun forgetAccount(email: String) {
+        val key = email.trim().lowercase()
+        listOf(profileKey(email), "profile_at:$key", "avatar:$key", "terms:$key").forEach { store.put(it, null) }
+        saveAccounts(accounts().filterNot { it.email == key })
+    }
     /** Sesión de Firebase (uid, correo y token de renovación). Nunca se guarda la contraseña. */
     fun cloudSession(): CloudSession? {
         val fields = store.get("cloud_session")?.split('|')?.takeIf { it.size == 3 && it.none(String::isBlank) } ?: return null

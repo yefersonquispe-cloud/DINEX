@@ -160,7 +160,7 @@ class DinexViewModelTest {
         val model = DinexViewModel(repository(store))
         model.createAccount(account()); model.setInitialBalance(100.0)
         model.saveSaving(SavingEntry(10.0, "Celular", 500.0))
-        assertTrue(model.setCategoryBudget("Comida", 150.0))
+        assertTrue(model.setCategoryBudgets(mapOf("Comida" to 150.0)))
         model.saveGoalArtwork("someoneelse@dinex.test", "Celular", "wrong")
         assertEquals("", model.state.value.data.goalArtwork)
         model.saveGoalArtwork("qa@dinex.test", "Celular", "image-example")

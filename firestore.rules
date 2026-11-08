@@ -13,12 +13,15 @@ service cloud.firestore {
 
       function validProfile() {
         let data = request.resource.data;
-        return data.keys().hasOnly(['name', 'email', 'profile', 'updatedAt'])
+        return data.keys().hasOnly(['name', 'email', 'profile', 'updatedAt', 'termsVersion', 'termsAcceptedAt'])
           && data.keys().hasAll(['name', 'email', 'profile', 'updatedAt'])
           && data.name is string && data.name.size() <= 80
           && data.email is string && data.email == request.auth.token.email
           && data.profile is string && data.profile.size() < 1000000
-          && data.updatedAt is int && data.updatedAt > 0;
+          && data.updatedAt is int && data.updatedAt > 0
+          // Constancia del consentimiento (Ley N.° 29733), opcional en cuentas antiguas.
+          && (!('termsVersion' in data) || (data.termsVersion is string && data.termsVersion.size() <= 20))
+          && (!('termsAcceptedAt' in data) || data.termsAcceptedAt is int);
       }
 
       allow get: if isOwner();

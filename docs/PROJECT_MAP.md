@@ -67,8 +67,14 @@ con el ícono adaptativo de Android y `iosApp/iosApp/Assets.xcassets/AppIcon`.
 La paleta visual principal se define en `DinexTheme.kt` en las constantes
 `AppBg`, `Card`, `Green`, `Indigo`, `ElectricBlue`, `Lime` y `Orange`.
 La dirección visual, animaciones y opción de reducir movimiento están descritas
-en `docs/DESIGN_SYSTEM.md`. La revisión del rediseño 1.5 está en
-`docs/QA_AURORA_2026-10-06.md`.
+en `docs/DESIGN_SYSTEM.md`.
+
+## Firebase y privacidad
+
+Las cuentas y la sincronización están en `data/DinexCloud.kt` (Firebase
+Authentication + Cloud Firestore por REST). Las reglas de seguridad están en
+`firestore.rules`. La guía de bienvenida está en `WelcomeGuide.kt` y los
+Términos y la Política de Privacidad (Ley N.° 29733, Perú) en `LegalScreen.kt`.
 
 ## Integraciones por plataforma
 

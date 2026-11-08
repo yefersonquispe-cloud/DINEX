@@ -163,6 +163,8 @@ internal class DinexViewModel(
         val session = cloud.signUp(email, password)
         val verification = runCatching { cloud.sendEmailVerification(session) }.isSuccess
         repository.saveProfile(session.email, FinancialData())
+        // Constancia del consentimiento dado en la casilla del registro.
+        repository.setTermsConsent(session.email, TermsConsent(DinexLegal.VERSION, epochMillis()))
         completeCloudLogin(session, name, trustLocal = true)
         if (verification) "Te enviamos un correo a ${session.email} para verificar tu cuenta." else null
     }
@@ -172,6 +174,35 @@ internal class DinexViewModel(
         // El mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados.
         "Si $email tiene una cuenta, te llegará un enlace para crear una nueva contraseña."
     }
+
+    /** Derecho de cancelación (ARCO): borra la cuenta en Firebase y todos sus datos de este equipo. */
+    fun deleteAccount(onDone: (String?) -> Unit) {
+        val email = value.email ?: return
+        val cloud = cloud
+        viewModelScope.launch {
+            val error = try {
+                if (cloud != null) validSession()?.let { cloud.deleteAccount(it) }
+                null
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: CloudAuthException) {
+                if (error.code == "CREDENTIAL_TOO_OLD_LOGIN_AGAIN") "Por seguridad, cierra sesión, vuelve a entrar y repite la eliminación."
+                else cloudErrorMessage(error.code)
+            } catch (_: Throwable) {
+                "Necesitas internet para eliminar tu cuenta."
+            }
+            if (error == null) {
+                syncJob?.cancel()
+                repository.forgetAccount(email)
+                logout()
+                mutableState.value = value.copy(accounts = repository.accounts(), authNotice = "Tu cuenta y tus datos fueron eliminados.")
+            }
+            onDone(error)
+        }
+    }
+
+    private fun localCloudProfile(email: String, name: String, updatedAt: Long) =
+        CloudProfile(name, email, cloudProfileText(repository.profile(email)), updatedAt, repository.termsConsent(email))
 
     fun clearAuthMessages() { mutableState.value = value.copy(authError = null, authNotice = null) }
 
@@ -222,11 +253,12 @@ internal class DinexViewModel(
         val remoteData = unpackProfileOrNull(remote?.profile)
         if (remote != null && remoteData != null && (preferRemote || remote.updatedAt >= localAt)) {
             val merged = mergeCloudProfile(remoteData, repository.profile(email))
+            remote.terms?.let { repository.setTermsConsent(email, it) }
             repository.saveProfile(email, merged, remote.updatedAt)
             if (value.email == email) mutableState.value = value.copy(data = merged)
         } else {
             val stamp = if (localAt > 1) localAt else epochMillis()
-            cloud.upload(session, CloudProfile(name, email, cloudProfileText(repository.profile(email)), stamp))
+            cloud.upload(session, localCloudProfile(email, name, stamp))
         }
     }
 
@@ -265,8 +297,7 @@ internal class DinexViewModel(
             val email = value.email ?: return@launch
             try {
                 val session = validSession() ?: return@launch
-                cloud.upload(session, CloudProfile(value.activeAccount?.name.orEmpty(), email,
-                    cloudProfileText(repository.profile(email)), repository.profileUpdatedAt(email)))
+                cloud.upload(session, localCloudProfile(email, value.activeAccount?.name.orEmpty(), repository.profileUpdatedAt(email)))
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: CloudAuthException) {
@@ -287,7 +318,7 @@ internal class DinexViewModel(
         val email = value.email
         if (pending && cloud != null && session != null && email != null) {
             // Termina de subir el último cambio antes de cerrar la sesión.
-            val profile = CloudProfile(value.activeAccount?.name.orEmpty(), email, cloudProfileText(repository.profile(email)), repository.profileUpdatedAt(email))
+            val profile = localCloudProfile(email, value.activeAccount?.name.orEmpty(), repository.profileUpdatedAt(email))
             viewModelScope.launch { runCatching { cloud.upload(if (session.fresh()) session else cloud.refresh(session), profile) } }
         }
         cloudSession = null
@@ -380,12 +411,6 @@ internal class DinexViewModel(
         }
     }
     fun setDailyLimit(limit: Float) { persist(value.data.copy(dailyLimit = limit.coerceIn(20f, 120f))) }
-    fun setCategoryBudget(category: String, amount: Double): Boolean {
-        if (categories.none { it.name == category } || !amount.isFinite() || amount < 0) return false
-        persist(value.data.copy(categoryBudgets = value.data.categoryBudgets + (category to amount)))
-        showMessage("Presupuesto de $category actualizado")
-        return true
-    }
     fun setCategoryBudgets(budgets: Map<String, Double>): Boolean {
         if (budgets.any { (category, amount) -> categories.none { it.name == category } || !amount.isFinite() || amount < 0 }) return false
         persist(value.data.copy(categoryBudgets = budgets))
