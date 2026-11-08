@@ -127,10 +127,6 @@ internal fun decodeMovements(raw: String?): List<Movement> = raw?.lineSequence()
 private fun transferEncodeField(value: String) = value.replace("%", "%25").replace("|", "%7C").replace("\n", "%0A").replace("\r", "%0D")
 private fun transferDecodeField(value: String) = value.replace("%7C", "|").replace("%0A", "\n").replace("%0D", "\r").replace("%25", "%")
 
-internal fun parseImportedMovements(raw: String): List<Movement> {
-    return runCatching { reviewImportedRows(parseCsvRows(raw)).movements }.getOrDefault(emptyList())
-}
-
 internal fun exportMovementsCsv(movements: List<Movement>): String = buildString {
     appendLine("fecha;descripcion;categoria;monto;tipo;medio;ubicacion")
     movements.forEach { movement ->
