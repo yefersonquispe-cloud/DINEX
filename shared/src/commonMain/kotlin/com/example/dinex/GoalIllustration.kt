@@ -7,6 +7,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.CancellationException
@@ -15,6 +17,9 @@ import org.jetbrains.compose.resources.ExperimentalResourceApi
 import org.jetbrains.compose.resources.decodeToImageBitmap
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
+
+/** Mensaje que usan las plataformas cuando la cuenta de Gemini no tiene cuota para imágenes. */
+internal const val GOAL_IMAGE_QUOTA = "cuota-imagenes"
 
 internal interface GoalIllustrator {
     val isConfigured: Boolean
@@ -38,9 +43,12 @@ internal fun SavingsGoalDialog(goal: SavingsGoal, illustrator: GoalIllustrator, 
     AlertDialog(onDismissRequest = onDismiss, title = { Text(goal.name) }, text = {
         Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             if (image != null) {
-                Image(image, "Imagen generada por IA de ${goal.name}", Modifier.fillMaxWidth().height(190.dp), contentScale = ContentScale.Crop)
-                Text("Imagen generada por IA", color = Gray)
-            } else Text("Visualiza aquí el objetivo para el que estás ahorrando.", color = Gray)
+                Image(image, "Imagen generada por IA de ${goal.name}", Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(24.dp)), contentScale = ContentScale.Crop)
+                Text("Imagen generada por IA", color = Gray, style = MaterialTheme.typography.bodySmall)
+            } else {
+                GoalArtwork(goal)
+                Text("Ilustración creada por DINEX según tu meta. Las monedas crecen mientras más ahorras.", color = Gray, style = MaterialTheme.typography.bodySmall)
+            }
             Text("Ahorrado: ${money(goal.saved)}", style = MaterialTheme.typography.titleLarge)
             if (goal.target > 0) {
                 DinexProgress((goal.saved / goal.target).toFloat(), Green)
@@ -48,18 +56,24 @@ internal fun SavingsGoalDialog(goal: SavingsGoal, illustrator: GoalIllustrator, 
             }
             Text("El ahorro se separa de tu saldo disponible. No se registra como un gasto ni se envía a un banco.", color = Gray)
             if (busy || externalBusy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Creando la imagen de tu meta…") }
-            error?.let { Text(it, color = Red) }
-            if (!illustrator.isConfigured) Text("La generación necesita Gemini con acceso a imágenes. En web requiere un servidor; tu ahorro funciona aunque la imagen no esté disponible.", color = Gray)
-            OutlinedButton(enabled = !busy && !externalBusy && illustrator.isConfigured && goal.name.isNotBlank(), onClick = {
-                busy = true; error = null
-                scope.launch {
-                    try { onArtwork(illustrator.generate(goal.name)) }
-                    catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Throwable) { error = "No se pudo generar la imagen. Revisa internet, acceso a generación de imágenes y cuota de Gemini. Tu ahorro sigue guardado." }
-                    finally { busy = false }
-                }
-            }) { Text(if (image == null) "Generar imagen con IA" else "Cambiar imagen con IA") }
-            Text("Solo se envía a Google el nombre de tu meta, nunca tu saldo ni tus movimientos. La generación puede consumir cuota de tu API.", color = Gray, style = MaterialTheme.typography.bodySmall)
+            error?.let { Text(it, color = Orange, style = MaterialTheme.typography.bodySmall) }
+            if (illustrator.isConfigured) {
+                OutlinedButton(enabled = !busy && !externalBusy && goal.name.isNotBlank(), onClick = {
+                    busy = true; error = null
+                    scope.launch {
+                        try { onArtwork(illustrator.generate(goal.name)) }
+                        catch (cancelled: CancellationException) { throw cancelled }
+                        catch (failure: Throwable) {
+                            error = if (failure.message == GOAL_IMAGE_QUOTA)
+                                "Tu clave de Gemini es del plan gratuito y Google no permite crear imágenes con IA sin activar la facturación. Te seguimos mostrando la ilustración de DINEX."
+                            else "No se pudo crear la foto con IA. Revisa tu internet. Tu ahorro sigue guardado."
+                        }
+                        finally { busy = false }
+                    }
+                }) { Text(if (image == null) "Crear foto con IA (opcional)" else "Cambiar foto con IA") }
+                Text("Solo se envía a Google el nombre de tu meta, nunca tu saldo ni tus movimientos.", color = Gray, style = MaterialTheme.typography.bodySmall)
+            }
+            if (image != null) TextButton(onClick = { onArtwork("") }) { Text("Usar la ilustración de DINEX", color = GreenDark) }
             TextButton(onClick = onDelete) { Text("Eliminar meta de ahorro", color = Red) }
         }
     }, confirmButton = { Button(onClick = onAdd) { Text("Agregar ahorro") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } })
@@ -72,7 +86,10 @@ internal fun SavingsGoalsDialog(goals: List<SavingsGoal>, onOpen: (Int) -> Unit,
             Text("Total reservado: ${money(goals.sumOf { it.saved })}", style = MaterialTheme.typography.titleMedium)
             if (goals.isEmpty()) Text("Crea tu primera meta desde el botón +. Puedes ahorrar para varios objetivos a la vez.")
             goals.forEach { goal -> OutlinedButton(onClick = { onOpen(goal.id) }, modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.fillMaxWidth()) { Text(goal.name); Text("${money(goal.saved)}" + if (goal.target > 0) " de ${money(goal.target)}" else " · Sin meta total") }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GoalThemeIcon(goal.name, 34.dp)
+                    Column(Modifier.weight(1f)) { Text(goal.name); Text("${money(goal.saved)}" + if (goal.target > 0) " de ${money(goal.target)}" else " · Sin meta total") }
+                }
             } }
         }
     }, confirmButton = { Button(onClick = onNew) { Text("Nueva meta") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } })

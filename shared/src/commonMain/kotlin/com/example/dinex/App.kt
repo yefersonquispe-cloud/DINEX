@@ -248,7 +248,8 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 goalScope.launch {
                     try { model.saveGoalArtwork(email, goal.id, purpose, illustrator.generate(purpose)) }
                     catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Throwable) { model.showMessage("Tu ahorro está guardado. La imagen no se pudo generar; puedes reintentar desde tu meta.") }
+                    // Si la IA no responde, la meta igual muestra la ilustración de DINEX; no hace falta avisar.
+                    catch (_: Throwable) { }
                     finally { artworkBusy = artworkBusy - goal.id }
                 }
             }

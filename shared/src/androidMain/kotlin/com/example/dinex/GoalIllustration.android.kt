@@ -21,7 +21,9 @@ internal actual fun rememberGoalIllustrator(): GoalIllustrator {
     return remember(context) {
         val key = readGeminiApiKey(context)
         object : GoalIllustrator {
-            override val isConfigured = key.isNotBlank()
+            // Si Google responde que no hay cuota para imágenes, no se vuelve a intentar en esta sesión.
+            private var blocked = false
+            override val isConfigured get() = key.isNotBlank() && !blocked
             override suspend fun generate(purpose: String): String = withContext(Dispatchers.IO) {
                 check(isConfigured)
                 val connection = (URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent").openConnection() as HttpURLConnection).apply {
@@ -33,7 +35,9 @@ internal actual fun rememberGoalIllustrator(): GoalIllustrator {
                     val body = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", goalImagePrompt(purpose))))))
                         .put("generationConfig", JSONObject().put("responseModalities", JSONArray().put("TEXT").put("IMAGE")))
                     connection.outputStream.use { it.write(body.toString().encodeToByteArray()) }
-                    check(connection.responseCode in 200..299) { "No se pudo generar la imagen" }
+                    val code = connection.responseCode
+                    if (code == 429 || code == 403) { blocked = true; error(GOAL_IMAGE_QUOTA) }
+                    check(code in 200..299) { "No se pudo generar la imagen" }
                     val bytes = connection.inputStream.use { it.readBytes() }
                     check(bytes.size <= 16_000_000)
                     val parts = JSONObject(bytes.decodeToString()).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts")
