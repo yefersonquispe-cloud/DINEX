@@ -34,7 +34,17 @@ internal actual fun rememberGoalIllustrator(): GoalIllustrator {
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Throwable) { /* sin cuota o error: probamos el servicio gratuito */ }
                 }
-                withFreeService(purpose)
+                withFreeService(purpose, describe(purpose))
+            }
+
+            /** Gemini (texto, gratis) entiende el nombre de la meta y lo describe en inglés para dibujarlo. */
+            private suspend fun describe(purpose: String): String? {
+                if (key.isBlank()) return null
+                return try {
+                    generateGeminiContent(key, JSONArray().put(JSONObject().put("text", purpose.take(120))), GOAL_DESCRIBE_PROMPT, 80, .4)
+                        .lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.trim('"')?.take(200)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Throwable) { null }
             }
 
             private fun withGemini(purpose: String): String {
@@ -62,8 +72,8 @@ internal actual fun rememberGoalIllustrator(): GoalIllustrator {
             }
 
             /** Pollinations.ai: generador de imágenes con IA gratuito y sin clave. Solo recibe el texto de la meta. */
-            private fun withFreeService(purpose: String): String {
-                val prompt = URLEncoder.encode(freeGoalImagePrompt(purpose), "UTF-8").replace("+", "%20")
+            private fun withFreeService(purpose: String, description: String?): String {
+                val prompt = URLEncoder.encode(freeGoalImagePrompt(purpose, description), "UTF-8").replace("+", "%20")
                 val seed = (1..999_999).random()
                 val url = URL("https://image.pollinations.ai/prompt/$prompt?width=768&height=576&nologo=true&seed=$seed")
                 val connection = (url.openConnection() as HttpURLConnection).apply {
@@ -71,7 +81,9 @@ internal actual fun rememberGoalIllustrator(): GoalIllustrator {
                     setRequestProperty("User-Agent", "DINEX/1.0 (Android)")
                 }
                 try {
-                    check(connection.responseCode in 200..299) { "No se pudo generar la imagen" }
+                    val code = connection.responseCode
+                    if (code == 402 || code == 429) error(GOAL_IMAGE_WAIT)
+                    check(code in 200..299) { "No se pudo generar la imagen" }
                     check(connection.contentType.orEmpty().startsWith("image/")) { "La respuesta no es una imagen" }
                     val bytes = connection.inputStream.use { it.readBytes() }
                     check(bytes.size in 1..16_000_000)

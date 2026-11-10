@@ -21,6 +21,9 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 /** Mensaje que usan las plataformas cuando la cuenta de Gemini no tiene cuota para imágenes. */
 internal const val GOAL_IMAGE_QUOTA = "cuota-imagenes"
 
+/** Mensaje cuando el generador gratuito pide esperar (permite 1 imagen cada 45 segundos). */
+internal const val GOAL_IMAGE_WAIT = "esperar-generador"
+
 internal interface GoalIllustrator {
     val isConfigured: Boolean
     suspend fun generate(purpose: String): String
@@ -29,16 +32,35 @@ internal interface GoalIllustrator {
 @Composable internal expect fun rememberGoalIllustrator(): GoalIllustrator
 
 internal fun goalImagePrompt(purpose: String): String =
-    "Create one elegant realistic editorial illustration of this personal savings goal: ${purpose.take(120)}. " +
-        "If travel, show a beautiful destination and a small airplane; if a phone, show a modern phone. " +
-        "Warm natural light, muted sage and slate colours, clean composition. No text, numbers, logos or people. Landscape 4:3."
+    "Create one magical cinematic 3D illustration of exactly what this person is saving for: ${purpose.take(120)}. " +
+        "Show that object or place as the hero of the image (if travel, the destination; if a phone, a modern phone). " +
+        "Glowing light, a few floating gold coins and sparkles, clean composition. No text, numbers, logos or people. Landscape 4:3."
 
-/** Texto para el generador gratuito: en inglés (lo entiende mejor) y con estilo mágico y cinematográfico. */
-internal fun freeGoalImagePrompt(purpose: String): String {
-    val theme = goalTheme(purpose).label
-    return "Magical cinematic 3D illustration of a personal savings dream: ${purpose.take(80)} ($theme). " +
-        "The dream object glowing in the center, floating gold coins, sparkles and soft volumetric light, " +
-        "dreamy teal and emerald background, Pixar style, vibrant, highly detailed, no text, no letters, no people."
+/** Objeto de la meta en inglés: los modelos gratuitos entienden mejor instrucciones cortas en inglés. */
+private val goalObjectEn = mapOf(
+    "Viaje" to "a suitcase on a tropical beach with an airplane in the sky", "Celular" to "a shiny new smartphone",
+    "Tecnología" to "a modern laptop", "Moto" to "a red motorcycle", "Auto" to "a small red car", "Bicicleta" to "a bicycle",
+    "Hogar" to "a cozy little house", "Estudios" to "a graduation cap and books", "Libros" to "a stack of books",
+    "Juegos" to "a video game controller", "Zapatillas" to "new sneakers", "Ropa" to "new clothes", "Regalo" to "a gift box with a bow",
+    "Fondo de emergencia" to "a golden shield", "Música" to "big headphones", "Cámara" to "a photo camera", "Mascota" to "a puppy",
+    "Boda" to "a diamond ring", "Negocio" to "a small shop", "Entradas" to "concert tickets", "Televisor" to "a smart TV",
+    "Meta" to "a golden trophy", "Ahorro" to "a piggy bank full of gold coins",
+)
+
+/** Pide a Gemini (texto) que diga en inglés qué dibujar según el nombre de la meta. */
+internal const val GOAL_DESCRIBE_PROMPT = "You turn a personal savings goal written in Spanish into a short English description of the thing or place " +
+    "to draw for an illustration, shown alone as a product shot or a landscape. Answer with one line of at most 20 words: " +
+    "only the visual description, no people, no text, no quotes."
+
+/**
+ * Instrucción para el generador gratuito: lo que la persona quiere lograr es el protagonista.
+ * Usa la descripción de Gemini si existe; si no, el objeto del tema y el nombre tal como lo escribió.
+ */
+internal fun freeGoalImagePrompt(purpose: String, description: String? = null): String {
+    val subject = description?.takeIf { it.isNotBlank() }?.trimEnd('.')
+        ?: ((goalObjectEn[goalTheme(purpose).label] ?: "a piggy bank full of gold coins") + ", for: " + purpose.take(80))
+    return "$subject, still life shot shown alone without any person, 3D render, hero shot, centered, vibrant colors, " +
+        "soft cinematic lighting, subtle magical sparkles, highly detailed"
 }
 
 @OptIn(ExperimentalResourceApi::class, ExperimentalEncodingApi::class)
@@ -69,7 +91,10 @@ internal fun SavingsGoalDialog(goal: SavingsGoal, illustrator: GoalIllustrator, 
                     scope.launch {
                         try { onArtwork(illustrator.generate(goal.name)) }
                         catch (cancelled: CancellationException) { throw cancelled }
-                        catch (_: Throwable) { error = "No se pudo crear la imagen con IA. Revisa tu internet e inténtalo otra vez. Tu ahorro sigue guardado." }
+                        catch (failure: Throwable) {
+                            error = if (failure.message == GOAL_IMAGE_WAIT) "El generador gratuito crea 1 imagen cada 45 segundos. Espera un momento y vuelve a tocar el botón."
+                            else "No se pudo crear la imagen con IA. Revisa tu internet e inténtalo otra vez. Tu ahorro sigue guardado."
+                        }
                         finally { busy = false }
                     }
                 }) { Text(if (image == null) "✨ Crear imagen mágica con IA" else "✨ Crear otra imagen con IA") }
