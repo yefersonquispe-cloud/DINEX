@@ -33,6 +33,14 @@ internal fun goalImagePrompt(purpose: String): String =
         "If travel, show a beautiful destination and a small airplane; if a phone, show a modern phone. " +
         "Warm natural light, muted sage and slate colours, clean composition. No text, numbers, logos or people. Landscape 4:3."
 
+/** Texto para el generador gratuito: en inglés (lo entiende mejor) y con estilo mágico y cinematográfico. */
+internal fun freeGoalImagePrompt(purpose: String): String {
+    val theme = goalTheme(purpose).label
+    return "Magical cinematic 3D illustration of a personal savings dream: ${purpose.take(80)} ($theme). " +
+        "The dream object glowing in the center, floating gold coins, sparkles and soft volumetric light, " +
+        "dreamy teal and emerald background, Pixar style, vibrant, highly detailed, no text, no letters, no people."
+}
+
 @OptIn(ExperimentalResourceApi::class, ExperimentalEncodingApi::class)
 @Composable
 internal fun SavingsGoalDialog(goal: SavingsGoal, illustrator: GoalIllustrator, onDismiss: () -> Unit, onAdd: () -> Unit, onArtwork: (String) -> Unit, externalBusy: Boolean = false, onDelete: () -> Unit = {}) {
@@ -42,20 +50,18 @@ internal fun SavingsGoalDialog(goal: SavingsGoal, illustrator: GoalIllustrator, 
     val image = remember(goal.artwork) { runCatching { Base64.decode(goal.artwork).decodeToImageBitmap() }.getOrNull() }
     AlertDialog(onDismissRequest = onDismiss, title = { Text(goal.name) }, text = {
         Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (image != null) {
-                Image(image, "Imagen generada por IA de ${goal.name}", Modifier.fillMaxWidth().height(190.dp).clip(RoundedCornerShape(24.dp)), contentScale = ContentScale.Crop)
-                Text("Imagen generada por IA", color = Gray, style = MaterialTheme.typography.bodySmall)
-            } else {
-                GoalArtwork(goal)
-                Text("Ilustración creada por DINEX según tu meta. Las monedas crecen mientras más ahorras.", color = Gray, style = MaterialTheme.typography.bodySmall)
+            Box {
+                if (image != null) MagicAiImage(image, goal.name) else GoalArtwork(goal)
+                if (busy || externalBusy) MagicLoading()
             }
+            Text(if (image != null) "Imagen creada con IA para tu meta." else "Ilustración mágica creada por DINEX. Las monedas crecen mientras más ahorras.",
+                color = Gray, style = MaterialTheme.typography.bodySmall)
             Text("Ahorrado: ${money(goal.saved)}", style = MaterialTheme.typography.titleLarge)
             if (goal.target > 0) {
                 DinexProgress((goal.saved / goal.target).toFloat(), Green)
                 Text("Meta: ${money(goal.target)} · Falta ${money((goal.target - goal.saved).coerceAtLeast(0.0))}")
             }
             Text("El ahorro se separa de tu saldo disponible. No se registra como un gasto ni se envía a un banco.", color = Gray)
-            if (busy || externalBusy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Creando la imagen de tu meta…") }
             error?.let { Text(it, color = Orange, style = MaterialTheme.typography.bodySmall) }
             if (illustrator.isConfigured) {
                 OutlinedButton(enabled = !busy && !externalBusy && goal.name.isNotBlank(), onClick = {
@@ -63,15 +69,12 @@ internal fun SavingsGoalDialog(goal: SavingsGoal, illustrator: GoalIllustrator, 
                     scope.launch {
                         try { onArtwork(illustrator.generate(goal.name)) }
                         catch (cancelled: CancellationException) { throw cancelled }
-                        catch (failure: Throwable) {
-                            error = if (failure.message == GOAL_IMAGE_QUOTA)
-                                "Tu clave de Gemini es del plan gratuito y Google no permite crear imágenes con IA sin activar la facturación. Te seguimos mostrando la ilustración de DINEX."
-                            else "No se pudo crear la foto con IA. Revisa tu internet. Tu ahorro sigue guardado."
-                        }
+                        catch (_: Throwable) { error = "No se pudo crear la imagen con IA. Revisa tu internet e inténtalo otra vez. Tu ahorro sigue guardado." }
                         finally { busy = false }
                     }
-                }) { Text(if (image == null) "Crear foto con IA (opcional)" else "Cambiar foto con IA") }
-                Text("Solo se envía a Google el nombre de tu meta, nunca tu saldo ni tus movimientos.", color = Gray, style = MaterialTheme.typography.bodySmall)
+                }) { Text(if (image == null) "✨ Crear imagen mágica con IA" else "✨ Crear otra imagen con IA") }
+                Text("Es gratis. Solo se envía el nombre de tu meta (a Google Gemini o a Pollinations.ai), nunca tu saldo ni tus movimientos. La versión gratuita puede llevar una pequeña marca de agua.",
+                    color = Gray, style = MaterialTheme.typography.bodySmall)
             }
             if (image != null) TextButton(onClick = { onArtwork("") }) { Text("Usar la ilustración de DINEX", color = GreenDark) }
             TextButton(onClick = onDelete) { Text("Eliminar meta de ahorro", color = Red) }

@@ -31,6 +31,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -138,47 +140,68 @@ internal fun GoalArtwork(goal: SavingsGoal, modifier: Modifier = Modifier, heigh
         else -> 1
     }
     val loop = rememberInfiniteTransition(label = "meta")
-    val float by loop.animateFloat(-6f, 6f, infiniteRepeatable(tween(1800), RepeatMode.Reverse), label = "flotar")
+    val float by loop.animateFloat(-7f, 7f, infiniteRepeatable(tween(1900), RepeatMode.Reverse), label = "flotar")
     val sway by loop.animateFloat(-3f, 3f, infiniteRepeatable(tween(2600), RepeatMode.Reverse), label = "balanceo")
-    val shine by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2400, easing = LinearEasing)), label = "brillo")
+    val shine by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(3200, easing = LinearEasing)), label = "brillo")
+    val spin by loop.animateFloat(0f, 360f, infiniteRepeatable(tween(18000, easing = LinearEasing)), label = "rayos")
+    val pulse by loop.animateFloat(.6f, 1f, infiniteRepeatable(tween(1300), RepeatMode.Reverse), label = "halo")
+    val aurora by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(6000), RepeatMode.Reverse), label = "aurora")
 
     BoxWithConstraints(
         modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(24.dp))
-            .background(Brush.verticalGradient(listOf(t.top, t.bottom))),
+            .background(Brush.linearGradient(listOf(t.top, t.bottom, t.top.copy(alpha = .9f)),
+                start = Offset(0f, 600f * aurora), end = Offset(900f, 600f * (1f - aurora) + 300f))),
     ) {
         val w = maxWidth
-        // Fondo: halo de luz, colinas suaves y destellos.
+        // Fondo mágico: aurora, rayos de luz que giran detrás del objeto, halo que late y polvo brillante que sube.
         Canvas(Modifier.fillMaxSize()) {
-            drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = .38f), Color.Transparent), center = Offset(size.width * .72f, size.height * .38f), radius = size.height * .7f),
-                radius = size.height * .7f, center = Offset(size.width * .72f, size.height * .38f))
+            val focus = Offset(size.width * .72f, size.height * .45f)
+            drawCircle(Brush.radialGradient(listOf(Color(0xFFB8FFE0).copy(alpha = .22f * aurora), Color.Transparent), center = Offset(size.width * .15f, size.height * .1f), radius = size.width * .6f),
+                radius = size.width * .6f, center = Offset(size.width * .15f, size.height * .1f))
+            rotate(spin, focus) {
+                repeat(12) { i -> drawArc(Color.White.copy(alpha = .09f), i * 30f, 11f, useCenter = true,
+                    topLeft = Offset(focus.x - size.height, focus.y - size.height), size = androidx.compose.ui.geometry.Size(size.height * 2, size.height * 2)) }
+            }
+            drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = .5f * pulse), Color.Transparent), center = focus, radius = size.height * .55f),
+                radius = size.height * .55f, center = focus)
             drawCircle(Color.White.copy(alpha = .10f), radius = size.width * .55f, center = Offset(size.width * .2f, size.height * 1.32f))
-            drawCircle(Color.Black.copy(alpha = .10f), radius = size.width * .6f, center = Offset(size.width * .92f, size.height * 1.45f))
-            repeat(7) { i ->
-                val phase = (shine + i / 7f) % 1f
-                val x = size.width * ((i * 37 % 100) / 100f)
-                val y = size.height * (.12f + (i * 23 % 60) / 100f)
-                drawCircle(Color.White.copy(alpha = (1f - phase) * .7f), radius = 2f + 4f * (1f - phase), center = Offset(x, y))
+            drawCircle(Color.Black.copy(alpha = .12f), radius = size.width * .6f, center = Offset(size.width * .92f, size.height * 1.45f))
+            repeat(16) { i ->
+                val phase = (shine + i / 16f) % 1f
+                val x = size.width * ((i * 37 % 100) / 100f) + kotlin.math.sin((phase + i) * 6f) * 8f
+                val y = size.height * (1.05f - phase * 1.1f)
+                val gold = i % 3 == 0
+                drawCircle((if (gold) Color(0xFFFFE08A) else Color.White).copy(alpha = kotlin.math.sin(phase * 3.14f) * .85f), radius = 1.5f + 3.5f * kotlin.math.sin(phase * 3.14f), center = Offset(x, y))
+            }
+            // Estrella fugaz cada pocos segundos.
+            val star = (shine * 1.6f) % 1.6f
+            if (star < .35f) {
+                val k = star / .35f
+                val head = Offset(size.width * (1.05f - k * .7f), size.height * (.05f + k * .3f))
+                drawLine(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = .9f)), start = Offset(head.x + 60f, head.y - 26f), end = head),
+                    start = Offset(head.x + 60f, head.y - 26f), end = head, strokeWidth = 3f)
             }
         }
         // Ilustración de apoyo detrás de la principal.
         t.extra?.let {
-            Image(painterResource(it), null, Modifier.size(height * .42f).align(Alignment.TopEnd).offset(x = (-14).dp, y = 12.dp)
+            Image(painterResource(it), null, Modifier.size(height * .4f).align(Alignment.TopEnd).offset(x = (-12).dp, y = (10 - float * .6f).dp)
                 .graphicsLayer { rotationZ = -sway * 2; alpha = .95f }, contentScale = ContentScale.Fit)
         }
         // Ilustración principal flotando.
         Image(
             painterResource(t.main), "Ilustración de ${goal.name}",
             Modifier.size(height * .62f).align(Alignment.CenterEnd).offset(x = -(w * .1f), y = float.dp - 6.dp)
-                .graphicsLayer { rotationZ = sway },
+                .graphicsLayer { rotationZ = sway; val s = .97f + .03f * pulse; scaleX = s; scaleY = s },
             contentScale = ContentScale.Fit,
         )
-        // Mascota de Dinex con su pila de monedas: crece con tu ahorro.
+        // Mascota de Dinex con su pila de monedas: crece con tu ahorro y las monedas rebotan.
         Row(Modifier.align(Alignment.BottomStart).padding(start = 12.dp, bottom = 12.dp), verticalAlignment = Alignment.Bottom) {
-            Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex", Modifier.size(height * .34f), contentScale = ContentScale.Fit)
+            Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex", Modifier.size(height * .34f).offset(y = (float * .4f).dp), contentScale = ContentScale.Fit)
             Box(Modifier.size(width = 40.dp, height = height * .5f)) {
                 repeat(coins) { i ->
+                    val hop = kotlin.math.max(0f, kotlin.math.sin((shine * 2f - i * .12f) * 6.28f)) * 4f
                     Image(painterResource(Res.drawable.goal_coin), null,
-                        Modifier.size(30.dp).align(Alignment.BottomCenter).offset(x = (if (i % 2 == 0) 0 else 3).dp, y = (-i * 11).dp),
+                        Modifier.size(30.dp).align(Alignment.BottomCenter).offset(x = (if (i % 2 == 0) 0 else 3).dp, y = (-i * 11 - hop).dp),
                         contentScale = ContentScale.Fit)
                 }
             }
@@ -186,7 +209,7 @@ internal fun GoalArtwork(goal: SavingsGoal, modifier: Modifier = Modifier, heigh
         // Nombre de la meta y avance.
         Column(Modifier.align(Alignment.TopStart).padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Surface(shape = RoundedCornerShape(50), color = Color.Black.copy(alpha = .28f)) {
-                Text(t.label.uppercase(), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp,
+                Text("✨ " + t.label.uppercase(), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp,
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp))
             }
             Text(goal.name, color = Color.White, fontWeight = FontWeight.Black, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -194,5 +217,54 @@ internal fun GoalArtwork(goal: SavingsGoal, modifier: Modifier = Modifier, heigh
             Text(if (goal.target > 0) "${(progress * 100).toInt()}% · ${money(goal.saved)} de ${money(goal.target)}" else "${money(goal.saved)} ahorrados",
                 color = Color.White.copy(alpha = .9f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
+    }
+}
+
+/** Imagen hecha con IA mostrada como en una película: zoom lento, destellos y brillo encima. */
+@Composable
+internal fun MagicAiImage(image: ImageBitmap, name: String, height: Dp = 200.dp) {
+    val loop = rememberInfiniteTransition(label = "ia")
+    val zoom by loop.animateFloat(1.03f, 1.13f, infiniteRepeatable(tween(7000), RepeatMode.Reverse), label = "zoom")
+    val pan by loop.animateFloat(-10f, 10f, infiniteRepeatable(tween(9000), RepeatMode.Reverse), label = "paneo")
+    val shine by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2800, easing = LinearEasing)), label = "destellos")
+    Box(Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(24.dp))) {
+        Image(image, "Imagen con IA de $name", Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom; translationX = pan },
+            contentScale = ContentScale.Crop)
+        Canvas(Modifier.fillMaxSize()) {
+            drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .45f)), startY = size.height * .55f))
+            repeat(12) { i ->
+                val phase = (shine + i / 12f) % 1f
+                val x = size.width * ((i * 41 % 100) / 100f)
+                val y = size.height * ((i * 29 % 90) / 100f)
+                drawCircle(Color.White.copy(alpha = kotlin.math.sin(phase * 3.14f) * .9f), radius = 1.5f + 4f * kotlin.math.sin(phase * 3.14f), center = Offset(x, y))
+            }
+        }
+        Surface(Modifier.align(Alignment.BottomStart).padding(12.dp), shape = RoundedCornerShape(50), color = Color.Black.copy(alpha = .4f)) {
+            Text("✨ $name", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
+        }
+    }
+}
+
+/** Brillo que recorre la tarjeta mientras la IA crea la imagen. */
+@Composable
+internal fun MagicLoading(height: Dp = 200.dp) {
+    val loop = rememberInfiniteTransition(label = "creando")
+    val sweep by loop.animateFloat(-.4f, 1.4f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "barrido")
+    val spin by loop.animateFloat(0f, 360f, infiniteRepeatable(tween(2200, easing = LinearEasing)), label = "giro")
+    Box(Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            drawRect(Color.Black.copy(alpha = .35f))
+            val x = size.width * sweep
+            drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = .45f), Color.Transparent),
+                start = Offset(x - 160f, 0f), end = Offset(x + 160f, size.height)))
+            rotate(spin) {
+                repeat(6) { i ->
+                    val a = i * 60f * 3.1416f / 180f
+                    drawCircle(Color(0xFFFFE08A), radius = 6f, center = Offset(center.x + kotlin.math.cos(a) * 46f, center.y + kotlin.math.sin(a) * 46f))
+                }
+            }
+        }
+        Text("Creando tu imagen mágica…", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp, modifier = Modifier.offset(y = 64.dp))
     }
 }
