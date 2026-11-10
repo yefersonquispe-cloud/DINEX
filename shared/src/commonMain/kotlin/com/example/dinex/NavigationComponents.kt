@@ -271,7 +271,7 @@ internal fun DinexDesktopTopBar(
                 border = BorderStroke(1.dp, level.color.copy(alpha = .32f)),
             ) {
                 Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MiniWalletMedal(level.color, 24.dp)
+                    StreakBadge(level, 30.dp, locked = streak == 0)
                     Spacer(Modifier.width(7.dp))
                     Text("$streak d · ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 }
@@ -349,7 +349,7 @@ internal fun DinexTopBar(
                 border = BorderStroke(1.dp, level.color.copy(alpha = .32f)),
             ) {
                 Row(Modifier.padding(horizontal = 8.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MiniWalletMedal(level.color, 22.dp)
+                    StreakBadge(level, 28.dp, locked = streak == 0)
                     Spacer(Modifier.width(5.dp))
                     Text("$streak", color = readableAccent(level.color), fontWeight = FontWeight.Black, fontSize = 11.sp)
                 }
@@ -476,7 +476,7 @@ internal fun ProfileDialog(
                     Text("Tu foto se guarda solo en este dispositivo.", color = Gray, fontSize = 11.sp)
                     Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
                         Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            MiniWalletMedal(level.color, 46.dp)
+                            StreakBadge(level, 56.dp, locked = streak == 0)
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text("Nivel ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold)
@@ -623,22 +623,6 @@ internal fun ProfileStat(label: String, value: String, tint: Color, modifier: Mo
             Text(label, color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
             Text(value, color = foreground, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = TextAlign.Center)
         }
-    }
-}
-
-@Composable
-internal fun MiniWalletMedal(tint: Color, size: androidx.compose.ui.unit.Dp) {
-    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        Box(
-            Modifier.fillMaxSize().clip(RoundedCornerShape(size * .28f))
-                .background(Brush.linearGradient(listOf(tint.copy(alpha = .95f), tint.copy(alpha = .52f)))),
-        )
-        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = size * .18f), horizontalArrangement = Arrangement.spacedBy(size * .045f), verticalAlignment = Alignment.Bottom) {
-            Box(Modifier.width(size * .10f).height(size * .18f).clip(RoundedCornerShape(2.dp)).background(Color.White))
-            Box(Modifier.width(size * .10f).height(size * .28f).clip(RoundedCornerShape(2.dp)).background(Color.White))
-            Box(Modifier.width(size * .10f).height(size * .39f).clip(RoundedCornerShape(2.dp)).background(Color.White))
-        }
-        Box(Modifier.align(Alignment.TopStart).offset(size * .08f, (-size * .08f)).width(size * .55f).height(size * .16f).clip(RoundedCornerShape(50)).background(Color(0xFFD92532)))
     }
 }
 

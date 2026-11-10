@@ -482,7 +482,8 @@ internal class DinexViewModel(
         )
         persist(next)
         mutableState.value = value.copy(
-            levelCelebration = streakLevel(streak).takeIf { streakLevel(streak).startsAt > streakLevel(old.streak).startsAt },
+            // Celebra cada vez que la racha cruza el inicio de un nivel, también al ganar la primera medalla (Cobre).
+            levelCelebration = streakLevel(streak).takeIf { old.streak < it.startsAt && streak >= it.startsAt },
             lastSavedGoalId = goal.id,
             celebrationGoal = goal,
             goalCelebration = goal.target > 0 && goal.saved >= goal.target && (existing?.saved ?: 0.0) < goal.target,

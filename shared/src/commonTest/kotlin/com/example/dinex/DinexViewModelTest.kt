@@ -80,6 +80,23 @@ class DinexViewModelTest {
         assertEquals(40.0, model.state.value.data.savings)
     }
 
+    @Test fun eachNewStreakMedalIsCelebratedOnce() {
+        val model = DinexViewModel(repository())
+        model.createAccount(account())
+        model.setInitialBalance(500.0)
+        val saving = SavingEntry(1.0, "Monedas", 0.0)
+        model.saveSaving(saving, today = 1)
+        assertEquals("Cobre", model.state.value.levelCelebration?.name)
+        model.dismissCelebrations()
+        for (day in 2..7) model.saveSaving(saving, today = day)
+        assertEquals(null, model.state.value.levelCelebration)
+        model.saveSaving(saving, today = 8)
+        assertEquals("Plata", model.state.value.levelCelebration?.name)
+        model.dismissCelebrations()
+        model.saveSaving(saving, today = 8)
+        assertEquals(null, model.state.value.levelCelebration)
+    }
+
     @Test fun reachingGoalCelebratesOnceAndInvalidSavingsDoNotPersist() {
         val model = DinexViewModel(repository())
         model.createAccount(account())

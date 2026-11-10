@@ -485,24 +485,6 @@ internal fun InitialBalanceDialog(onSave: (Double) -> Unit) {
 }
 
 @Composable
-internal fun StreakLevelDialog(level: StreakLevel, streak: Int, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(32.dp), color = Card, border = androidx.compose.foundation.BorderStroke(2.dp, level.color.copy(alpha = .68f)), shadowElevation = 26.dp) {
-            Box(Modifier.fillMaxWidth().background(Brush.radialGradient(listOf(level.color.copy(alpha = .28f), Color.Transparent)))) {
-                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("NUEVO NIVEL", color = readableAccent(level.color), fontWeight = FontWeight.Black, fontSize = 10.sp, letterSpacing = 2.sp)
-                    Spacer(Modifier.height(8.dp)); Image(painterResource(Res.drawable.dinex_mascot_ai), "Mascota ${level.name}", Modifier.size(150.dp), contentScale = ContentScale.Fit)
-                    MiniWalletMedal(level.color, 72.dp)
-                    Spacer(Modifier.height(10.dp)); Text(level.name.uppercase(), color = readableAccent(level.color), fontWeight = FontWeight.Black, fontSize = 27.sp)
-                    Text("¡Lograste $streak días ahorrando! Tu billetterita evolucionó.", color = Night, fontSize = 12.sp, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(18.dp)); Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = level.color), shape = RoundedCornerShape(16.dp)) { Text("Continuar mi racha", color = Color(0xFF0A0C10), fontWeight = FontWeight.Black) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 internal fun GoalCelebrationDialog(goalName: String, amount: Double, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(32.dp), color = Card, border = androidx.compose.foundation.BorderStroke(2.dp, Orange.copy(alpha = .72f)), shadowElevation = 28.dp) {
