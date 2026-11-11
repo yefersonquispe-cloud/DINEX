@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.scale
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -14,6 +15,7 @@ import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 
 @Composable
 internal actual fun rememberGoalIllustrator(): GoalIllustrator {
@@ -21,9 +23,31 @@ internal actual fun rememberGoalIllustrator(): GoalIllustrator {
     return remember(context) {
         val key = readGeminiApiKey(context)
         object : GoalIllustrator {
-            override val isConfigured = key.isNotBlank()
+            // Si Google responde que no hay cuota para imágenes, en esta sesión se usa directo el servicio gratuito.
+            private var geminiBlocked = false
+            // Siempre disponible: si Gemini no puede, se usa el generador gratuito sin clave.
+            override val isConfigured = true
+
             override suspend fun generate(purpose: String): String = withContext(Dispatchers.IO) {
-                check(isConfigured)
+                if (key.isNotBlank() && !geminiBlocked) {
+                    try { return@withContext withGemini(purpose) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Throwable) { /* sin cuota o error: probamos el servicio gratuito */ }
+                }
+                withFreeService(purpose, describe(purpose))
+            }
+
+            /** Gemini (texto, gratis) entiende el nombre de la meta y lo describe en inglés para dibujarlo. */
+            private suspend fun describe(purpose: String): String? {
+                if (key.isBlank()) return null
+                return try {
+                    generateGeminiContent(key, JSONArray().put(JSONObject().put("text", purpose.take(120))), GOAL_DESCRIBE_PROMPT, 80, .4)
+                        .lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.trim('"')?.take(200)
+                } catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Throwable) { null }
+            }
+
+            private fun withGemini(purpose: String): String {
                 val connection = (URL("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent").openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"; doOutput = true; connectTimeout = 20_000; readTimeout = 90_000
                     setRequestProperty("Content-Type", "application/json")
@@ -33,7 +57,9 @@ internal actual fun rememberGoalIllustrator(): GoalIllustrator {
                     val body = JSONObject().put("contents", JSONArray().put(JSONObject().put("parts", JSONArray().put(JSONObject().put("text", goalImagePrompt(purpose))))))
                         .put("generationConfig", JSONObject().put("responseModalities", JSONArray().put("TEXT").put("IMAGE")))
                     connection.outputStream.use { it.write(body.toString().encodeToByteArray()) }
-                    check(connection.responseCode in 200..299) { "No se pudo generar la imagen" }
+                    val code = connection.responseCode
+                    if (code == 429 || code == 403) { geminiBlocked = true; error(GOAL_IMAGE_QUOTA) }
+                    check(code in 200..299) { "No se pudo generar la imagen" }
                     val bytes = connection.inputStream.use { it.readBytes() }
                     check(bytes.size <= 16_000_000)
                     val parts = JSONObject(bytes.decodeToString()).getJSONArray("candidates").getJSONObject(0).getJSONObject("content").getJSONArray("parts")
@@ -41,16 +67,40 @@ internal actual fun rememberGoalIllustrator(): GoalIllustrator {
                         val part = parts.getJSONObject(i)
                         (part.optJSONObject("inlineData") ?: part.optJSONObject("inline_data"))?.optString("data")?.takeIf { it.isNotBlank() }
                     } ?: error("Gemini no devolvió una imagen")
-                    val decoded = Base64.decode(encoded, Base64.DEFAULT)
-                    val bitmap = BitmapFactory.decodeByteArray(decoded, 0, decoded.size) ?: error("Imagen inválida")
-                    val ratio = minOf(1f, 900f / maxOf(bitmap.width, bitmap.height))
-                    val resized = if (ratio < 1f) bitmap.scale((bitmap.width * ratio).toInt().coerceAtLeast(1), (bitmap.height * ratio).toInt().coerceAtLeast(1)) else bitmap
-                    val compressed = ByteArrayOutputStream().use { stream -> resized.compress(Bitmap.CompressFormat.JPEG, 85, stream); stream.toByteArray() }
-                    if (resized !== bitmap) resized.recycle()
-                    bitmap.recycle()
-                    Base64.encodeToString(compressed, Base64.NO_WRAP)
+                    return storable(Base64.decode(encoded, Base64.DEFAULT))
+                } finally { connection.disconnect() }
+            }
+
+            /** Pollinations.ai: generador de imágenes con IA gratuito y sin clave. Solo recibe el texto de la meta. */
+            private fun withFreeService(purpose: String, description: String?): String {
+                val prompt = URLEncoder.encode(freeGoalImagePrompt(purpose, description), "UTF-8").replace("+", "%20")
+                val seed = (1..999_999).random()
+                val url = URL("https://image.pollinations.ai/prompt/$prompt?width=768&height=576&nologo=true&seed=$seed")
+                val connection = (url.openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"; connectTimeout = 20_000; readTimeout = 90_000; instanceFollowRedirects = true
+                    setRequestProperty("User-Agent", "DINEX/1.0 (Android)")
+                }
+                try {
+                    val code = connection.responseCode
+                    if (code == 402 || code == 429) error(GOAL_IMAGE_WAIT)
+                    check(code in 200..299) { "No se pudo generar la imagen" }
+                    check(connection.contentType.orEmpty().startsWith("image/")) { "La respuesta no es una imagen" }
+                    val bytes = connection.inputStream.use { it.readBytes() }
+                    check(bytes.size in 1..16_000_000)
+                    return storable(bytes)
                 } finally { connection.disconnect() }
             }
         }
     }
+}
+
+/** Reduce la imagen a 900 px como máximo y la guarda en JPEG para no llenar el teléfono. */
+private fun storable(decoded: ByteArray): String {
+    val bitmap = BitmapFactory.decodeByteArray(decoded, 0, decoded.size) ?: error("Imagen inválida")
+    val ratio = minOf(1f, 900f / maxOf(bitmap.width, bitmap.height))
+    val resized = if (ratio < 1f) bitmap.scale((bitmap.width * ratio).toInt().coerceAtLeast(1), (bitmap.height * ratio).toInt().coerceAtLeast(1)) else bitmap
+    val compressed = ByteArrayOutputStream().use { stream -> resized.compress(Bitmap.CompressFormat.JPEG, 85, stream); stream.toByteArray() }
+    if (resized !== bitmap) resized.recycle()
+    bitmap.recycle()
+    return Base64.encodeToString(compressed, Base64.NO_WRAP)
 }

@@ -275,7 +275,7 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
     val next = nextStreakLevel(streak)
     DinexCard(accent = level.color, elevated = elevated) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            MiniWalletMedal(level.color, 44.dp)
+            StreakBadge(level, 58.dp, locked = streak == 0)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Racha actual", color = Gray, fontSize = 10.sp)
@@ -320,7 +320,7 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
             items(streakLevels) { item ->
                 val unlocked = streak >= item.startsAt
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    MiniWalletMedal(if (unlocked) item.color else Border, 34.dp)
+                    StreakBadge(item, 48.dp, locked = !unlocked)
                     Spacer(Modifier.height(4.dp))
                     Text(item.name, color = if (unlocked) readableAccent(item.color) else Gray.copy(alpha = .75f), fontSize = 8.sp, fontWeight = FontWeight.Bold)
                     if (unlocked) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(10.dp))

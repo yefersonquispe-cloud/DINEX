@@ -64,7 +64,9 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            // R8 quita el código sin uso y achica la app para que cargue más rápido.
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

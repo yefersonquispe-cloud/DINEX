@@ -48,5 +48,17 @@ globalThis.dinexHttp = {
         return response.text();
       })
       .then(onText, function (error) { onError(String((error && error.message) || error)); });
+  },
+  // Firebase Authentication y Firestore: solo HTTPS, sin cookies ni caché.
+  request: function (method, url, body, bearer, onDone, onError) {
+    if (String(url).indexOf('https://') !== 0) { onError('Solo se permiten conexiones seguras'); return; }
+    var headers = { Accept: 'application/json' };
+    if (bearer) headers.Authorization = 'Bearer ' + bearer;
+    if (body != null) headers['Content-Type'] = 'application/json; charset=utf-8';
+    fetch(url, { method: method, headers: headers, body: body == null ? undefined : body, credentials: 'omit', cache: 'no-store' })
+      .then(function (response) {
+        return response.text().then(function (text) { onDone(response.status, text); });
+      })
+      .catch(function (error) { onError(String((error && error.message) || error)); });
   }
 };

@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// Reglas de seguridad de Dinex.
+// Cada persona solo puede leer y escribir su propio documento users/{uid}.
+// Todo lo demás está cerrado.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{userId} {
+      function isOwner() {
+        return request.auth != null && request.auth.uid == userId;
+      }
+
+      function validProfile() {
+        let data = request.resource.data;
+        return data.keys().hasOnly(['name', 'email', 'profile', 'updatedAt', 'termsVersion', 'termsAcceptedAt'])
+          && data.keys().hasAll(['name', 'email', 'profile', 'updatedAt'])
+          && data.name is string && data.name.size() <= 80
+          && data.email is string && data.email == request.auth.token.email
+          && data.profile is string && data.profile.size() < 1000000
+          && data.updatedAt is int && data.updatedAt > 0
+          // Constancia del consentimiento (Ley N.° 29733), opcional en cuentas antiguas.
+          && (!('termsVersion' in data) || (data.termsVersion is string && data.termsVersion.size() <= 20))
+          && (!('termsAcceptedAt' in data) || data.termsAcceptedAt is int);
+      }
+
+      allow get: if isOwner();
+      allow list: if false;
+      allow create, update: if isOwner() && validProfile();
+      allow delete: if isOwner();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

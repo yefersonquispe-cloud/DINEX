@@ -43,11 +43,12 @@ internal fun DinexLaunchScreen(
         if (reduceMotion || systemScale == 0f) {
             writing.snapTo(1f)
             finish.snapTo(1f)
-            delay(200)
+            delay(120)
         } else {
-            writing.animateTo(1f, tween(1600, easing = LinearEasing))
-            finish.animateTo(1f, tween(600))
-            delay(400)
+            // Corta para que la app abra rápido (antes tardaba casi 3 segundos).
+            writing.animateTo(1f, tween(850, easing = LinearEasing))
+            finish.animateTo(1f, tween(300))
+            delay(150)
         }
         continueOnce()
     }

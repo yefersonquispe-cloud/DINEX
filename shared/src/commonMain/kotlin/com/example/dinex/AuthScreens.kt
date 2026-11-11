@@ -35,8 +35,13 @@ import kotlin.math.max
 @Composable
 internal fun AuthFlow(
     accounts: List<UserAccount>,
-    onCreateAccount: (UserAccount) -> Unit,
-    onAuthenticated: (String) -> Unit,
+    busy: Boolean,
+    serverError: String?,
+    notice: String?,
+    onRegister: (name: String, email: String, password: String) -> Unit,
+    onSignIn: (email: String, password: String) -> Unit,
+    onForgotPassword: (email: String) -> Unit,
+    onClearMessages: () -> Unit,
 ) {
     var createMode by remember { mutableStateOf(accounts.isEmpty()) }
     var name by remember { mutableStateOf("") }
@@ -44,6 +49,9 @@ internal fun AuthFlow(
     var password by remember { mutableStateOf("") }
     var confirmation by remember { mutableStateOf("") }
     var showPassword by remember { mutableStateOf(false) }
+    var showConfirmation by remember { mutableStateOf(false) }
+    var acceptedTerms by remember { mutableStateOf(false) }
+    var legalTab by remember { mutableStateOf<Int?>(null) }
     var attempted by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
@@ -151,15 +159,7 @@ internal fun AuthFlow(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
                             isError = attempted && (password.isBlank() || (createMode && !passwordValid)),
-                            trailingIcon = {
-                                Text(
-                                    if (showPassword) "OCULTAR" else "VER",
-                                    color = GreenDark,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Black,
-                                    modifier = Modifier.heightIn(min = 48.dp).clickable(onClickLabel = if (showPassword) "Ocultar contraseña" else "Mostrar contraseña") { showPassword = !showPassword }.wrapContentHeight().padding(6.dp),
-                                )
-                            },
+                            trailingIcon = { PasswordEye(showPassword) { showPassword = !showPassword } },
                             shape = RoundedCornerShape(15.dp),
                         )
                         if (createMode) {
@@ -175,42 +175,89 @@ internal fun AuthFlow(
                                 placeholder = { Text("Repítela") },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                                visualTransformation = PasswordVisualTransformation(),
+                                visualTransformation = if (showConfirmation) VisualTransformation.None else PasswordVisualTransformation(),
                                 isError = attempted && confirmation != password,
-                                trailingIcon = { if (confirmation.isNotBlank() && confirmation == password) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(18.dp)) },
+                                trailingIcon = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if (confirmation.isNotBlank() && confirmation == password) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(18.dp))
+                                        PasswordEye(showConfirmation) { showConfirmation = !showConfirmation }
+                                    }
+                                },
                                 shape = RoundedCornerShape(15.dp),
                             )
                             if (attempted && confirmation != password) ValidationHint("Las contraseñas deben coincidir", false)
+                            Spacer(Modifier.height(12.dp))
+                            // Consentimiento expreso y por escrito (Ley N.° 29733): la casilla empieza sin marcar.
+                            Surface(
+                                shape = RoundedCornerShape(15.dp),
+                                color = if (attempted && !acceptedTerms) Red.copy(alpha = .08f) else CardRaised,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (attempted && !acceptedTerms) Red.copy(alpha = .5f) else Border),
+                            ) {
+                                Row(Modifier.fillMaxWidth().padding(end = 10.dp), verticalAlignment = Alignment.Top) {
+                                    Checkbox(checked = acceptedTerms, onCheckedChange = { acceptedTerms = it; error = null })
+                                    Column(Modifier.padding(top = 12.dp)) {
+                                        Text(
+                                            "Leí y acepto los Términos y la Política de Privacidad, y autorizo a Dinex a tratar mis datos personales y financieros según la Ley N.° 29733.",
+                                            color = NightSoft, fontSize = 11.sp, lineHeight = 15.sp,
+                                        )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                            LegalLink("Ver términos") { legalTab = 0 }
+                                            LegalLink("Ver privacidad") { legalTab = 1 }
+                                        }
+                                    }
+                                }
+                            }
                         }
 
-                        error?.let {
+                        (error ?: serverError)?.let {
                             Spacer(Modifier.height(12.dp))
                             Surface(shape = RoundedCornerShape(13.dp), color = Red.copy(alpha = .12f), border = androidx.compose.foundation.BorderStroke(1.dp, Red.copy(alpha = .38f))) {
                                 Text("!  $it", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(11.dp))
                             }
                         }
+                        notice?.let {
+                            Spacer(Modifier.height(12.dp))
+                            Surface(shape = RoundedCornerShape(13.dp), color = Green.copy(alpha = .12f), border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .38f))) {
+                                Text(it, color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth().padding(11.dp))
+                            }
+                        }
                         Spacer(Modifier.height(16.dp))
                         Button(
+                            enabled = !busy,
                             onClick = {
                                 attempted = true
+                                onClearMessages()
                                 if (createMode) {
                                     when {
                                         !nameValid || !emailValid || !passwordValid || confirmation != password -> error = "Revisa los campos marcados antes de continuar."
-                                        accounts.any { it.email == normalizedEmail } -> error = "Ya existe una cuenta con este correo."
-                                        else -> onCreateAccount(UserAccount(name.trim(), normalizedEmail, credentialDigest(normalizedEmail, password)))
+                                        !acceptedTerms -> error = "Para crear tu cuenta acepta los Términos y la Política de Privacidad."
+                                        accounts.any { it.email == normalizedEmail } -> error = "Ya existe una cuenta con este correo. Inicia sesión."
+                                        else -> onRegister(name.trim(), normalizedEmail, password)
                                     }
                                 } else {
-                                    val account = accounts.firstOrNull { it.email == normalizedEmail }
-                                    if (account != null && account.passwordDigest == credentialDigest(normalizedEmail, password)) onAuthenticated(normalizedEmail)
-                                    else error = "Correo o contraseña incorrectos."
+                                    if (!emailValid || password.isBlank()) error = "Escribe tu correo y tu contraseña."
+                                    else onSignIn(normalizedEmail, password)
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().height(50.dp),
                             shape = RoundedCornerShape(RadiusMd),
                             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
-                        ) { Text(if (createMode) "Crear cuenta" else "Iniciar sesión", fontWeight = FontWeight.Bold) }
+                        ) {
+                            if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+                            else Text(if (createMode) "Crear cuenta" else "Iniciar sesión", fontWeight = FontWeight.Bold)
+                        }
+                        if (!createMode) {
+                            TextButton(
+                                enabled = !busy,
+                                onClick = {
+                                    onClearMessages()
+                                    if (emailValid) onForgotPassword(normalizedEmail) else error = "Escribe tu correo para enviarte el enlace."
+                                },
+                                modifier = Modifier.align(Alignment.CenterHorizontally),
+                            ) { Text("¿Olvidaste tu contraseña?", color = Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+                        }
                         TextButton(
-                            onClick = { createMode = !createMode; attempted = false; error = null; password = ""; confirmation = "" },
+                            onClick = { createMode = !createMode; attempted = false; error = null; password = ""; confirmation = ""; onClearMessages() },
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         ) {
                             Text(if (createMode) "¿Ya tienes cuenta? Iniciar sesión" else "¿Primera vez? Crear nueva cuenta", color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
@@ -218,9 +265,31 @@ internal fun AuthFlow(
                     }
                 }
                 Spacer(Modifier.height(15.dp))
-                Text("Cuenta local de este dispositivo. No se sincroniza todavía con otros celulares ni con la web. Dinex no almacena tu contraseña visible.", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                if (!createMode) {
+                    Text("Al iniciar sesión aceptas los Términos y la Política de Privacidad vigentes.", color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally)) {
+                        LegalLink("Términos") { legalTab = 0 }
+                        LegalLink("Privacidad") { legalTab = 1 }
+                    }
+                    Spacer(Modifier.height(6.dp))
+                }
+                Text("Tu cuenta está protegida con Firebase de Google: tu contraseña nunca se guarda en el equipo y tus datos se sincronizan de forma privada entre tu celular y la web.", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
         }
+    }
+    legalTab?.let { LegalDialog(it) { legalTab = null } }
+}
+
+/** Ojito para mostrar u ocultar la contraseña. */
+@Composable
+private fun PasswordEye(visible: Boolean, onToggle: () -> Unit) {
+    IconButton(onClick = onToggle) {
+        Icon(
+            if (visible) DinexNavigationIcons.EyeOff else DinexNavigationIcons.Eye,
+            contentDescription = if (visible) "Ocultar contraseña" else "Mostrar contraseña",
+            tint = if (visible) GreenDark else Gray,
+            modifier = Modifier.size(22.dp),
+        )
     }
 }
 
@@ -267,7 +336,7 @@ private fun AuthBrandStory(modifier: Modifier = Modifier) {
             )
             Spacer(Modifier.height(30.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.widthIn(max = 460.dp)) {
-                AuthBenefit(DinexNavigationIcons.Wallet, "Privado", "Tus datos se quedan en tu dispositivo.")
+                AuthBenefit(DinexNavigationIcons.Wallet, "Privado", "Solo tú puedes ver tus datos, en el celular y en la web.")
                 AuthBenefit(DinexNavigationIcons.Analysis, "Claro", "Ve en qué gastas y cuánto puedes ahorrar.")
                 AuthBenefit(DinexNavigationIcons.Sparkle, "Inteligente", "Dinex IA te da consejos con tu contexto.")
             }

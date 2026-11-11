@@ -706,65 +706,6 @@ internal fun InitialBalanceDialog(onSave: (Double) -> Unit) {
 }
 
 @Composable
-internal fun WelcomeGuideDialog(onDismiss: () -> Unit, onTryAssistant: () -> Unit) {
-    var step by remember { mutableIntStateOf(0) }
-    val headings = listOf("Registra en segundos", "Ahorra con propósito", "Conoce Dinex IA")
-    val details = listOf(
-        "Pulsa + para registrar un gasto o un ingreso.",
-        "Crea una meta y separa dinero de tu saldo.",
-        "Pregúntale por tus gastos o por una meta.",
-    )
-    val icons = listOf(DinexNavigationIcons.Add, DinexNavigationIcons.Wallet, DinexNavigationIcons.Sparkle)
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(28.dp), containerColor = Card,
-        icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Mascota Dinex", Modifier.size(84.dp), contentScale = ContentScale.Fit) },
-        title = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("${step + 1} de 3", color = GreenDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text(headings[step], color = Night, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
-            }
-        },
-        text = {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Surface(shape = CircleShape, color = Mint) {
-                    Icon(icons[step], null, tint = GreenDark, modifier = Modifier.padding(20.dp).size(32.dp))
-                }
-                Text(details[step], color = Gray, textAlign = TextAlign.Center, fontSize = 14.sp)
-                if (step == 2) Text("Dinex IA te orienta; tú decides qué guardar.", color = GreenDark, textAlign = TextAlign.Center, fontSize = 12.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    repeat(3) { index -> Box(Modifier.size(if (index == step) 24.dp else 8.dp, 8.dp).clip(CircleShape).background(if (index == step) Green else Border)) }
-                }
-            }
-        },
-        confirmButton = {
-            Button(onClick = { if (step < 2) step++ else onTryAssistant() }, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
-                Text(if (step < 2) "Siguiente" else "Probar Dinex IA")
-            }
-        },
-        dismissButton = { TextButton(onClick = { if (step > 0) step-- else onDismiss() }) { Text(if (step > 0) "Atrás" else "Ir al inicio") } },
-    )
-}
-
-@Composable
-internal fun StreakLevelDialog(level: StreakLevel, streak: Int, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(32.dp), color = Card, border = androidx.compose.foundation.BorderStroke(2.dp, level.color.copy(alpha = .68f)), shadowElevation = 26.dp) {
-            Box(Modifier.fillMaxWidth().background(Brush.radialGradient(listOf(level.color.copy(alpha = .28f), Color.Transparent)))) {
-                Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("NUEVO NIVEL", color = readableAccent(level.color), fontWeight = FontWeight.Black, fontSize = 10.sp, letterSpacing = 2.sp)
-                    Spacer(Modifier.height(8.dp)); Image(painterResource(Res.drawable.dinex_mascot_ai), "Mascota ${level.name}", Modifier.size(150.dp), contentScale = ContentScale.Fit)
-                    MiniWalletMedal(level.color, 72.dp)
-                    Spacer(Modifier.height(10.dp)); Text(level.name.uppercase(), color = readableAccent(level.color), fontWeight = FontWeight.Black, fontSize = 27.sp)
-                    Text("¡Lograste $streak días ahorrando! Tu billetterita evolucionó.", color = Night, fontSize = 12.sp, textAlign = TextAlign.Center)
-                    Spacer(Modifier.height(18.dp)); Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = level.color), shape = RoundedCornerShape(16.dp)) { Text("Continuar mi racha", color = Color(0xFF0A0C10), fontWeight = FontWeight.Black) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
 internal fun GoalCelebrationDialog(goalName: String, amount: Double, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(32.dp), color = Card, border = androidx.compose.foundation.BorderStroke(2.dp, Orange.copy(alpha = .72f)), shadowElevation = 28.dp) {

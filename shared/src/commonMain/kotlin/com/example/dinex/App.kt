@@ -33,7 +33,7 @@ import kotlinx.coroutines.CancellationException
 /** View layer: navigation, screens and presentation-only dialog state. */
 @Composable
 fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) {
-    val model = viewModel { DinexViewModel() }
+    val model = viewModel { DinexViewModel(cloud = DinexCloud()) }
     val state by model.state.collectAsState()
     SideEffect { onThemeChanged(state.darkMode) }
     LaunchedEffect(state.email, state.data, state.darkMode) { onDataChanged() }
@@ -47,7 +47,16 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) 
             if (launchVisible) {
                 DinexLaunchScreen(reduceMotion = state.reduceMotion, onReduceMotion = model::setReduceMotion) { launchVisible = false }
             } else if (state.email == null) {
-                AuthFlow(state.accounts, onCreateAccount = model::createAccount, onAuthenticated = model::authenticate)
+                AuthFlow(
+                    accounts = state.accounts,
+                    busy = state.authBusy,
+                    serverError = state.authError,
+                    notice = state.authNotice,
+                    onRegister = model::register,
+                    onSignIn = model::signIn,
+                    onForgotPassword = model::sendPasswordReset,
+                    onClearMessages = model::clearAuthMessages,
+                )
             } else {
                 key(state.email) { DinexSignedInView(model, state) }
             }
@@ -75,6 +84,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var marketOpen by remember { mutableStateOf(false) }
     var tipsOpen by remember { mutableStateOf(false) }
     var welcomeGuideOpen by remember { mutableStateOf(false) }
+    var legalTab by remember { mutableStateOf<Int?>(null) }
     var savingDialog by remember { mutableStateOf(false) }
     var importDialog by remember { mutableStateOf(false) }
     var exportDialog by remember { mutableStateOf(false) }
@@ -151,14 +161,6 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                     label = "page",
                 ) { page ->
                     when (page) {
-                        0 -> HomePage(movements, dailyLimit, streak, savings, "${data.savingGoals().size} metas", data.savingGoals().sumOf { it.target },
-                            onDailyLimitChange = model::setDailyLimit,
-                            onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
-                            goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true },
-                            onScan = { scanner() }, onVoice = { automationDialog = true },
-                            onGoals = { savingGoalId = null; savingDialog = true },
-                            notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
-                            onEnableNotifications = { automation.requestSystemNotificationPermission() })
                         1 -> HistoryPage(movements, onAdd = { quickAdd = true }, onDelete = { movementToDelete = it },
                             onImport = { importDialog = true }, onExport = { exportDialog = true })
                         2 -> PlanPage(movements.filter { it.isInCurrentMonth() }, dailyLimit, reminders, onDailyLimitChange = model::setDailyLimit,
@@ -250,7 +252,8 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 goalScope.launch {
                     try { model.saveGoalArtwork(email, goal.id, purpose, illustrator.generate(purpose)) }
                     catch (cancelled: CancellationException) { throw cancelled }
-                    catch (_: Throwable) { model.showMessage("Tu ahorro está guardado. La imagen no se pudo generar; puedes reintentar desde tu meta.") }
+                    // Si la IA no responde, la meta igual muestra la ilustración de DINEX; no hace falta avisar.
+                    catch (_: Throwable) { }
                     finally { artworkBusy = artworkBusy - goal.id }
                 }
             }
@@ -279,7 +282,20 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     if (state.goalCelebration) GoalCelebrationDialog(state.celebrationGoal?.name ?: "tu meta", state.celebrationGoal?.saved ?: savings, onDismiss = model::dismissCelebrations)
     state.levelCelebration?.let { StreakLevelDialog(it, streak, onDismiss = model::dismissCelebrations) }
     if (state.initialBalanceRequired) InitialBalanceDialog(onSave = { model.setInitialBalance(it); welcomeGuideOpen = true })
-    if (welcomeGuideOpen) WelcomeGuideDialog(onDismiss = { welcomeGuideOpen = false }, onTryAssistant = { welcomeGuideOpen = false; assistantOpen = true })
+    if (welcomeGuideOpen) WelcomeGuideDialog(
+        name = state.activeAccount?.name.orEmpty(),
+        onDismiss = { welcomeGuideOpen = false },
+        onAction = { action ->
+            welcomeGuideOpen = false
+            when (action) {
+                GuideAction.Automation -> automationDialog = true
+                GuideAction.Market -> marketOpen = true
+                GuideAction.Tips -> tipsOpen = true
+                GuideAction.Assistant -> assistantOpen = true
+            }
+        },
+    )
+    legalTab?.let { LegalDialog(it) { legalTab = null } }
     if (assistantOpen) Dialog(onDismissRequest = { assistantOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
             Surface(Modifier.fillMaxWidth().widthIn(max = 700.dp).heightIn(max = maxHeight - 24.dp).height(maxHeight.coerceAtMost(760.dp)),
@@ -347,6 +363,9 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         onOpenNotificationSettings = { automation.openAppDetailsSettings() },
         profilePhoto = state.profilePhoto, onProfilePhoto = model::setProfilePhoto,
         onAutomation = { profileOpen = false; automationDialog = true },
+        onOpenGuide = { profileOpen = false; welcomeGuideOpen = true },
+        onOpenLegal = { legalTab = it },
+        onDeleteAccount = { done -> model.deleteAccount { error -> if (error == null) automation.setHotwordEnabled(false); done(error) } },
     )
     premiumLoading?.let { PremiumLoadingDialog(it) }
 }

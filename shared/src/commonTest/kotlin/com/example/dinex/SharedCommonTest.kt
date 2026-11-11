@@ -66,7 +66,7 @@ class SharedCommonTest {
             15/09/2026;Pago Yape;Comida;-20,50;Egreso;Yape
             16/09/2026;Transferencia recibida;Ingreso;100,00;Abono;Yape
         """.trimIndent()
-        val movements = parseImportedMovements(csv)
+        val movements = reviewImportedRows(parseCsvRows(csv)).movements
         assertEquals(2, movements.size)
         assertFalse(movements[0].income)
         assertEquals(20.50, movements[0].amount)

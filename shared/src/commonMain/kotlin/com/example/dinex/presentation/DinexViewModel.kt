@@ -1,6 +1,11 @@
 package com.example.dinex
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -24,13 +29,20 @@ internal data class DinexUiState(
     val pendingReminderId: Int? = null,
     val lastSavedGoalId: Int? = null,
     val celebrationGoal: SavingsGoal? = null,
+    val authBusy: Boolean = false,
+    val authError: String? = null,
+    val authNotice: String? = null,
 ) {
     val activeAccount get() = accounts.firstOrNull { it.email == email }
     val initialBalanceRequired get() = email != null && !data.onboardingCompleted && data.movements.isEmpty()
 }
 
 /** Owns session and financial actions; composables only render state and send events. */
-internal class DinexViewModel(private val repository: DinexRepository = DinexRepository()) : ViewModel() {
+internal class DinexViewModel(
+    private val repository: DinexRepository = DinexRepository(),
+    /** null en pruebas: la app funciona solo con los datos del equipo. */
+    private val cloud: DinexCloud? = null,
+) : ViewModel() {
     init { DinexThemeState.dark = repository.darkMode() }
     private val initialEmail = repository.session()
     private val mutableState = MutableStateFlow(DinexUiState(
@@ -53,6 +65,21 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
     }
     val state = mutableState.asStateFlow()
     private val value get() = mutableState.value
+    private var cloudSession: CloudSession? = repository.cloudSession()
+    private var syncJob: Job? = null
+
+    init {
+        val email = initialEmail
+        if (cloud != null && email != null) {
+            if (cloudSession?.email != email) {
+                // Sesiones antiguas solo locales: se pide entrar otra vez para pasar la cuenta a Firebase.
+                logout()
+                mutableState.value = value.copy(authNotice = "Por seguridad, vuelve a iniciar sesión para proteger tu cuenta en la nube.")
+            } else {
+                viewModelScope.launch { resumeCloud(email) }
+            }
+        }
+    }
     fun refreshProfile() {
         val email = value.email ?: return
         mutableState.value = value.copy(data = repository.profile(email))
@@ -115,7 +142,187 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         if (value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
     }
 
+    // ── Cuentas en Firebase ───────────────────────────────────────────────────
+    fun signIn(email: String, password: String) = launchAuth {
+        val cloud = cloud ?: return@launchAuth null
+        val legacy = value.accounts.firstOrNull { it.email == email && !it.passwordDigest.startsWith("cloud:") }
+        val legacyMatches = legacy != null && legacy.passwordDigest == credentialDigest(email, password)
+        val session = try {
+            cloud.signIn(email, password)
+        } catch (error: CloudAuthException) {
+            // Cuenta antigua de este equipo: si su clave coincide, se crea en Firebase y se suben sus datos.
+            if (!legacyMatches || error.code !in setOf("INVALID_LOGIN_CREDENTIALS", "EMAIL_NOT_FOUND")) throw error
+            cloud.signUp(email, password).also { runCatching { cloud.sendEmailVerification(it) } }
+        }
+        completeCloudLogin(session, legacy?.name.orEmpty(), trustLocal = legacyMatches)
+        null
+    }
+
+    fun register(name: String, email: String, password: String) = launchAuth {
+        val cloud = cloud ?: return@launchAuth null
+        val session = cloud.signUp(email, password)
+        val verification = runCatching { cloud.sendEmailVerification(session) }.isSuccess
+        repository.saveProfile(session.email, FinancialData())
+        // Constancia del consentimiento dado en la casilla del registro.
+        repository.setTermsConsent(session.email, TermsConsent(DinexLegal.VERSION, epochMillis()))
+        completeCloudLogin(session, name, trustLocal = true)
+        if (verification) "Te enviamos un correo a ${session.email} para verificar tu cuenta." else null
+    }
+
+    fun sendPasswordReset(email: String) = launchAuth {
+        cloud?.sendPasswordReset(email)
+        // El mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados.
+        "Si $email tiene una cuenta, te llegará un enlace para crear una nueva contraseña."
+    }
+
+    /** Derecho de cancelación (ARCO): borra la cuenta en Firebase y todos sus datos de este equipo. */
+    fun deleteAccount(onDone: (String?) -> Unit) {
+        val email = value.email ?: return
+        val cloud = cloud
+        viewModelScope.launch {
+            val error = try {
+                if (cloud != null) validSession()?.let { cloud.deleteAccount(it) }
+                null
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: CloudAuthException) {
+                if (error.code == "CREDENTIAL_TOO_OLD_LOGIN_AGAIN") "Por seguridad, cierra sesión, vuelve a entrar y repite la eliminación."
+                else cloudErrorMessage(error.code)
+            } catch (_: Throwable) {
+                "Necesitas internet para eliminar tu cuenta."
+            }
+            if (error == null) {
+                syncJob?.cancel()
+                repository.forgetAccount(email)
+                logout()
+                mutableState.value = value.copy(accounts = repository.accounts(), authNotice = "Tu cuenta y tus datos fueron eliminados.")
+            }
+            onDone(error)
+        }
+    }
+
+    private fun localCloudProfile(email: String, name: String, updatedAt: Long) =
+        CloudProfile(name, email, cloudProfileText(repository.profile(email)), updatedAt, repository.termsConsent(email))
+
+    fun clearAuthMessages() { mutableState.value = value.copy(authError = null, authNotice = null) }
+
+    private fun launchAuth(block: suspend () -> String?) {
+        if (value.authBusy) return
+        mutableState.value = value.copy(authBusy = true, authError = null, authNotice = null)
+        viewModelScope.launch {
+            var notice: String? = null
+            val error = try {
+                notice = block(); null
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: CloudAuthException) {
+                cloudErrorMessage(error.code)
+            } catch (_: Throwable) {
+                "Sin conexión a internet. Revísala e inténtalo de nuevo."
+            }
+            mutableState.value = value.copy(authBusy = false, authError = error, authNotice = notice)
+        }
+    }
+
+    /**
+     * Une los datos del equipo con los de la nube. Los datos locales solo se suben si
+     * pertenecen de verdad a esta cuenta (misma uid o cuenta antigua con la clave correcta),
+     * así nadie puede mezclar datos ajenos en una cuenta creando un perfil local con su correo.
+     */
+    private suspend fun completeCloudLogin(session: CloudSession, name: String, trustLocal: Boolean) {
+        val cloud = cloud ?: return
+        val email = session.email.trim().lowercase()
+        val linked = value.accounts.any { it.email == email && it.passwordDigest == "cloud:${session.uid}" }
+        val remote = cloud.download(session)
+        val displayName = remote?.name?.takeIf { it.isNotBlank() } ?: name.ifBlank { email.substringBefore('@') }
+        if (!linked && !trustLocal && unpackProfileOrNull(remote?.profile) == null) repository.saveProfile(email, FinancialData())
+        reconcile(cloud, session, email, displayName, remote, preferRemote = !linked && !trustLocal)
+        val accounts = value.accounts.filterNot { it.email == email } + UserAccount(displayName, email, "cloud:${session.uid}")
+        repository.saveAccounts(accounts)
+        cloudSession = session
+        repository.setCloudSession(session)
+        repository.setSession(email)
+        mutableState.value = DinexUiState(accounts, email, repository.profile(email), reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
+            budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour, profilePhoto = repository.profilePhoto(email),
+            authBusy = true)
+        if (value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
+    }
+
+    private suspend fun reconcile(cloud: DinexCloud, session: CloudSession, email: String, name: String, remote: CloudProfile?, preferRemote: Boolean = false) {
+        val localAt = repository.profileUpdatedAt(email)
+        val remoteData = unpackProfileOrNull(remote?.profile)
+        if (remote != null && remoteData != null && (preferRemote || remote.updatedAt >= localAt)) {
+            val merged = mergeCloudProfile(remoteData, repository.profile(email))
+            remote.terms?.let { repository.setTermsConsent(email, it) }
+            repository.saveProfile(email, merged, remote.updatedAt)
+            if (value.email == email) mutableState.value = value.copy(data = merged)
+        } else {
+            val stamp = if (localAt > 1) localAt else epochMillis()
+            cloud.upload(session, localCloudProfile(email, name, stamp))
+        }
+    }
+
+    private suspend fun resumeCloud(email: String) {
+        val cloud = cloud ?: return
+        try {
+            val session = validSession() ?: return
+            reconcile(cloud, session, email, value.activeAccount?.name.orEmpty(), cloud.download(session))
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (error: CloudAuthException) {
+            if (sessionRevoked(error.code)) {
+                logout()
+                mutableState.value = value.copy(authNotice = "Tu sesión expiró. Vuelve a iniciar sesión.")
+            }
+        } catch (_: Throwable) {
+            // Sin internet: se sigue usando lo guardado en el equipo y se sube en el próximo cambio.
+        }
+    }
+
+    private suspend fun validSession(): CloudSession? {
+        val cloud = cloud ?: return null
+        val current = cloudSession ?: return null
+        if (current.fresh()) return current
+        return cloud.refresh(current).also {
+            cloudSession = it
+            repository.setCloudSession(it)
+        }
+    }
+
+    private fun scheduleSync() {
+        if (cloud == null || cloudSession == null) return
+        syncJob?.cancel()
+        syncJob = viewModelScope.launch {
+            delay(1_500)
+            val email = value.email ?: return@launch
+            try {
+                val session = validSession() ?: return@launch
+                cloud.upload(session, localCloudProfile(email, value.activeAccount?.name.orEmpty(), repository.profileUpdatedAt(email)))
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: CloudAuthException) {
+                if (sessionRevoked(error.code)) {
+                    logout()
+                    mutableState.value = value.copy(authNotice = "Tu sesión expiró. Vuelve a iniciar sesión.")
+                }
+            } catch (_: Throwable) {
+                // Sin internet: el cambio queda guardado en el equipo y se sube después.
+            }
+        }
+    }
+
     fun logout() {
+        val pending = syncJob?.isActive == true
+        syncJob?.cancel()
+        val session = cloudSession
+        val email = value.email
+        if (pending && cloud != null && session != null && email != null) {
+            // Termina de subir el último cambio antes de cerrar la sesión.
+            val profile = localCloudProfile(email, value.activeAccount?.name.orEmpty(), repository.profileUpdatedAt(email))
+            viewModelScope.launch { runCatching { cloud.upload(if (session.fresh()) session else cloud.refresh(session), profile) } }
+        }
+        cloudSession = null
+        repository.setCloudSession(null)
         repository.setSession(null)
         mutableState.value = DinexUiState(accounts = value.accounts, reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
             budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour)
@@ -204,12 +411,6 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         }
     }
     fun setDailyLimit(limit: Float) { persist(value.data.copy(dailyLimit = limit.coerceIn(20f, 120f))) }
-    fun setCategoryBudget(category: String, amount: Double): Boolean {
-        if (categories.none { it.name == category } || !amount.isFinite() || amount < 0) return false
-        persist(value.data.copy(categoryBudgets = value.data.categoryBudgets + (category to amount)))
-        showMessage("Presupuesto de $category actualizado")
-        return true
-    }
     fun setCategoryBudgets(budgets: Map<String, Double>): Boolean {
         if (budgets.any { (category, amount) -> categories.none { it.name == category } || !amount.isFinite() || amount < 0 }) return false
         persist(value.data.copy(categoryBudgets = budgets))
@@ -281,7 +482,8 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         )
         persist(next)
         mutableState.value = value.copy(
-            levelCelebration = streakLevel(streak).takeIf { streakLevel(streak).startsAt > streakLevel(old.streak).startsAt },
+            // Celebra cada vez que la racha cruza el inicio de un nivel, también al ganar la primera medalla (Cobre).
+            levelCelebration = streakLevel(streak).takeIf { old.streak < it.startsAt && streak >= it.startsAt },
             lastSavedGoalId = goal.id,
             celebrationGoal = goal,
             goalCelebration = goal.target > 0 && goal.saved >= goal.target && (existing?.saved ?: 0.0) < goal.target,
@@ -304,5 +506,6 @@ internal class DinexViewModel(private val repository: DinexRepository = DinexRep
         val email = value.email ?: return
         repository.saveProfile(email, data)
         mutableState.value = value.copy(data = data)
+        scheduleSync()
     }
 }
