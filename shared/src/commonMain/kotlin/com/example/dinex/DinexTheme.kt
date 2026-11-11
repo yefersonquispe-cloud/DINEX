@@ -173,6 +173,26 @@ internal fun CategoryMark(code: String, tint: Color, size: Dp = 36.dp) {
     }
 }
 
+/** Marca del método de pago en la fila de movimiento. */
+@Composable
+internal fun MethodMark(method: String, tint: Color, size: Dp = 26.dp) {
+    if (isBrandPayment(method)) {
+        PaymentBrandBadge(method, size)
+    } else {
+        Box(
+            Modifier.size(size).clip(RoundedCornerShape(RadiusSm)).background(tint.copy(alpha = .12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            androidx.compose.material3.Icon(
+                DinexPaymentIcons.forMethod(method),
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(size * .5f),
+            )
+        }
+    }
+}
+
 @Composable
 internal fun DinexEmptyState(title: String, body: String, action: String? = null, onAction: (() -> Unit)? = null) {
     Column(

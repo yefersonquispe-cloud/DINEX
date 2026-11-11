@@ -1,9 +1,10 @@
 package com.example.dinex
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -310,91 +312,186 @@ private fun AutomationStep(number: String, text: String) {
     }
 }
 
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit, onSave: (Movement) -> Unit, onScan: (() -> Unit)? = null) {
-    var isIncome by remember { mutableStateOf(income) }
+    val isIncome = income
     var amount by remember { mutableStateOf("") }
     var title by remember { mutableStateOf("") }
-    var category by remember { mutableStateOf(if (income) "Ingreso" else "Comida") }
-    var method by remember { mutableStateOf("Yape") }
+    var category by remember { mutableStateOf(if (isIncome) "Ingreso" else "Comida") }
+    var method by remember { mutableStateOf("Efectivo") }
     var day by remember { mutableStateOf(currentDayOfMonth().toString()) }
     var note by remember { mutableStateOf("") }
+    var showDetails by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf(false) }
     val tint = if (isIncome) Green else Red
+
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(24.dp),
         containerColor = Card,
         title = {
-            Column {
-                Text("¿Qué quieres registrar?", fontWeight = FontWeight.Black, color = Night)
-                Text("Una acción clara, sin ruido", color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Normal)
+            Row {
+                Box(
+                    Modifier.size(40.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(tint.copy(alpha = .12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = if (isIncome) DinexCategoryIcons.Income else DinexCategoryIcons.Expense,
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(22.dp),
+                    )
+                }
+                Spacer(Modifier.width(10.dp))
+                Column {
+                    Text(
+                        if (isIncome) "Nuevo ingreso" else "Nuevo gasto",
+                        fontWeight = FontWeight.Black,
+                        color = Night,
+                    )
+                    Text(
+                        if (isIncome) "Dinero que entra" else "Dinero que sale",
+                        color = Gray,
+                        fontSize = 12.sp,
+                    )
+                }
             }
         },
         text = {
-            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(isIncome, {
-                        isIncome = true
-                        category = "Ingreso"
-                    }, label = { Text("Ingreso") })
-                    FilterChip(!isIncome, {
-                        isIncome = false
-                        if (category == "Ingreso") category = "Comida"
-                    }, label = { Text("Gasto") })
-                }
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                // Monto
                 OutlinedTextField(
-                    title,
-                    { title = it },
-                    Modifier.fillMaxWidth(),
-                    label = { Text("Nombre") },
-                    placeholder = { Text(if (isIncome) "¿De dónde viene?" else "¿Qué compraste?") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(RadiusMd),
-                )
-                OutlinedTextField(
-                    amount,
-                    { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false },
-                    Modifier.fillMaxWidth(),
+                    value = amount,
+                    onValueChange = {
+                        amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }
+                        error = false
+                    },
+                    modifier = Modifier.fillMaxWidth(),
                     label = { Text("Monto") },
-                    prefix = { Text("S/ ") },
+                    prefix = { Text("S/ ", color = tint) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     isError = error,
-                    shape = RoundedCornerShape(RadiusMd),
+                    shape = RoundedCornerShape(16.dp),
+                    textStyle = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        color = tint,
+                    ),
                 )
+
+                // Nombre
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it.take(60) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("¿En qué fue?") },
+                    placeholder = {
+                        Text(
+                            if (isIncome) "Ej. Pago freelance" else "Ej. Almuerzo en el centro",
+                            color = Gray,
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(16.dp),
+                )
+
+                // Categoría (solo gasto) con iconos
                 if (!isIncome) {
-                    Text("Categoría", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Gray)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(categories) { item -> FilterChip(category == item.name, { category = item.name }, label = { Text(item.name) }) }
+                    Column {
+                        Text("Categoría", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Gray)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(categories.filter { it.name != "Ingreso" }) { item: CategoryInfo ->
+                                CategoryChip(
+                                    selected = category == item.name,
+                                    icon = DinexCategoryIcons.forCategory(item.name),
+                                    color = item.color,
+                                    label = item.name,
+                                    onClick = { category = item.name },
+                                )
+                            }
+                        }
                     }
                 }
-                Text("Método de pago", fontWeight = FontWeight.Bold, fontSize = 10.sp, color = Gray)
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("Yape", "Plin", "Efectivo", "Tarjeta", "Transferencia").forEach { item ->
-                        FilterChip(method == item, { method = item }, label = { Text(item) })
+
+                // Botón más detalles
+                Row {
+                    TextButton(
+                        onClick = { showDetails = !showDetails },
+                    ) {
+                        Box(
+                            Modifier.size(18.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                imageVector = DinexNavigationIcons.Chevron,
+                                contentDescription = null,
+                                tint = tint,
+                                modifier = Modifier
+                                    .size(18.dp)
+                                    .rotate(if (showDetails) 90f else 0f),
+                            )
+                        }
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            if (showDetails) "Ocultar detalles" else "Más detalles",
+                            color = tint,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                 }
-                OutlinedTextField(
-                    day,
-                    { day = it.filter(Char::isDigit).take(2) },
-                    Modifier.fillMaxWidth(),
-                    label = { Text("Fecha (día del mes)") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(RadiusMd),
-                )
-                OutlinedTextField(
-                    note,
-                    { note = it.take(80) },
-                    Modifier.fillMaxWidth(),
-                    label = { Text("Nota (opcional)") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(RadiusMd),
-                )
-                if (onScan != null && !isIncome) {
-                    OutlinedButton(onClick = onScan, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(RadiusMd)) {
-                        Text("Escanear comprobante", fontWeight = FontWeight.Bold)
+
+                if (showDetails) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Método de pago", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Gray)
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            listOf("Efectivo", "Yape", "Plin", "Tarjeta", "Transferencia").forEach { item ->
+                                MethodChip(
+                                    selected = method == item,
+                                    method = item,
+                                    onClick = { method = item },
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = day,
+                            onValueChange = { day = it.filter(Char::isDigit).take(2) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Día del mes") },
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                        )
+
+                        OutlinedTextField(
+                            value = note,
+                            onValueChange = { note = it.take(80) },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Nota (opcional)") },
+                            placeholder = { Text("Ej. con tarjeta de crédito", color = Gray) },
+                            singleLine = true,
+                            shape = RoundedCornerShape(16.dp),
+                        )
+
+                        if (onScan != null && !isIncome) {
+                            OutlinedButton(
+                                onClick = onScan,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(16.dp),
+                            ) {
+                                Text("Escanear comprobante", fontWeight = FontWeight.Bold)
+                            }
+                        }
                     }
+                }
+
+                if (error) {
+                    Text("Ingresa un monto válido", color = Red, fontSize = 12.sp)
                 }
             }
         },
@@ -404,17 +501,141 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                     val value = amount.replace(',', '.').toDoubleOrNull()
                     val parsedDay = day.toIntOrNull()?.coerceIn(1, 31) ?: currentDayOfMonth()
                     val savedTitle = buildString {
-                        append(title.ifBlank { if (isIncome) "Ingreso" else "Compra" })
+                        append(title.ifBlank { if (isIncome) "Ingreso" else category })
                         if (note.isNotBlank()) append(" · ").append(note)
                     }
-                    if (value == null || value <= 0) error = true
-                    else onSave(Movement(nextId, savedTitle, if (isIncome) "Ingreso" else category, value, isIncome, parsedDay, method))
+                    if (value == null || value <= 0) {
+                        error = true
+                    } else {
+                        onSave(
+                            Movement(
+                                id = nextId,
+                                title = savedTitle,
+                                category = if (isIncome) "Ingreso" else category,
+                                amount = value,
+                                income = isIncome,
+                                day = parsedDay,
+                                method = method,
+                            )
+                        )
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = tint),
-            ) { Text("Guardar") }
+            ) {
+                Text("Guardar", fontWeight = FontWeight.Bold)
+            }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
+}
+
+/** Punto de entrada del formulario de ingreso/gasto (llamado desde App.kt). */
+@Composable
+internal fun MovementEntryDialog(
+    isIncome: Boolean,
+    nextId: Int,
+    onDismiss: () -> Unit,
+    onSave: (Movement) -> Unit,
+    onScan: (() -> Unit)? = null,
+) {
+    MovementDialog(isIncome, nextId, onDismiss, onSave, onScan)
+}
+
+/** Chip de método de pago: compacto, con ícono o logo de la marca (se acomoda en varias líneas). */
+@Composable
+private fun MethodChip(
+    selected: Boolean,
+    method: String,
+    onClick: () -> Unit,
+) {
+    val tint = DinexPaymentIcons.tintForMethod(method)
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(14.dp),
+        color = if (selected) tint.copy(alpha = .15f) else CardRaised,
+        border = BorderStroke(
+            if (selected) 1.5.dp else 1.dp,
+            if (selected) tint else Border.copy(alpha = .4f),
+        ),
+        modifier = Modifier.height(42.dp),
+    ) {
+        Row(
+            Modifier.fillMaxHeight().padding(horizontal = 9.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (isBrandPayment(method)) {
+                PaymentBrandBadge(method, 24.dp)
+            } else {
+                Box(
+                    Modifier.size(24.dp).clip(RoundedCornerShape(7.dp)).background(tint.copy(alpha = .20f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        imageVector = DinexPaymentIcons.forMethod(method),
+                        contentDescription = null,
+                        tint = tint,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.width(6.dp))
+            Text(
+                method,
+                fontWeight = FontWeight.Bold,
+                color = if (selected) tint else Gray,
+                fontSize = 12.sp,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** Chip de categoría con icono grande y color de fondo. */
+@Composable
+private fun CategoryChip(
+    selected: Boolean,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    color: Color,
+    label: String,
+    onClick: () -> Unit,
+) {
+    Surface(
+        Modifier
+            .size(88.dp)
+            .clickable(onClick = onClick)
+            .background(
+                if (selected) color.copy(alpha = .18f) else CardRaised,
+                shape = RoundedCornerShape(16.dp),
+            )
+            .border(
+                if (selected) BorderStroke(1.5.dp, color) else BorderStroke(1.dp, Border.copy(alpha = .4f)),
+                shape = RoundedCornerShape(16.dp),
+            ),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.Transparent,
+    ) {
+        Column(
+            Modifier.fillMaxSize(),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Box(
+                Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(color.copy(alpha = .15f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(imageVector = icon, contentDescription = null, tint = color, modifier = Modifier.size(24.dp))
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                label,
+                fontWeight = FontWeight.Bold,
+                color = if (selected) color else Gray,
+                fontSize = 12.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
 }
 
 @Composable

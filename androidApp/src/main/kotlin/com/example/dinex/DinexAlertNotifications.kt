@@ -1,5 +1,6 @@
 package com.example.dinex
 
+import android.annotation.SuppressLint
 import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -52,6 +53,7 @@ internal object DinexNotificationCenter {
         )
     }
 
+    @SuppressLint("MissingPermission")
     fun post(context: Context, id: Int, channel: String, alert: DinexAlertText) {
         if (!canPost(context)) return
         ensureChannels(context)

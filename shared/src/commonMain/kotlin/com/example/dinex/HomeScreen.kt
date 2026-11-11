@@ -530,7 +530,17 @@ internal fun MovementRow(movement: Movement, onClick: (() -> Unit)? = null) {
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
             Text(movement.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Night, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${movement.category} · ${movement.method} · ${movement.dateLabel()}", color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                MethodMark(movement.method, tint)
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    "${movement.category} · ${movement.method} · ${movement.dateLabel()}",
+                    color = Gray,
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         AmountText(movement.amount, movement.income)
     }

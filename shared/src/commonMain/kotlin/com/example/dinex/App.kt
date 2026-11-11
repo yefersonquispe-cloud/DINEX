@@ -225,9 +225,13 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         onImport = { model.importNotifications(it, automation.currentLocationLabel()); automation.acknowledgeNotifications(it); automationDialog = false },
     )
     manualIncome?.let { income ->
-        MovementDialog(income, model.nextMovementId(), onDismiss = { manualIncome = null },
+        MovementEntryDialog(
+            isIncome = income,
+            nextId = model.nextMovementId(),
+            onDismiss = { manualIncome = null },
             onSave = { model.saveMovement(it); manualIncome = null },
-            onScan = { manualIncome = null; scanner() })
+            onScan = { manualIncome = null; scanner() }
+        )
     }
     scanResult?.let { result ->
         ScanReviewDialog(result, movementId = null, nextId = model.nextMovementId(),
