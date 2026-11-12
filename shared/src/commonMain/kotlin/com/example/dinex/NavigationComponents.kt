@@ -9,6 +9,7 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.hoverable
@@ -454,107 +455,126 @@ internal fun ProfileDialog(
     )
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = AppBg) {
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onDismiss) { Text("‹  Volver", color = GreenDark) }
-                    Spacer(Modifier.weight(1f))
-                    Text("MI ESPACIO", color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp)
+            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                // Cabecera: foto, nombre, correo y nivel de racha sobre el verde de la marca.
+                Box(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
+                        .background(Brush.verticalGradient(listOf(Color(0xFF1F7A4D), Color(0xFF0F4A2E)))),
+                ) {
+                    Column(Modifier.fillMaxWidth().statusBarsPadding().padding(bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = onDismiss) {
+                                Icon(DinexNavigationIcons.Back, null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Volver", color = Color.White, fontWeight = FontWeight.Bold)
+                            }
+                            Spacer(Modifier.weight(1f))
+                            Text("MI PERFIL", color = Color.White.copy(alpha = .75f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+                                modifier = Modifier.padding(end = 12.dp))
+                        }
+                        Box {
+                            Box(Modifier.clip(CircleShape).border(3.dp, Color.White, CircleShape)) { ProfilePhoto(name, profilePhoto, 96.dp) }
+                            Box(
+                                Modifier.align(Alignment.BottomEnd).size(32.dp).clip(CircleShape).background(Color.White)
+                                    .clickable(onClickLabel = if (profilePhoto.isBlank()) "Agregar foto" else "Cambiar foto") { files.chooseImport() },
+                                contentAlignment = Alignment.Center,
+                            ) { Icon(DinexNavigationIcons.Camera, null, tint = Color(0xFF0F4A2E), modifier = Modifier.size(17.dp)) }
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        Text(name, fontWeight = FontWeight.Black, fontSize = 24.sp, color = Color.White, textAlign = TextAlign.Center)
+                        Text(email, color = Color.White.copy(alpha = .8f), fontSize = 13.sp)
+                        if (profilePhoto.isNotBlank()) TextButton(onClick = { photoError = if (onProfilePhoto(null)) "" else "No se pudo quitar la foto." }) {
+                            Text("Quitar foto", color = Color.White.copy(alpha = .85f), fontSize = 12.sp)
+                        }
+                        if (photoError.isNotBlank()) Text(photoError, color = Color(0xFFFFC2C8), fontSize = 12.sp)
+                        Spacer(Modifier.height(12.dp))
+                        Surface(shape = RoundedCornerShape(50), color = Color.White.copy(alpha = .14f), border = BorderStroke(1.dp, Color.White.copy(alpha = .25f))) {
+                            Row(Modifier.padding(start = 6.dp, end = 14.dp, top = 5.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                                StreakBadge(level, 30.dp, locked = streak == 0)
+                                Spacer(Modifier.width(8.dp))
+                                Column {
+                                    Text("Nivel ${level.name} · $streak ${if (streak == 1) "día" else "días"} de racha", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(if (next == null) "Completaste los 365 días" else "${next.startsAt - streak} días para ${next.name}", color = Color.White.copy(alpha = .75f), fontSize = 10.sp)
+                                }
+                            }
+                        }
+                    }
                 }
-                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(15.dp)) {
-                    Spacer(Modifier.height(4.dp))
-                    ProfilePhoto(name, profilePhoto, 100.dp)
-                    Text(name, fontWeight = FontWeight.Black, fontSize = 27.sp, color = Night)
-                    Text(email, color = Gray, fontSize = 13.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { files.chooseImport() }) { Text(if (profilePhoto.isBlank()) "Agregar foto" else "Cambiar foto") }
-                        if (profilePhoto.isNotBlank()) TextButton(onClick = {
-                            photoError = if (onProfilePhoto(null)) "" else "No se pudo quitar la foto."
-                        }) { Text("Quitar", color = Red) }
-                    }
-                    if (photoError.isNotBlank()) Text(photoError, color = Red, fontSize = 12.sp)
-                    Text("Tu foto se guarda solo en este dispositivo.", color = Gray, fontSize = 11.sp)
-                    Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
-                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                            StreakBadge(level, 56.dp, locked = streak == 0)
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text("Nivel ${level.name}", color = readableAccent(level.color), fontWeight = FontWeight.Bold)
-                                Text(if (next == null) "Completaste los 365 días" else "${next.startsAt - streak} días para ${next.name}", color = Gray, fontSize = 12.sp)
-                            }
-                            Text("$streak días", color = Night, fontWeight = FontWeight.Black)
-                        }
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ProfileStat("SALDO", money(income - expenses - savings), Lime, Modifier.weight(1f))
-                        ProfileStat("AHORRADO", money(savings), GreenDark, Modifier.weight(1f))
-                    }
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        ProfileStat("INGRESOS", money(income), GreenDark, Modifier.weight(1f))
-                        ProfileStat("EGRESOS", money(expenses), Red, Modifier.weight(1f))
-                    }
-                    Text("${movements.size} movimientos · sincronizados con tu cuenta", color = Gray, fontSize = 12.sp)
-                    Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
-                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                            Text("Preferencias", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            ProfileSetting("Modo oscuro", if (darkMode) "Verde bosque" else "Verde y blanco", darkMode, onDarkMode)
-                            ProfileSetting("Reducir movimiento", "Menos animaciones", reduceMotion, onReduceMotion)
-                            ProfileSetting("Texto más grande", "Respeta el tamaño del sistema", largeText, onLargeText)
-                        }
-                    }
-                    if (notificationsSupported) Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
-                        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Recordatorios", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                            Text("Te avisamos en el momento justo para cuidar tu presupuesto y tu racha.", color = Gray, fontSize = 11.sp)
-                            ProfileSetting("Aviso de presupuesto", "Cuando superes tu límite diario", budgetAlerts, onBudgetAlerts)
-                            ProfileSetting(
-                                "Recordatorio para ahorrar",
-                                if (saveReminderEnabled) "Si aún no ahorras, a las ${reminderHourLabel(saveReminderHour)}"
-                                else "Un aviso al día para no romper tu racha",
-                                saveReminderEnabled,
-                            ) { enabled ->
-                                onSaveReminderEnabled(enabled)
-                                if (enabled && !notificationsEnabled) onRequestNotifications()
-                            }
-                            if (saveReminderEnabled) {
-                                Text("Hora del recordatorio", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf(18, 20, 21).forEach { hour ->
-                                        FilterChip(
-                                            selected = saveReminderHour == hour,
-                                            onClick = { onSaveReminderHour(hour) },
-                                            label = { Text(reminderHourLabel(hour), fontSize = 11.sp) },
-                                        )
-                                    }
-                                }
-                            }
-                            if (!notificationsEnabled) {
-                                Text(
-                                    "Las notificaciones están bloqueadas en Android. Actívalas para que Dinex pueda avisarte.",
-                                    color = Orange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-                                )
-                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    TextButton(onClick = onRequestNotifications) {
-                                        Text("Permitir notificaciones", color = GreenDark, fontWeight = FontWeight.Bold)
-                                    }
-                                    TextButton(onClick = onOpenNotificationSettings) {
-                                        Text("Abrir ajustes", color = Gray, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    OutlinedButton(onClick = onAutomation, modifier = Modifier.fillMaxWidth()) { Text("Voz y notificaciones") }
-                    Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
+                Column(
+                    Modifier.fillMaxWidth().widthIn(max = 640.dp).align(Alignment.CenterHorizontally).padding(horizontal = 18.dp).navigationBarsPadding(),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    Spacer(Modifier.height(2.dp))
+                    // Resumen del dinero en una sola tarjeta.
+                    Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border), shadowElevation = 2.dp) {
                         Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
-                            Text("Ayuda y privacidad", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
-                            ProfileLink("Ver guía de Dinex", "Repasa todas las funciones", onOpenGuide)
-                            ProfileLink("Términos y condiciones", "Reglas de uso de la app", { onOpenLegal(0) })
-                            ProfileLink("Política de privacidad", "Cómo cuidamos tus datos (Ley N.° 29733)", { onOpenLegal(1) })
-                            ProfileLink("Eliminar mi cuenta", "Borra tu cuenta y todos tus datos", { deleteError = null; confirmDelete = true }, danger = true)
+                            Row(Modifier.height(IntrinsicSize.Min)) {
+                                ProfileFigure("Saldo disponible", money(income - expenses - savings), Night, DinexNavigationIcons.Wallet, Modifier.weight(1f))
+                                VerticalDivider(color = Border)
+                                ProfileFigure("Ahorrado", money(savings), GreenDark, DinexNavigationIcons.Target, Modifier.weight(1f))
+                            }
+                            HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 14.dp))
+                            Row(Modifier.height(IntrinsicSize.Min)) {
+                                ProfileFigure("Ingresos", money(income), if (DinexThemeState.dark) Color(0xFF56FF9C) else Color(0xFF087C40), DinexNavigationIcons.ArrowUp, Modifier.weight(1f))
+                                VerticalDivider(color = Border)
+                                ProfileFigure("Egresos", money(expenses), if (DinexThemeState.dark) Color(0xFFFF7182) else Color(0xFFD90F32), DinexNavigationIcons.ArrowDown, Modifier.weight(1f))
+                            }
+                            Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                                Icon(DinexNavigationIcons.Check, null, tint = GreenDark, modifier = Modifier.size(13.dp))
+                                Spacer(Modifier.width(5.dp))
+                                Text("${movements.size} movimientos sincronizados con tu cuenta", color = Gray, fontSize = 11.sp)
+                            }
                         }
                     }
-                    TextButton(onClick = onLogout) { Text("Cerrar sesión", color = Red) }
+                    ProfileSection("Preferencias") {
+                        ProfileSwitchRow(if (darkMode) DinexNavigationIcons.Moon else DinexNavigationIcons.Sun, "Modo oscuro", if (darkMode) "Verde bosque" else "Verde y blanco", darkMode, onDarkMode)
+                        ProfileRowDivider()
+                        ProfileSwitchRow(DinexNavigationIcons.Sparkle, "Reducir movimiento", "Menos animaciones", reduceMotion, onReduceMotion)
+                        ProfileRowDivider()
+                        ProfileSwitchRow(DinexNavigationIcons.Eye, "Texto más grande", "Respeta el tamaño del sistema", largeText, onLargeText)
+                    }
+                    if (notificationsSupported) ProfileSection("Recordatorios") {
+                        ProfileSwitchRow(DinexNavigationIcons.Bell, "Aviso de presupuesto", "Cuando superes tu límite diario", budgetAlerts, onBudgetAlerts)
+                        ProfileRowDivider()
+                        ProfileSwitchRow(
+                            DinexNavigationIcons.Target, "Recordatorio para ahorrar",
+                            if (saveReminderEnabled) "Si aún no ahorras, a las ${reminderHourLabel(saveReminderHour)}" else "Un aviso al día para no romper tu racha",
+                            saveReminderEnabled,
+                        ) { enabled ->
+                            onSaveReminderEnabled(enabled)
+                            if (enabled && !notificationsEnabled) onRequestNotifications()
+                        }
+                        if (saveReminderEnabled) Row(Modifier.fillMaxWidth().padding(start = 62.dp, end = 14.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(18, 20, 21).forEach { hour ->
+                                FilterChip(selected = saveReminderHour == hour, onClick = { onSaveReminderHour(hour) }, label = { Text(reminderHourLabel(hour), fontSize = 11.sp) })
+                            }
+                        }
+                        if (!notificationsEnabled) Column(Modifier.padding(start = 62.dp, end = 14.dp, bottom = 10.dp)) {
+                            Text("Las notificaciones están bloqueadas en Android. Actívalas para que Dinex pueda avisarte.", color = Orange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                TextButton(onClick = onRequestNotifications) { Text("Permitir", color = GreenDark, fontWeight = FontWeight.Bold) }
+                                TextButton(onClick = onOpenNotificationSettings) { Text("Abrir ajustes", color = Gray, fontWeight = FontWeight.Bold) }
+                            }
+                        }
+                        ProfileRowDivider()
+                        ProfileLinkRow(DinexNavigationIcons.Microphone, "Voz y notificaciones", "Registro automático con Yape, Plin y tu voz", onAutomation)
+                    }
+                    if (!notificationsSupported) ProfileSection("Registro automático") {
+                        ProfileLinkRow(DinexNavigationIcons.Microphone, "Voz y notificaciones", "Registro automático con Yape, Plin y tu voz", onAutomation)
+                    }
+                    ProfileSection("Ayuda y privacidad") {
+                        ProfileLinkRow(DinexNavigationIcons.Tips, "Ver guía de Dinex", "Repasa todas las funciones", onOpenGuide)
+                        ProfileRowDivider()
+                        ProfileLinkRow(DinexNavigationIcons.Plan, "Términos y condiciones", "Reglas de uso de la app", { onOpenLegal(0) })
+                        ProfileRowDivider()
+                        ProfileLinkRow(DinexNavigationIcons.Shield, "Política de privacidad", "Cómo cuidamos tus datos (Ley N.° 29733)", { onOpenLegal(1) })
+                    }
+                    ProfileSection("Cuenta") {
+                        ProfileLinkRow(DinexNavigationIcons.Back, "Cerrar sesión", "Tus datos quedan guardados en la nube", onLogout)
+                        ProfileRowDivider()
+                        ProfileLinkRow(DinexNavigationIcons.Close, "Eliminar mi cuenta", "Borra tu cuenta y todos tus datos", { deleteError = null; confirmDelete = true }, danger = true)
+                    }
+                    Text("DINEX · Tu dinero, con propósito.", color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(18.dp))
                 }
             }
@@ -585,24 +605,49 @@ internal fun ProfileDialog(
 }
 
 @Composable
-private fun ProfileLink(label: String, detail: String, onClick: () -> Unit, danger: Boolean = false) {
-    Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 11.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Text(label, color = if (danger) Red else Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(detail, color = Gray, fontSize = 11.sp)
+private fun ProfileSection(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(title.uppercase(), color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, modifier = Modifier.padding(start = 6.dp))
+        Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
+            Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), content = content)
         }
-        Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(18.dp))
     }
 }
 
 @Composable
-private fun ProfileSetting(label: String, detail: String, value: Boolean, onChange: (Boolean) -> Unit) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+private fun ProfileRowDivider() = HorizontalDivider(color = Border.copy(alpha = .7f), modifier = Modifier.padding(start = 62.dp))
+
+@Composable
+private fun ProfileRowIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, danger: Boolean = false) {
+    val tint = if (danger) Red else GreenDark
+    Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = .10f)), contentAlignment = Alignment.Center) {
+        Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
+    }
+}
+
+@Composable
+private fun ProfileLinkRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, detail: String, onClick: () -> Unit, danger: Boolean = false) {
+    Row(
+        Modifier.fillMaxWidth().clickable(onClickLabel = label, onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ProfileRowIcon(icon, danger)
+        Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(label, color = Night, fontWeight = FontWeight.Medium, fontSize = 14.sp)
+            Text(label, color = if (danger) Red else Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(detail, color = Gray, fontSize = 11.sp)
+        }
+        Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(16.dp))
+    }
+}
+
+@Composable
+private fun ProfileSwitchRow(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, detail: String, value: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        ProfileRowIcon(icon)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            Text(label, color = Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
             Text(detail, color = Gray, fontSize = 11.sp)
         }
         Switch(value, onChange, modifier = Modifier.semantics { contentDescription = label })
@@ -610,19 +655,15 @@ private fun ProfileSetting(label: String, detail: String, value: Boolean, onChan
 }
 
 @Composable
-internal fun ProfileStat(label: String, value: String, tint: Color, modifier: Modifier) {
-    val vivid = label == "INGRESOS" || label == "EGRESOS"
-    val foreground = when (label) {
-        "INGRESOS" -> if (DinexThemeState.dark) Color(0xFF56FF9C) else Color(0xFF087C40)
-        "EGRESOS" -> if (DinexThemeState.dark) Color(0xFFFF7182) else Color(0xFFD90F32)
-        else -> tint
-    }
-    Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = tint.copy(alpha = .09f),
-        border = BorderStroke(1.dp, foreground.copy(alpha = if (vivid) .35f else .25f))) {
-        Column(Modifier.fillMaxWidth().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            Text(value, color = foreground, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 2, textAlign = TextAlign.Center)
+private fun ProfileFigure(label: String, value: String, tint: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier) {
+    Column(modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = Gray, modifier = Modifier.size(13.dp))
+            Spacer(Modifier.width(5.dp))
+            Text(label, color = Gray, fontSize = 11.sp)
         }
+        Spacer(Modifier.height(3.dp))
+        Text(value, color = tint, fontSize = 18.sp, fontWeight = FontWeight.Black, maxLines = 1)
     }
 }
 
