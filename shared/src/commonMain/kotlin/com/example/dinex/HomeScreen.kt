@@ -1,6 +1,7 @@
 package com.example.dinex
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.graphics.Brush
@@ -76,10 +77,10 @@ internal fun HomePage(
             item {
                 if (desktop) Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
                     Box(Modifier.weight(1f)) { BalanceStrip(balance, income, expenses, savingRate) }
-                    Box(Modifier.weight(1f)) { SavingsHero(savings, streak, goalName, goalTarget, onClick = onGoalDetails) }
+                    Box(Modifier.weight(1f)) { SavingsHero(savings, goals, onClick = onGoalDetails, onOpenGoal = onOpenGoal) }
                 } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     BalanceStrip(balance, income, expenses, savingRate)
-                    SavingsHero(savings, streak, goalName, goalTarget, onClick = onGoalDetails)
+                    SavingsHero(savings, goals, onClick = onGoalDetails, onOpenGoal = onOpenGoal)
                 }
             }
             item { QuickActions(onScan = onScan, onVoice = onVoice, onGoals = onGoals, onHistory = onHistory, wide = desktop) }
@@ -96,7 +97,6 @@ internal fun HomePage(
                 // La racha y el ahorro se abren ahora desde la billetera de la barra superior.
                 DailyBudget(today, dailyLimit, onDailyLimitChange)
             }
-            goals.forEach { goal -> item(key = "goal-${goal.id}") { SavingsGoalCard(goal.name, goal.saved, goal.target, onClick = { onOpenGoal(goal.id) }) } }
             item { Spacer(Modifier.height(8.dp)) }
         }
     }
@@ -232,44 +232,85 @@ internal fun MiniStat(label: String, value: String, tint: Color, modifier: Modif
     }
 }
 
+/**
+ * Tarjeta de ahorro del inicio: el total reservado, el avance de todas las metas juntas
+ * y un resumen de hasta tres metas. Tocar la tarjeta abre "Mis metas"; tocar una meta la abre directo.
+ */
 @Composable
-internal fun SavingsGoalCard(name: String, saved: Double, target: Double, onClick: (() -> Unit)? = null) {
-    val progress = if (target > 0) (saved / target).toFloat().coerceIn(0f, 1f) else 0f
-    DinexCard(accent = Orange, onClick = onClick) {
-        Text("Meta de ahorro", color = Orange, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        Text(name, color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Spacer(Modifier.height(8.dp))
-        DinexProgress(progress, Orange)
-        Spacer(Modifier.height(6.dp))
-        Text(if (target > 0) "${money(saved)} de ${money(target)} · ${(progress * 100).toInt()}%" else "${money(saved)} · Sin meta total", color = Gray, fontSize = 11.sp)
-    }
-}
-
-@Composable
-internal fun SavingsHero(savings: Double, streak: Int, goalName: String = "", goalTarget: Double = 0.0, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
-    val goal = if (goalTarget > 0) goalTarget else when { savings < 500 -> 500.0; savings < 1000 -> 1000.0; savings < 2500 -> 2500.0; else -> 5000.0 }
-    val goalTitle = if (goalTarget > 0 && goalName.isNotBlank()) "Mi tarjeta de ahorro · $goalName" else "Mi tarjeta de ahorro"
-    val progress = (savings / goal).toFloat().coerceIn(0f, 1f)
+internal fun SavingsHero(
+    savings: Double,
+    goals: List<SavingsGoal>,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    onOpenGoal: (Int) -> Unit = {},
+) {
+    val totalTarget = goals.sumOf { it.target }
+    val withTarget = goals.filter { it.target > 0 }
+    val progress = if (withTarget.isNotEmpty()) (withTarget.sumOf { minOf(it.saved, it.target) } / withTarget.sumOf { it.target }).toFloat().coerceIn(0f, 1f) else 0f
+    val bar by animateFloatAsState(progress, tween(900), label = "avance total")
     DinexCard(modifier = modifier.fillMaxWidth(), elevated = true, accent = Green, vibrant = true, onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(goalTitle, color = GreenDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                Text(money(savings), color = Night, fontWeight = FontWeight.Black, fontSize = 34.sp)
+                Text("AHORRO RESERVADO", color = GreenDark, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+                Text(money(savings), color = Night, fontWeight = FontWeight.Black, fontSize = 32.sp)
             }
-            Box(Modifier.size(46.dp).clip(RoundedCornerShape(16.dp)).background(Mint), contentAlignment = Alignment.Center) {
-                Icon(DinexNavigationIcons.Sparkle, null, tint = GreenDark, modifier = Modifier.size(26.dp))
+            Surface(shape = RoundedCornerShape(50), color = Card, border = BorderStroke(1.dp, Border)) {
+                Row(Modifier.padding(horizontal = 10.dp, vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(DinexNavigationIcons.Target, null, tint = GreenDark, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(5.dp))
+                    Text(
+                        when (goals.size) { 0 -> "Sin metas"; 1 -> "1 meta"; else -> "${goals.size} metas" },
+                        color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                    )
+                }
             }
         }
-        Spacer(Modifier.height(10.dp))
-        Row {
-            Text("Meta ${money(goal)}", color = Gray, fontSize = 14.sp, modifier = Modifier.weight(1f))
-            Text("${(progress * 100).toInt()}%", color = Lime, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        if (totalTarget > 0) {
+            Spacer(Modifier.height(10.dp))
+            Row {
+                Text("Objetivo total ${money(totalTarget)}", color = Gray, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                Text(if (progress > 0f && progress < .01f) "<1%" else "${(progress * 100).toInt()}%", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(6.dp))
+            Box(Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(50)).background(Border.copy(alpha = .7f))) {
+                Box(Modifier.fillMaxWidth(bar).fillMaxHeight().clip(RoundedCornerShape(50)).background(Brush.horizontalGradient(listOf(Green, Lime))))
+            }
         }
-        Spacer(Modifier.height(6.dp))
-        DinexProgress(progress, Green, height = 8.dp)
-        if (onClick != null) Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("Ver mi meta y su imagen", color = Gray, fontSize = 12.sp)
-            Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(14.dp))
+        if (goals.isEmpty()) {
+            Spacer(Modifier.height(10.dp))
+            Text("Crea tu primera meta y separa tu ahorro de tu saldo.", color = Gray, fontSize = 12.sp)
+        } else {
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = Border.copy(alpha = .8f))
+            // Las metas con más avance primero; si hay más de tres, se resumen.
+            val shown = goals.sortedByDescending { if (it.target > 0) it.saved / it.target else 0.0 }.take(3)
+            shown.forEach { goal ->
+                val p = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).clickable(onClickLabel = "Abrir ${goal.name}") { onOpenGoal(goal.id) }
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    GoalAvatar(goal.name, 32.dp)
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.weight(1f)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(displayGoalName(goal.name), color = Night, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 1,
+                                overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                            Text(if (goal.target > 0) "${money(goal.saved)} / ${money(goal.target)}" else money(goal.saved), color = Gray, fontSize = 11.sp)
+                        }
+                        Spacer(Modifier.height(5.dp))
+                        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(Border.copy(alpha = .7f))) {
+                            Box(Modifier.fillMaxWidth(p).fillMaxHeight().clip(RoundedCornerShape(50)).background(Green))
+                        }
+                    }
+                }
+            }
+            if (goals.size > 3) Text("+${goals.size - 3} metas más", color = Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
+        }
+        if (onClick != null) Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(if (goals.isEmpty()) "Crear una meta" else "Ver todas mis metas", color = GreenDark, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            Icon(DinexNavigationIcons.Chevron, null, tint = GreenDark, modifier = Modifier.size(14.dp))
         }
     }
 }
