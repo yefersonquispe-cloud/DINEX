@@ -453,7 +453,8 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text("Método de pago", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Gray)
                         FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             listOf("Efectivo", "Yape", "Plin", "Tarjeta", "Transferencia").forEach { item ->
