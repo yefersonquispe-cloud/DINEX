@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 
@@ -82,7 +83,7 @@ internal fun GoalProgress(goal: SavingsGoal) {
             }
             if (target > 0) {
                 // Barra con hitos al 25 %, 50 %, 75 % y 100 %.
-                BoxWithConstraints(Modifier.fillMaxWidth().height(22.dp)) {
+                BoxWithConstraints(Modifier.fillMaxWidth().height(22.dp).padding(horizontal = 11.dp)) {
                     val w = maxWidth
                     Box(Modifier.fillMaxWidth().height(10.dp).align(Alignment.CenterStart).clip(RoundedCornerShape(50)).background(Border.copy(alpha = .6f)))
                     Box(
@@ -103,7 +104,11 @@ internal fun GoalProgress(goal: SavingsGoal) {
                 }
                 val next = listOf(.25, .5, .75, 1.0).firstOrNull { goal.saved < target * it }
                 val pace = listOf(1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0).firstOrNull { remaining / it <= 180 } ?: 100.0
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
                     GoalStat("Falta", money(remaining))
                     if (next != null) GoalStat("Próximo hito ${(next * 100).toInt()}%", money(target * next - goal.saved))
                     if (remaining > 0) GoalStat("Ritmo", "${money(pace)} al día · ${kotlin.math.ceil(remaining / pace).toInt()} días")
@@ -120,6 +125,7 @@ internal fun GoalProgress(goal: SavingsGoal) {
                     else -> "Empieza hoy con lo que puedas, aunque sea S/ 1."
                 },
                 color = NightSoft, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
             )
         }
     }
@@ -128,7 +134,7 @@ internal fun GoalProgress(goal: SavingsGoal) {
 @Composable
 private fun GoalStat(label: String, value: String) {
     Surface(shape = RoundedCornerShape(12.dp), color = Card, border = BorderStroke(1.dp, Border)) {
-        Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(label, color = Gray, fontSize = 9.sp)
             Text(value, color = Night, fontSize = 12.sp, fontWeight = FontWeight.Bold)
         }
