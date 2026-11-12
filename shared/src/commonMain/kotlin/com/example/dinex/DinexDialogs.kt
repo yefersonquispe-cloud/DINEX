@@ -792,16 +792,34 @@ internal fun ReminderDialog(nextId: Int, onDismiss: () -> Unit, onSave: (Payment
 internal fun ScanReviewDialog(result: ScannedPurchase, movementId: Int?, nextId: Int, onDismiss: () -> Unit, onSave: (Movement) -> Unit) {
     var title by remember { mutableStateOf(if (result.merchant != result.product) "${result.product} · ${result.merchant}" else result.product) }
     var amount by remember { mutableStateOf(result.amount?.let(::format2).orEmpty()) }; var category by remember { mutableStateOf(result.category) }; var error by remember { mutableStateOf(false) }
+    // La fecha del comprobante solo se usa si es real: no futura y de los últimos 12 meses.
+    val receiptDate = remember(result.date) {
+        val today = civilDateFromEpochDays()
+        result.date?.takeIf { d ->
+            val key = d.year * 400 + d.month * 32 + d.day
+            val now = today.year * 400 + today.month * 32 + today.day
+            key <= now && key >= now - 400
+        }
+    }
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(28.dp),
         title = { Column { Text("Compra detectada", fontWeight = FontWeight.Black); Text("Revísala antes de registrarla. Nada se guarda sin tu confirmación.", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Normal) } },
         text = { Column(Modifier.verticalScroll(rememberScrollState())) {
             Surface(shape = RoundedCornerShape(16.dp), color = Indigo.copy(alpha = .14f)) { Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex IA", Modifier.size(46.dp), contentScale = ContentScale.Fit); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(if (result.analyzedWithGemini) "Analizado con Dinex IA" else "Análisis local completado", color = GreenDark, fontWeight = FontWeight.Black, fontSize = 12.sp); Text("Confianza ${result.confidence}%${if (result.priceEstimated) " · precio estimado" else ""}", color = Gray, fontSize = 9.sp) }; Text("REVISAR", color = GreenDark, fontWeight = FontWeight.Black, fontSize = 8.sp) } }
+            val details = listOfNotNull(result.kind.takeIf { it.isNotBlank() }, receiptDate?.let { "${it.day.toString().padStart(2, '0')}/${it.month.toString().padStart(2, '0')}/${it.year}" }, result.method)
+            if (details.isNotEmpty()) {
+                Spacer(Modifier.height(10.dp))
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    details.forEach { Surface(shape = RoundedCornerShape(50), color = Mint) { Text(it, color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) } }
+                }
+            }
             Spacer(Modifier.height(12.dp)); OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), label = { Text("Producto o comercio") }, singleLine = true)
             Spacer(Modifier.height(9.dp)); OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false }, Modifier.fillMaxWidth(), label = { Text(if (result.priceEstimated) "Precio estimado" else "Precio detectado") }, prefix = { Text("S/ ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, isError = error)
             Spacer(Modifier.height(10.dp)); Text("Categoría sugerida", fontWeight = FontWeight.Bold, fontSize = 10.sp); LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(categories) { item -> FilterChip(category == item.name, { category = item.name }, label = { Text(item.name) }) } }
             Spacer(Modifier.height(10.dp)); Text(if (result.analyzedWithGemini) "Gemini procesa la foto para extraer los datos; Dinex no conserva la imagen." else "El reconocimiento de respaldo ocurrió en el dispositivo.", color = Gray, fontSize = 9.sp)
         } },
-        confirmButton = { Button(onClick = { val value = amount.replace(',', '.').toDoubleOrNull(); if (value == null || value <= 0) error = true else onSave(Movement(movementId ?: nextId, title.ifBlank { "Compra escaneada" }, category, value, false, currentDayOfMonth(), if (result.analyzedWithGemini) "Foto + Gemini" else "Escáner local")) }) { Text("Registrar gasto") } },
+        confirmButton = { Button(onClick = { val value = amount.replace(',', '.').toDoubleOrNull(); if (value == null || value <= 0) error = true else onSave(Movement(movementId ?: nextId, title.ifBlank { "Compra escaneada" }, category, value, false, receiptDate?.day ?: currentDayOfMonth(),
+                result.method ?: if (result.analyzedWithGemini) "Foto + Gemini" else "Escáner local",
+                month = receiptDate?.month ?: civilDateFromEpochDays().month, year = receiptDate?.year ?: civilDateFromEpochDays().year)) }) { Text("Registrar gasto") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Descartar foto", color = Red, fontWeight = FontWeight.Bold) } })
 }
 

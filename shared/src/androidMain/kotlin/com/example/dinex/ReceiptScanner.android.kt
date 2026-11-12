@@ -79,11 +79,14 @@ actual fun rememberReceiptScanner(
                 barcodeScanner.process(image).await().firstNotNullOfOrNull { it.rawValue?.takeIf(String::isNotBlank) }
             }.getOrNull()
             val openFoodProduct = barcode?.let { runCatching { lookupOpenFoodFacts(it) }.getOrNull() }
-            val localResult = parsePurchase(text, labels, barcode, openFoodProduct)
+            val raw = text?.text.orEmpty()
+            val reading = raw.takeIf { it.isNotBlank() }?.let(::readReceiptText)
+            val localResult = reading?.takeIf { it.kind != ReceiptKind.PRODUCTO && it.total != null }?.toPurchase()
+                ?: parsePurchase(text, labels, barcode, openFoodProduct)
             val geminiResult = readGeminiApiKey(context).takeIf { it.isNotBlank() }?.let { apiKey ->
-                runCatching { analyzePurchaseWithGemini(context, uri, apiKey, localResult, barcode) }.getOrNull()
+                runCatching { analyzePurchaseWithGemini(context, uri, apiKey, localResult, barcode, raw) }.getOrNull()
             }
-            currentResult(geminiResult?.mergeReliableLocalData(localResult) ?: localResult)
+            currentResult(geminiResult?.mergeReliableLocalData(localResult, reading) ?: localResult)
         }
     }
 
@@ -115,21 +118,38 @@ private suspend fun analyzePurchaseWithGemini(
     apiKey: String,
     local: ScannedPurchase,
     barcode: String?,
+    ocrText: String,
 ): ScannedPurchase {
     val imageBytes = withContext(Dispatchers.IO) {
         val original = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: error("No se pudo leer la imagen")
         optimizeImage(original)
     }
+    val ocrHint = ocrText.lines().map { it.trim() }.filter { it.isNotBlank() }.take(60).joinToString("\n").take(2500)
     val prompt = """
-        Analiza esta foto como un registro de gasto personal en Perú. Puede ser un producto real, su empaque, una etiqueta de precio o un recibo.
-        Examina logotipo, colores del empaque, texto pequeño, volumen/peso y código de barras. Identifica el nombre comercial más
-        específico, marca, variante/tamaño, rubro y precio en soles. No respondas con términos genéricos como "botella" si el empaque
-        permite reconocer una marca. El análisis local encontró "${local.product}" de "${local.merchant}"${barcode?.let { " y código $it" }.orEmpty()}.
-        Si el precio está visible, léelo con cuidado. Si no aparece, estima un precio minorista razonable en Perú y marca priceEstimated=true.
-        La categoría debe ser exactamente una de: Comida, Transporte, Estudios, Entretenimiento, Otros.
+        Analiza esta foto para registrar un gasto personal en Perú. Primero decide qué es:
+        boleta electrónica, factura electrónica, ticket de caja, nota de venta, voucher de tarjeta (Niubiz, Izipay),
+        captura de Yape o Plin, transferencia bancaria, recibo de servicio (luz, agua, teléfono, internet, gas),
+        recibo por honorarios, boleto (bus, avión, cine, concierto), pedido por app (Rappi, PedidosYa) o la foto de un producto.
+        Reglas para el monto (amount), en soles:
+        - En boletas, facturas y tickets usa el IMPORTE TOTAL pagado. Nunca el subtotal, la op. gravada, el IGV, los descuentos,
+          el efectivo entregado ni el vuelto.
+        - En Yape, Plin o transferencias usa el monto enviado.
+        - En recibos de servicio usa el TOTAL A PAGAR del mes, no consumos parciales ni deudas anteriores por separado.
+        - En vouchers usa el monto aprobado (TOTAL o IMPORTE).
+        - Si el total está en dólares, conviértelo a soles y dilo en product.
+        - Si es un producto sin precio visible, estima un precio minorista razonable en Perú y marca priceEstimated=true.
+        product: lo comprado en pocas palabras (un producto, "Almuerzo", "Recibo de luz noviembre", "3 productos de bodega").
+        merchant: el comercio, la empresa o la persona a quien se pagó.
+        date: fecha de emisión o del pago en formato AAAA-MM-DD (no la de vencimiento), o "" si no se ve.
+        paymentMethod: Yape, Plin, Tarjeta, Efectivo o Transferencia si el documento lo indica; si no, "".
+        category: exactamente una de Comida, Transporte, Estudios, Entretenimiento, Otros (servicios del hogar = Otros).
+        Texto leído por el OCR del teléfono (puede tener errores; úsalo para confirmar números):
+        ${ocrHint.ifBlank { "(sin texto)" }}
+        El análisis local encontró "${local.product}" de "${local.merchant}"${local.amount?.let { " por S/ ${format2(it)}" }.orEmpty()}${barcode?.let { " y código $it" }.orEmpty()}.
         Devuelve exclusivamente JSON válido, sin Markdown, con esta forma:
-        {"product":"nombre", "merchant":"marca o comercio", "amount":12.90, "category":"Comida", "confidence":85, "priceEstimated":false}
+        {"documentType":"boleta", "product":"nombre", "merchant":"comercio", "amount":12.90, "date":"2026-11-08", "paymentMethod":"",
+         "category":"Comida", "confidence":85, "priceEstimated":false}
         amount debe ser un número positivo. confidence debe estar entre 0 y 100.
     """.trimIndent()
     val parts = JSONArray()
@@ -147,7 +167,7 @@ private suspend fun analyzePurchaseWithGemini(
         apiKey = apiKey,
         parts = parts,
         systemPrompt = "Eres el analizador visual de Dinex. Extraes compras con precisión y nunca incluyes texto fuera del JSON solicitado.",
-        maxOutputTokens = 300,
+        maxOutputTokens = 400,
         temperature = 0.1,
         preferVision = true,
     )
@@ -160,6 +180,11 @@ private suspend fun analyzePurchaseWithGemini(
         ?: error("Gemini no detectó un precio válido")
     val product = json.optString("product").trim().ifBlank { "Producto fotografiado" }
     val merchant = json.optString("merchant").trim().ifBlank { product }
+    val date = Regex("(20\\d{2})-(\\d{1,2})-(\\d{1,2})").find(json.optString("date"))?.destructured?.let { (y, m, d) ->
+        ReceiptDate(d.toInt(), m.toInt(), y.toInt()).takeIf { it.day in 1..31 && it.month in 1..12 }
+    }
+    val method = json.optString("paymentMethod").trim().takeIf { it in setOf("Yape", "Plin", "Tarjeta", "Efectivo", "Transferencia") }
+    val kind = json.optString("documentType").trim().lowercase()
     return ScannedPurchase(
         product = product,
         merchant = merchant,
@@ -168,6 +193,41 @@ private suspend fun analyzePurchaseWithGemini(
         confidence = json.optInt("confidence", 75).coerceIn(0, 100),
         priceEstimated = json.optBoolean("priceEstimated", false),
         analyzedWithGemini = true,
+        kind = geminiKinds[kind] ?: if (kind.isBlank() || "producto" in kind) "" else kind.replaceFirstChar(Char::uppercase),
+        date = date,
+        method = method,
+    )
+}
+
+private val geminiKinds = mapOf(
+    "boleta" to ReceiptKind.BOLETA.label, "boleta electrónica" to ReceiptKind.BOLETA.label, "factura" to ReceiptKind.FACTURA.label,
+    "factura electrónica" to ReceiptKind.FACTURA.label, "ticket" to ReceiptKind.TICKET.label, "ticket de caja" to ReceiptKind.TICKET.label,
+    "nota de venta" to ReceiptKind.NOTA_VENTA.label, "voucher" to ReceiptKind.VOUCHER.label, "voucher de tarjeta" to ReceiptKind.VOUCHER.label,
+    "yape" to ReceiptKind.YAPE.label, "plin" to ReceiptKind.PLIN.label, "transferencia" to ReceiptKind.TRANSFERENCIA.label,
+    "recibo de servicio" to ReceiptKind.SERVICIO.label, "recibo por honorarios" to ReceiptKind.HONORARIOS.label,
+    "boleto" to ReceiptKind.BOLETO.label, "pedido por app" to ReceiptKind.DELIVERY.label,
+)
+
+/** Resultado armado solo con el lector de comprobantes (sin internet). */
+private fun ReceiptReading.toPurchase(): ScannedPurchase {
+    val product = when {
+        items.size == 1 -> items.single()
+        items.size > 1 -> "${items.size} productos"
+        kind == ReceiptKind.SERVICIO -> "Recibo de ${merchant ?: "servicio"}"
+        kind == ReceiptKind.YAPE || kind == ReceiptKind.PLIN -> "Pago a ${merchant ?: "contacto"}"
+        else -> kind.label
+    }
+    return ScannedPurchase(
+        product = product,
+        merchant = merchant ?: kind.label,
+        amount = total,
+        category = category ?: "Otros",
+        confidence = totalConfidence.coerceIn(35, 98),
+        priceEstimated = false,
+        analyzedWithGemini = false,
+        kind = kind.label,
+        date = date,
+        method = method,
     )
 }
 
@@ -322,14 +382,29 @@ private fun parsePurchase(
     )
 }
 
-private fun ScannedPurchase.mergeReliableLocalData(local: ScannedPurchase): ScannedPurchase {
+/**
+ * Une lo que dice Gemini con lo que leyó el teléfono. Si el comprobante trae una línea de total
+ * muy clara y Gemini da un monto que no aparece en el papel, se queda el monto del comprobante.
+ */
+private fun ScannedPurchase.mergeReliableLocalData(local: ScannedPurchase, reading: ReceiptReading?): ScannedPurchase {
     val generic = product.lowercase() in setOf("producto", "producto fotografiado", "botella", "alimento", "objeto")
+    val printed = reading?.amounts.orEmpty()
+    val geminiOnPaper = amount != null && printed.any { kotlin.math.abs(it - amount) < 0.011 }
+    val trustLocalTotal = reading != null && reading.total != null && reading.totalConfidence >= 92 && !geminiOnPaper
     return copy(
         product = if (generic && local.product != "Compra escaneada") local.product else product,
         merchant = if (merchant.isBlank() || merchant == "Producto fotografiado") local.merchant else merchant,
-        amount = amount ?: local.amount,
+        amount = if (trustLocalTotal) reading!!.total else amount ?: local.amount,
         category = if (category == "Otros" && local.category != "Otros") local.category else category,
-        confidence = maxOf(confidence, if (local.confidence >= 86) local.confidence else confidence),
+        confidence = when {
+            geminiOnPaper -> maxOf(confidence, 95)
+            trustLocalTotal -> reading!!.totalConfidence
+            else -> maxOf(confidence, if (local.confidence >= 86) local.confidence else confidence)
+        },
+        priceEstimated = priceEstimated && !geminiOnPaper && !trustLocalTotal,
+        kind = local.kind.ifBlank { kind },
+        date = local.date ?: date,
+        method = local.method ?: method,
     )
 }
 

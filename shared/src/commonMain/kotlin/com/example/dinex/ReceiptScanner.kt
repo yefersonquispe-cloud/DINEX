@@ -10,6 +10,11 @@ data class ScannedPurchase(
     val confidence: Int,
     val priceEstimated: Boolean = false,
     val analyzedWithGemini: Boolean = false,
+    /** Tipo de comprobante detectado (boleta, factura, Yape…); vacío si es la foto de un producto. */
+    val kind: String = "",
+    val date: ReceiptDate? = null,
+    /** Yape, Plin, Tarjeta, Efectivo o Transferencia, si el comprobante lo dice. */
+    val method: String? = null,
 )
 
 @Composable
