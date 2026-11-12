@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,7 +26,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun SavingsGoalDialog(goal: SavingsGoal, onDismiss: () -> Unit, onAdd: () -> Unit, onDelete: () -> Unit = {}) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text(goal.name) }, text = {
+    AlertDialog(onDismissRequest = onDismiss, title = { Text(displayGoalName(goal.name), fontWeight = FontWeight.Black) }, text = {
         Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             GoalArtwork(goal)
             Text("Ilustración creada por DINEX según tu meta. Las monedas crecen mientras más ahorras.", color = Gray, style = MaterialTheme.typography.bodySmall)
@@ -38,18 +39,63 @@ internal fun SavingsGoalDialog(goal: SavingsGoal, onDismiss: () -> Unit, onAdd: 
 
 @Composable
 internal fun SavingsGoalsDialog(goals: List<SavingsGoal>, onOpen: (Int) -> Unit, onNew: () -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(onDismissRequest = onDismiss, title = { Text("Mis metas de ahorro") }, text = {
-        Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Total reservado: ${money(goals.sumOf { it.saved })}", style = MaterialTheme.typography.titleMedium)
-            if (goals.isEmpty()) Text("Crea tu primera meta desde el botón +. Puedes ahorrar para varios objetivos a la vez.")
-            goals.forEach { goal -> OutlinedButton(onClick = { onOpen(goal.id) }, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    GoalThemeIcon(goal.name, 34.dp)
-                    Column(Modifier.weight(1f)) { Text(goal.name); Text("${money(goal.saved)}" + if (goal.target > 0) " de ${money(goal.target)}" else " · Sin meta total") }
+    val total = goals.sumOf { it.saved }
+    val target = goals.sumOf { it.target }
+    AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(28.dp),
+        title = {
+            Column {
+                Text("Mis metas de ahorro", fontWeight = FontWeight.Black)
+                Text("Toca una meta para ver su avance o agregarle ahorro.", color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Normal)
+            }
+        },
+        text = {
+            Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Resumen de todas las metas.
+                Surface(shape = RoundedCornerShape(18.dp), color = Mint.copy(alpha = .6f), border = BorderStroke(1.dp, Border)) {
+                    Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("TOTAL RESERVADO", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                            Text(money(total), color = GreenDark, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                            if (target > 0) Text("de ${money(target)} entre todas tus metas", color = Gray, fontSize = 11.sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("${goals.size}", color = Night, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                            Text(if (goals.size == 1) "meta" else "metas", color = Gray, fontSize = 11.sp)
+                        }
+                    }
                 }
-            } }
-        }
-    }, confirmButton = { Button(onClick = onNew) { Text("Nueva meta") } }, dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } })
+                if (goals.isEmpty()) Text("Aún no tienes metas. Crea la primera y separa tu ahorro de tu saldo disponible.", color = Gray, fontSize = 13.sp)
+                goals.forEach { goal ->
+                    val p = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClickLabel = "Abrir ${goal.name}") { onOpen(goal.id) },
+                        shape = RoundedCornerShape(16.dp), color = Card, border = BorderStroke(1.dp, Border),
+                    ) {
+                        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            GoalAvatar(goal.name, 40.dp)
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(displayGoalName(goal.name), color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
+                                    if (goal.target > 0) Text(percentText(p), color = if (p >= 1f) Lime else GreenDark, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                                }
+                                Text(if (goal.target > 0) "${money(goal.saved)} de ${money(goal.target)}" else "${money(goal.saved)} · sin meta total", color = Gray, fontSize = 11.sp)
+                                if (goal.target > 0) {
+                                    Spacer(Modifier.height(6.dp))
+                                    Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(Border.copy(alpha = .7f))) {
+                                        Box(Modifier.fillMaxWidth(p).fillMaxHeight().clip(RoundedCornerShape(50)).background(Brush.horizontalGradient(listOf(Green, Lime))))
+                                    }
+                                }
+                            }
+                            Spacer(Modifier.width(6.dp))
+                            Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(16.dp))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { Button(onClick = onNew, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Nueva meta", fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar", color = GreenDark) } })
 }
 
 private fun percentText(p: Float): String = when {
