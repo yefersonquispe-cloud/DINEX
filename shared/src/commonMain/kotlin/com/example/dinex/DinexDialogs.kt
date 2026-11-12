@@ -669,10 +669,10 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
                         shape = RoundedCornerShape(18.dp), color = Card, border = androidx.compose.foundation.BorderStroke(1.dp, if (menuOpen) GreenDark else Border),
                     ) {
                         Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (chosen != null) GoalThemeIcon(chosen.name, 36.dp) else NewGoalBadge()
+                            if (chosen != null) GoalAvatar(chosen.name, 36.dp) else NewGoalBadge()
                             Spacer(Modifier.width(10.dp))
                             Column(Modifier.weight(1f)) {
-                                Text(chosen?.name ?: "Nueva meta de ahorro", color = Night, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(chosen?.let { displayGoalName(it.name) } ?: "Nueva meta de ahorro", color = Night, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text(chosen?.let { goalSummary(it) } ?: "Escribe abajo para qué ahorras", color = Gray, fontSize = 11.sp, maxLines = 1)
                             }
                             Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(18.dp).rotate(if (menuOpen) 270f else 90f))
@@ -683,10 +683,10 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
                         goals.forEach { goal ->
                             val p = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
                             DropdownMenuItem(
-                                leadingIcon = { GoalThemeIcon(goal.name, 34.dp) },
+                                leadingIcon = { GoalAvatar(goal.name, 34.dp) },
                                 text = {
                                     Column(Modifier.padding(vertical = 4.dp)) {
-                                        Text(goal.name, color = Night, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(displayGoalName(goal.name), color = Night, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Text(goalSummary(goal), color = Gray, fontSize = 11.sp)
                                         if (goal.target > 0) {
                                             Spacer(Modifier.height(4.dp))
