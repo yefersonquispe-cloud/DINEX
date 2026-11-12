@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -402,7 +403,12 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                 if (!isIncome) {
                     Column {
                         Text("Categoría", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Gray)
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val categoryRow = rememberLazyListState()
+                        LazyRow(
+                            state = categoryRow,
+                            modifier = Modifier.fadingEdges(categoryRow),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             items(categories.filter { it.name != "Ingreso" }) { item: CategoryInfo ->
                                 CategoryChip(
                                     selected = category == item.name,
