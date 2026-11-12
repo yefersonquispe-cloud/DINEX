@@ -177,7 +177,14 @@ internal fun CategoryMark(code: String, tint: Color, size: Dp = 36.dp) {
 @Composable
 internal fun MethodMark(method: String, tint: Color, size: Dp = 26.dp) {
     if (isBrandPayment(method)) {
-        PaymentBrandBadge(method, size)
+        // Mismo cuadro y mismo tamaño visible que los demás métodos: el logo va pequeño sobre un fondo suave.
+        val brand = if (method == "Yape") Color(0xFF742284) else Color(0xFF1C74E8)
+        Box(
+            Modifier.size(size).clip(RoundedCornerShape(RadiusSm)).background(brand.copy(alpha = .12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(Modifier.size(size * .62f).clip(RoundedCornerShape(size * .16f))) { PaymentBrandBadge(method, size * .62f) }
+        }
     } else {
         Box(
             Modifier.size(size).clip(RoundedCornerShape(RadiusSm)).background(tint.copy(alpha = .12f)),
