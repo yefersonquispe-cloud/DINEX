@@ -662,10 +662,50 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box {
-                    OutlinedButton(onClick = { menuOpen = true }) { Text(goals.firstOrNull { it.id == selectedId }?.name ?: "Crear una nueva meta") }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(text = { Text("+ Nueva meta de ahorro") }, onClick = { selectedId = null; purpose = ""; target = ""; menuOpen = false })
-                        goals.forEach { goal -> DropdownMenuItem(text = { Text("${goal.name} · ${money(goal.saved)}") }, onClick = { selectedId = goal.id; purpose = goal.name; target = if (goal.target > 0) format2(goal.target) else ""; menuOpen = false }) }
+                    val chosen = goals.firstOrNull { it.id == selectedId }
+                    // Botón que muestra la meta elegida con su ilustración y su avance.
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).clickable(onClickLabel = "Elegir meta") { menuOpen = true },
+                        shape = RoundedCornerShape(18.dp), color = Card, border = androidx.compose.foundation.BorderStroke(1.dp, if (menuOpen) GreenDark else Border),
+                    ) {
+                        Row(Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (chosen != null) GoalThemeIcon(chosen.name, 36.dp) else NewGoalBadge()
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(chosen?.name ?: "Nueva meta de ahorro", color = Night, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(chosen?.let { goalSummary(it) } ?: "Escribe abajo para qué ahorras", color = Gray, fontSize = 11.sp, maxLines = 1)
+                            }
+                            Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(18.dp).rotate(if (menuOpen) 270f else 90f))
+                        }
+                    }
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, modifier = Modifier.widthIn(min = 260.dp)) {
+                        Text("TUS METAS", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                        goals.forEach { goal ->
+                            val p = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
+                            DropdownMenuItem(
+                                leadingIcon = { GoalThemeIcon(goal.name, 34.dp) },
+                                text = {
+                                    Column(Modifier.padding(vertical = 4.dp)) {
+                                        Text(goal.name, color = Night, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(goalSummary(goal), color = Gray, fontSize = 11.sp)
+                                        if (goal.target > 0) {
+                                            Spacer(Modifier.height(4.dp))
+                                            Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(Border)) {
+                                                Box(Modifier.fillMaxWidth(p).fillMaxHeight().clip(RoundedCornerShape(50)).background(Green))
+                                            }
+                                        }
+                                    }
+                                },
+                                trailingIcon = { if (goal.id == selectedId) Icon(DinexNavigationIcons.Check, null, tint = GreenDark, modifier = Modifier.size(18.dp)) },
+                                onClick = { selectedId = goal.id; purpose = goal.name; target = if (goal.target > 0) format2(goal.target) else ""; menuOpen = false },
+                            )
+                        }
+                        HorizontalDivider(color = Border)
+                        DropdownMenuItem(
+                            leadingIcon = { NewGoalBadge() },
+                            text = { Text("Nueva meta de ahorro", color = GreenDark, fontWeight = FontWeight.Black) },
+                            onClick = { selectedId = null; purpose = ""; target = ""; menuOpen = false },
+                        )
                     }
                 }
                 Text("Disponible para ahorrar: ${money(available)}. Este monto se separará del saldo disponible; no es un gasto.", color = Gray)
@@ -691,6 +731,17 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
         confirmButton = { Button(onClick = { val value = amount.replace(',', '.').toDoubleOrNull(); val targetValue = target.replace(',', '.').toDoubleOrNull() ?: 0.0; if (value == null || !value.isFinite() || value <= 0 || value > available) error = true else onSave(SavingEntry(value, purpose.trim(), targetValue, selectedId)) }) { Text("Guardar ahorro", fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
+}
+
+private fun goalSummary(goal: SavingsGoal): String =
+    if (goal.target > 0) "${money(goal.saved)} de ${money(goal.target)} · ${((goal.saved / goal.target) * 100).toInt().coerceIn(0, 100)}%"
+    else "${money(goal.saved)} ahorrados · sin meta total"
+
+@Composable
+private fun NewGoalBadge() {
+    Box(Modifier.size(34.dp).clip(CircleShape).background(Mint), contentAlignment = Alignment.Center) {
+        Icon(DinexNavigationIcons.Add, null, tint = GreenDark, modifier = Modifier.size(18.dp))
+    }
 }
 
 @Composable
