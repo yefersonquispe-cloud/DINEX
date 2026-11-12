@@ -97,6 +97,29 @@ internal object DinexNavigationIcons {
         lineTo(15f, 15f); lineTo(12f, 22f); lineTo(9f, 15f)
         lineTo(2f, 12f); lineTo(9f, 9f); close()
     }
+    /** Comprobante dentro de un marco de escaneo. */
+    val ScanReceipt = outline("DinexScanReceipt") {
+        moveTo(3f, 8f); lineTo(3f, 4.5f); quadTo(3f, 3f, 4.5f, 3f); lineTo(8f, 3f)
+        moveTo(16f, 3f); lineTo(19.5f, 3f); quadTo(21f, 3f, 21f, 4.5f); lineTo(21f, 8f)
+        moveTo(21f, 16f); lineTo(21f, 19.5f); quadTo(21f, 21f, 19.5f, 21f); lineTo(16f, 21f)
+        moveTo(8f, 21f); lineTo(4.5f, 21f); quadTo(3f, 21f, 3f, 19.5f); lineTo(3f, 16f)
+        moveTo(8f, 6.5f); lineTo(16f, 6.5f); lineTo(16f, 17.5f); lineTo(14.7f, 16.7f); lineTo(13.4f, 17.5f)
+        lineTo(12f, 16.7f); lineTo(10.6f, 17.5f); lineTo(9.3f, 16.7f); lineTo(8f, 17.5f); close()
+        moveTo(10f, 9.5f); lineTo(14f, 9.5f)
+        moveTo(10f, 12.5f); lineTo(14f, 12.5f)
+    }
+    /** Diana: una meta a la que apuntar. */
+    val Target = outline("DinexTarget") {
+        moveTo(21f, 12f); arcTo(9f, 9f, 0f, true, true, 3f, 12f); arcTo(9f, 9f, 0f, true, true, 21f, 12f)
+        moveTo(17f, 12f); arcTo(5f, 5f, 0f, true, true, 7f, 12f); arcTo(5f, 5f, 0f, true, true, 17f, 12f)
+        moveTo(13.2f, 12f); arcTo(1.2f, 1.2f, 0f, true, true, 10.8f, 12f); arcTo(1.2f, 1.2f, 0f, true, true, 13.2f, 12f)
+    }
+    /** Reloj con flecha hacia atrás: el historial. */
+    val History = outline("DinexHistory") {
+        moveTo(4f, 12f); arcTo(8f, 8f, 0f, true, false, 6.34f, 6.34f)
+        moveTo(3.2f, 4.2f); lineTo(3.8f, 7.6f); lineTo(7.2f, 7f)
+        moveTo(12f, 7.5f); lineTo(12f, 12f); lineTo(15f, 14f)
+    }
     val ArrowUp = outline("DinexArrowUp") {
         moveTo(12f, 21f); lineTo(12f, 3f)
         moveTo(5f, 10f); lineTo(12f, 3f); lineTo(19f, 10f)

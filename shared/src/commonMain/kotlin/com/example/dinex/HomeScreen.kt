@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
@@ -124,10 +125,11 @@ internal fun NotificationsNudge(onEnable: () -> Unit) {
 @Composable
 private fun QuickActions(onScan: () -> Unit, onVoice: () -> Unit, onGoals: () -> Unit, onHistory: () -> Unit, wide: Boolean = false) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (wide) 16.dp else 10.dp)) {
-        QuickActionTile("Escanear", "Foto del comprobante", DinexNavigationIcons.Camera, Indigo, onScan, wide, Modifier.weight(1f))
-        QuickActionTile("Voz", "Dicta un gasto", DinexNavigationIcons.Microphone, ElectricBlue, onVoice, wide, Modifier.weight(1f))
-        QuickActionTile("Metas", "Ahorra para algo", DinexNavigationIcons.Sparkle, Orange, onGoals, wide, Modifier.weight(1f))
-        QuickActionTile("Historial", "Todos tus movimientos", DinexNavigationIcons.Movements, Lime, onHistory, wide, Modifier.weight(1f))
+        // Un solo color de marca y trazos finos para un estilo más formal.
+        QuickActionTile("Escanear", "Foto del comprobante", DinexNavigationIcons.ScanReceipt, GreenDark, onScan, wide, Modifier.weight(1f))
+        QuickActionTile("Voz", "Dicta un gasto", DinexNavigationIcons.Microphone, GreenDark, onVoice, wide, Modifier.weight(1f))
+        QuickActionTile("Metas", "Ahorra para algo", DinexNavigationIcons.Target, GreenDark, onGoals, wide, Modifier.weight(1f))
+        QuickActionTile("Historial", "Todos tus movimientos", DinexNavigationIcons.History, GreenDark, onHistory, wide, Modifier.weight(1f))
     }
 }
 
@@ -150,7 +152,10 @@ private fun QuickActionTile(
         border = BorderStroke(1.dp, if (hovered) tint.copy(alpha = .35f) else Border),
     ) {
         val badge: @Composable () -> Unit = {
-            Box(Modifier.size(42.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
+            Box(
+                Modifier.size(44.dp).clip(CircleShape).background(Mint).border(1.dp, tint.copy(alpha = .18f), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
                 Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
             }
         }
