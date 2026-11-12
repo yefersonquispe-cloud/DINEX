@@ -22,8 +22,8 @@ import androidx.compose.ui.window.Dialog
 // del Consumidor. Si cambias el texto, sube VERSION para volver a pedir permiso.
 // ═══════════════════════════════════════════════════════════════════════════
 internal object DinexLegal {
-    const val VERSION = "2026-11-b"
-    const val UPDATED = "9 de noviembre de 2026"
+    const val VERSION = "2026-11-c"
+    const val UPDATED = "12 de noviembre de 2026"
 
     /** Correo para ejercer derechos ARCO. Si está vacío, solo se muestran las opciones de la app. */
     const val CONTACT_EMAIL = ""
@@ -49,7 +49,7 @@ internal object DinexLegal {
         "4. Para qué los usamos" to "Solo para darte el servicio: guardar y sincronizar tus finanzas, mostrarte reportes, el mapa de calor, alertas de presupuesto, recordatorios y consejos. No vendemos tus datos, no los usamos para publicidad y no los compartimos con bancos ni empresas de cobranza.",
         "5. Permisos del teléfono" to "Cámara: escanear boletas y poner tu foto. Micrófono: registrar gastos con la voz y \"Oye Dinex\". Ubicación: guardar dónde gastaste para el mapa de calor. Notificaciones: avisarte del presupuesto y recordarte ahorrar. Acceso a notificaciones: leer solo los avisos de pago de Yape, Plin y bancos para registrarlos por ti. Cada permiso es opcional y puedes quitarlo cuando quieras desde los ajustes del teléfono.",
         "6. Dónde se guardan" to "En tu equipo y en Firebase (Google Cloud): la cuenta en Firebase Authentication y tus datos en Cloud Firestore, en servidores de Santiago de Chile y otros países. Esto es un flujo transfronterizo de datos permitido por la ley, con proveedores que aplican estándares de seguridad internacionales.",
-        "7. Otros servicios" to "El asistente usa Gemini Nano dentro de tu teléfono cuando está disponible. Algunas funciones, como leer boletas o crear imágenes de metas, pueden enviar solo el texto o la imagen necesaria a Google Gemini. Si Gemini no está disponible, la imagen de tu meta se crea con Pollinations.ai, un servicio gratuito al que solo le enviamos el nombre de la meta. El mapa usa OpenStreetMap y el mercado usa servicios públicos de precios; a ellos no les enviamos tu nombre ni tu correo.",
+        "7. Otros servicios" to "El asistente usa Gemini Nano dentro de tu teléfono cuando está disponible. Algunas funciones, como leer boletas, pueden enviar solo la imagen necesaria a Google Gemini. La ilustración de cada meta se crea en tu teléfono, sin internet. El mapa usa OpenStreetMap y el mercado usa servicios públicos de precios; a ellos no les enviamos tu nombre ni tu correo.",
         "8. Seguridad" to "Toda la información viaja cifrada (HTTPS). Cada cuenta solo puede leer y cambiar sus propios datos gracias a reglas de acceso en Firebase. Las ilustraciones de metas y tu foto de perfil se quedan solo en tu equipo.",
         "9. Cuánto tiempo" to "Guardamos tus datos mientras tengas la cuenta. Si la eliminas, borramos tu cuenta y tus datos de la nube y de este equipo.",
         "10. Tus derechos (ARCO)" to "Puedes acceder a tus datos, rectificarlos, cancelarlos u oponerte a su uso. En la app puedes ver y corregir todo, exportar un reporte y eliminar tu cuenta desde Perfil → Eliminar mi cuenta.$contactLine Si no quedas conforme, puedes acudir a la Autoridad Nacional de Protección de Datos Personales del Ministerio de Justicia y Derechos Humanos.",

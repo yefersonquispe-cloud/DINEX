@@ -31,7 +31,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -217,54 +216,5 @@ internal fun GoalArtwork(goal: SavingsGoal, modifier: Modifier = Modifier, heigh
             Text(if (goal.target > 0) "${(progress * 100).toInt()}% · ${money(goal.saved)} de ${money(goal.target)}" else "${money(goal.saved)} ahorrados",
                 color = Color.White.copy(alpha = .9f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
-    }
-}
-
-/** Imagen hecha con IA mostrada como en una película: zoom lento, destellos y brillo encima. */
-@Composable
-internal fun MagicAiImage(image: ImageBitmap, name: String, height: Dp = 200.dp) {
-    val loop = rememberInfiniteTransition(label = "ia")
-    val zoom by loop.animateFloat(1.03f, 1.13f, infiniteRepeatable(tween(7000), RepeatMode.Reverse), label = "zoom")
-    val pan by loop.animateFloat(-10f, 10f, infiniteRepeatable(tween(9000), RepeatMode.Reverse), label = "paneo")
-    val shine by loop.animateFloat(0f, 1f, infiniteRepeatable(tween(2800, easing = LinearEasing)), label = "destellos")
-    Box(Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(24.dp))) {
-        Image(image, "Imagen con IA de $name", Modifier.fillMaxSize().graphicsLayer { scaleX = zoom; scaleY = zoom; translationX = pan },
-            contentScale = ContentScale.Crop)
-        Canvas(Modifier.fillMaxSize()) {
-            drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = .45f)), startY = size.height * .55f))
-            repeat(12) { i ->
-                val phase = (shine + i / 12f) % 1f
-                val x = size.width * ((i * 41 % 100) / 100f)
-                val y = size.height * ((i * 29 % 90) / 100f)
-                drawCircle(Color.White.copy(alpha = kotlin.math.sin(phase * 3.14f) * .9f), radius = 1.5f + 4f * kotlin.math.sin(phase * 3.14f), center = Offset(x, y))
-            }
-        }
-        Surface(Modifier.align(Alignment.BottomStart).padding(12.dp), shape = RoundedCornerShape(50), color = Color.Black.copy(alpha = .4f)) {
-            Text("✨ $name", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
-        }
-    }
-}
-
-/** Brillo que recorre la tarjeta mientras la IA crea la imagen. */
-@Composable
-internal fun MagicLoading(height: Dp = 200.dp) {
-    val loop = rememberInfiniteTransition(label = "creando")
-    val sweep by loop.animateFloat(-.4f, 1.4f, infiniteRepeatable(tween(1400, easing = LinearEasing)), label = "barrido")
-    val spin by loop.animateFloat(0f, 360f, infiniteRepeatable(tween(2200, easing = LinearEasing)), label = "giro")
-    Box(Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(24.dp)), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            drawRect(Color.Black.copy(alpha = .35f))
-            val x = size.width * sweep
-            drawRect(Brush.linearGradient(listOf(Color.Transparent, Color.White.copy(alpha = .45f), Color.Transparent),
-                start = Offset(x - 160f, 0f), end = Offset(x + 160f, size.height)))
-            rotate(spin) {
-                repeat(6) { i ->
-                    val a = i * 60f * 3.1416f / 180f
-                    drawCircle(Color(0xFFFFE08A), radius = 6f, center = Offset(center.x + kotlin.math.cos(a) * 46f, center.y + kotlin.math.sin(a) * 46f))
-                }
-            }
-        }
-        Text("Creando tu imagen mágica…", color = Color.White, fontWeight = FontWeight.Black, fontSize = 14.sp, modifier = Modifier.offset(y = 64.dp))
     }
 }

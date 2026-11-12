@@ -172,18 +172,14 @@ class DinexViewModelTest {
         assertEquals(3, model.state.value.data.movements.size)
     }
 
-    @Test fun categoryBudgetsAndArtworkStayWithTheirProfile() {
+    @Test fun categoryBudgetsStayWithTheirProfile() {
         val store = MemoryDinexStore()
         val model = DinexViewModel(repository(store))
         model.createAccount(account()); model.setInitialBalance(100.0)
         model.saveSaving(SavingEntry(10.0, "Celular", 500.0))
         assertTrue(model.setCategoryBudgets(mapOf("Comida" to 150.0)))
-        model.saveGoalArtwork("someoneelse@dinex.test", "Celular", "wrong")
-        assertEquals("", model.state.value.data.goalArtwork)
-        model.saveGoalArtwork("qa@dinex.test", "Celular", "image-example")
         val restored = DinexViewModel(repository(store)).state.value.data
         assertEquals(150.0, restored.categoryBudgets["Comida"])
-        assertEquals("image-example", restored.goalArtwork)
     }
 
     @Test fun multipleGoalsAndDeletionPreserveMoneyAndOtherGoals() {
@@ -198,21 +194,16 @@ class DinexViewModelTest {
         model.dismissCelebrations()
         assertTrue(model.saveSaving(SavingEntry(20.0, "Viaje", 100.0, travel.id)))
         assertFalse(model.state.value.goalCelebration)
-        model.saveGoalArtwork("qa@dinex.test", phone.id, "Celular", "phone-image")
         assertEquals(2, DinexViewModel(repository(store)).state.value.data.goals.size)
         assertEquals(200.0, model.state.value.data.availableBalance())
         assertTrue(model.deleteSavingsGoal(travel.id))
         assertEquals(phone.id, model.state.value.data.goals.single().id)
-        assertEquals("phone-image", model.state.value.data.goals.single().artwork)
         assertEquals(250.0, model.state.value.data.availableBalance())
         assertEquals(1, model.state.value.data.movements.size)
         assertFalse(model.deleteSavingsGoal(travel.id))
         assertTrue(model.deleteSavingsGoal(phone.id))
         assertTrue(model.state.value.data.savingGoals().isEmpty())
         assertEquals(300.0, DinexViewModel(repository(store)).state.value.data.availableBalance())
-        model.saveSaving(SavingEntry(5.0, "Celular", 50.0))
-        model.saveGoalArtwork("qa@dinex.test", phone.id, "Celular", "stale-image")
-        assertEquals("", model.state.value.data.goals.single().artwork)
     }
 
     @Test fun legacyGoalCanBeDeletedWithoutLosingOtherMoney() {

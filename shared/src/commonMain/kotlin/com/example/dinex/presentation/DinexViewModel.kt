@@ -421,18 +421,6 @@ internal class DinexViewModel(
         persist(value.data.copy(categoryBudgets = emptyMap()))
         showMessage("Volviste a las sugerencias automáticas")
     }
-    fun saveGoalArtwork(email: String, purpose: String, artwork: String) {
-        if (value.email != email || value.data.goalName != purpose || artwork.length > 8_000_000) return
-        val goal = value.data.savingGoals().lastOrNull { it.name == purpose } ?: return
-        saveGoalArtwork(email, goal.id, purpose, artwork)
-    }
-    fun saveGoalArtwork(email: String, goalId: Int, purpose: String, artwork: String) {
-        if (value.email != email || artwork.length > 8_000_000) return
-        val goals = value.data.savingGoals()
-        if (goals.none { it.id == goalId && it.name == purpose }) return
-        persist(value.data.copy(goals = goals.map { if (it.id == goalId) it.copy(artwork = artwork) else it },
-            goalArtwork = if (value.lastSavedGoalId == goalId) artwork else value.data.goalArtwork))
-    }
     fun deleteSavingsGoal(id: Int): Boolean {
         val goals = value.data.savingGoals()
         val goal = goals.firstOrNull { it.id == id } ?: return false

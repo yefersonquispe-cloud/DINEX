@@ -28,7 +28,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
 
 /** View layer: navigation, screens and presentation-only dialog state. */
 @Composable
@@ -95,9 +94,6 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var savingGoalId by remember { mutableStateOf<Int?>(null) }
     var goalToDelete by remember { mutableStateOf<SavingsGoal?>(null) }
     var walletBubbleOpen by remember { mutableStateOf(false) }
-    val illustrator = rememberGoalIllustrator()
-    val goalScope = rememberCoroutineScope()
-    var artworkBusy by remember { mutableStateOf(emptySet<Int>()) }
 
     val scanner = rememberReceiptScanner(
         onResult = { premiumLoading = null; scanResult = it; model.showMessage(null) },
@@ -243,32 +239,18 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     if (savingDialog) SavingDialog(available = data.availableBalance(), goals = data.savingGoals(), initialGoalId = savingGoalId,
         onDismiss = { savingDialog = false }, onSave = { entry -> if (model.saveSaving(entry)) {
             savingDialog = false; goalDetails = true
-            val goal = model.state.value.data.savingGoals().first { it.id == model.state.value.lastSavedGoalId }
-            selectedGoalId = goal.id
-            val purpose = goal.name
-            val email = state.email.orEmpty()
-            if (goal.id !in artworkBusy && purpose.isNotBlank() && goal.artwork.isBlank() && illustrator.isConfigured) {
-                artworkBusy = artworkBusy + goal.id
-                goalScope.launch {
-                    try { model.saveGoalArtwork(email, goal.id, purpose, illustrator.generate(purpose)) }
-                    catch (cancelled: CancellationException) { throw cancelled }
-                    // Si la IA no responde, la meta igual muestra la ilustración de DINEX; no hace falta avisar.
-                    catch (_: Throwable) { }
-                    finally { artworkBusy = artworkBusy - goal.id }
-                }
-            }
+            selectedGoalId = model.state.value.lastSavedGoalId
         } })
     if (goalDetails) {
         val goal = data.savingGoals().firstOrNull { it.id == selectedGoalId }
         if (goal == null) SavingsGoalsDialog(data.savingGoals(), onOpen = { selectedGoalId = it },
             onNew = { goalDetails = false; savingGoalId = null; savingDialog = true }, onDismiss = { goalDetails = false })
-        else key(goal.id) { SavingsGoalDialog(goal, illustrator, onDismiss = { selectedGoalId = null },
+        else key(goal.id) { SavingsGoalDialog(goal, onDismiss = { selectedGoalId = null },
             onAdd = { goalDetails = false; savingGoalId = goal.id; savingDialog = true },
-            onArtwork = { model.saveGoalArtwork(state.email.orEmpty(), goal.id, goal.name, it) }, externalBusy = goal.id in artworkBusy,
             onDelete = { goalToDelete = goal }) }
     }
     goalToDelete?.let { goal -> AlertDialog(onDismissRequest = { goalToDelete = null }, title = { Text("¿Eliminar ${goal.name}?") },
-        text = { Text("Se eliminarán esta meta y su imagen. ${money(goal.saved)} volverán al saldo disponible. Las demás metas y tu historial no cambiarán.") },
+        text = { Text("Se eliminará esta meta. ${money(goal.saved)} volverán al saldo disponible. Las demás metas y tu historial no cambiarán.") },
         confirmButton = { TextButton(onClick = { model.deleteSavingsGoal(goal.id); goalToDelete = null; selectedGoalId = null }) { Text("Eliminar meta", color = Red) } },
         dismissButton = { TextButton(onClick = { goalToDelete = null }) { Text("Conservar meta") } }) }
     state.pendingExpense?.let { pending ->
