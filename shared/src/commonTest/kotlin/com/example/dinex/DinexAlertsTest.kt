@@ -127,24 +127,42 @@ class DinexAlertsTest {
     }
 
     @Test
-    fun saveReminderAlwaysAsksToSaveToday() {
-        val fresh = dinexSaveReminderAlert(0, "", 0.0, 0.0)
-        assertEquals("Ahorra hoy 💚", fresh.title)
-        assertTrue(fresh.body.contains("Ahorra aunque sea S/ 1"))
+    fun saveReminderAlwaysAsksToSaveTodayAndAddsATip() {
+        for (day in 20_400..20_420) {
+            val text = dinexSaveReminderAlert(0, "", 0.0, 0.0, day)
+            assertTrue((text.title + text.body).contains("S/"), "día $day: $text")
+            assertTrue(text.body.contains("Consejo: "), "día $day: ${text.body}")
+        }
     }
 
     @Test
-    fun streakReminderWarnsAboutLosingTheStreak() {
-        val text = dinexSaveReminderAlert(7, "", 0.0, 0.0)
-        assertTrue(text.title.contains("racha de 7 días"))
-        assertTrue(text.body.contains("Ahorra hoy"))
+    fun saveReminderChangesFromOneDayToTheNext() {
+        for (day in 20_400..20_430) {
+            val today = dinexSaveReminderAlert(3, "Celular", 40.0, 100.0, day)
+            val tomorrow = dinexSaveReminderAlert(3, "Celular", 40.0, 100.0, day + 1)
+            assertTrue(today != tomorrow, "el día $day y el siguiente tienen el mismo texto")
+        }
+        val week = (20_400 until 20_407).map { dinexSaveReminderAlert(0, "", 0.0, 0.0, it).title }.toSet()
+        assertTrue(week.size >= 4, "en una semana deberían verse varios títulos: $week")
+    }
+
+    @Test
+    fun streakReminderAlwaysTalksAboutTheStreak() {
+        for (day in 20_400..20_410) {
+            val text = dinexSaveReminderAlert(7, "", 0.0, 0.0, day)
+            assertTrue(text.body.contains("racha") || text.title.contains("racha") || text.title.contains("medalla"), "día $day: $text")
+        }
+        val medal = (20_400..20_410).map { dinexSaveReminderAlert(7, "", 0.0, 0.0, it) }.first { it.title.contains("medalla") }
+        assertTrue(medal.title.contains("1 día para la medalla Plata"), medal.title)
     }
 
     @Test
     fun goalReminderShowsHowMuchIsLeft() {
-        val text = dinexSaveReminderAlert(0, "Celular", 40.0, 100.0)
-        assertEquals("Ahorra hoy para «Celular»", text.title)
-        assertTrue(text.body.contains("S/ 60.00"))
+        val texts = (20_400..20_403).map { dinexSaveReminderAlert(0, "Celular", 40.0, 100.0, it) }
+        assertTrue(texts.all { it.title.contains("«Celular»") })
+        assertTrue(texts.any { it.body.contains("S/ 60.00") })
+        assertTrue(texts.any { it.title.contains("40%") })
+        assertTrue(texts.any { it.title.contains("12 días") })
     }
 
     @Test
