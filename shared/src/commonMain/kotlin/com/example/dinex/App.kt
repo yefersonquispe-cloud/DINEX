@@ -291,7 +291,8 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                         TextButton(onClick = { assistantOpen = false }) { Text("Cerrar") }
                     }
                     HorizontalDivider(color = Border)
-                    Box(Modifier.weight(1f)) { AssistantPage(assistant, movements, dailyLimit, streak, savings, chatMessages, data.categoryBudgets) }
+                    Box(Modifier.weight(1f)) { AssistantPage(assistant, movements, dailyLimit, streak, savings, chatMessages, data.categoryBudgets,
+                        queriesLeft = model::aiQueriesLeft, onQueryUsed = model::recordAiQuery) }
                 }
             }
         }

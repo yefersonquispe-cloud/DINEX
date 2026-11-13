@@ -30,6 +30,25 @@ class DinexViewModelTest {
         assertEquals(150.0, model.state.value.data.movements.single().amount)
     }
 
+    @Test fun aiAssistantAllowsThreeQueriesPerUserPerDay() {
+        val store = MemoryDinexStore()
+        val repo = repository(store)
+        val model = DinexViewModel(repo)
+        model.createAccount(account())
+        assertEquals(DAILY_AI_QUERIES, model.aiQueriesLeft())
+        repeat(3) { model.recordAiQuery() }
+        assertEquals(0, model.aiQueriesLeft())
+        // Otra cuenta en el mismo equipo tiene sus propias consultas.
+        model.logout()
+        model.createAccount(account("other@dinex.test"))
+        assertEquals(3, model.aiQueriesLeft())
+        // Al día siguiente se renuevan.
+        assertEquals(3, repo.aiQueriesToday("qa@dinex.test", currentDayIndex()))
+        assertEquals(0, repo.aiQueriesToday("qa@dinex.test", currentDayIndex() + 1))
+        // El conteo sigue al volver a abrir la app.
+        assertEquals(3, repository(store).aiQueriesToday("QA@dinex.test"))
+    }
+
     @Test fun profilesStayIsolatedAndSurviveRecreation() {
         val store = MemoryDinexStore()
         val model = DinexViewModel(repository(store))

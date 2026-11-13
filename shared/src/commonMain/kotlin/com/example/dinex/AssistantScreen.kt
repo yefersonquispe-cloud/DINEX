@@ -55,8 +55,11 @@ internal fun AssistantPage(
     savings: Double,
     messages: androidx.compose.runtime.snapshots.SnapshotStateList<ChatMessage>,
     categoryBudgets: Map<String, Double> = emptyMap(),
+    queriesLeft: () -> Int = { DAILY_AI_QUERIES },
+    onQueryUsed: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
+    var remaining by remember { mutableIntStateOf(queriesLeft()) }
     val chatListState = rememberLazyListState()
     var draft by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
@@ -79,6 +82,12 @@ internal fun AssistantPage(
     fun send(question: String) {
         val cleanQuestion = question.trim()
         if (cleanQuestion.isBlank() || loading) return
+        // Se vuelve a leer aquí por si cambió el día con la pantalla abierta.
+        remaining = queriesLeft()
+        if (remaining <= 0) {
+            messages.add(ChatMessage(aiLimitMessage(), user = false, error = true, engine = GeminiEngine.NONE))
+            return
+        }
         messages.add(ChatMessage(cleanQuestion, user = true))
         draft = ""
         loading = true
@@ -86,6 +95,8 @@ internal fun AssistantPage(
             val reply = runCatching {
                 assistant.ask(cleanQuestion, buildFinancialContext(movements, dailyLimit, streak, savings, categoryBudgets))
             }.getOrElse { GeminiReply("No pude conectarme. Inténtalo de nuevo.", successful = false, engine = GeminiEngine.NONE) }
+            // Solo cuentan las respuestas que llegaron bien; un error de conexión no gasta la consulta.
+            if (reply.successful) { onQueryUsed(); remaining = queriesLeft() }
             messages.add(ChatMessage(reply.text, user = false, error = !reply.successful, engine = reply.engine))
             loading = false
         }
@@ -181,19 +192,21 @@ internal fun AssistantPage(
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 7.dp)) {
                     items(listOf("¿En qué gasto más?", "Hazme un plan semanal", "¿Puedo gastar S/ 80?", "¿Cómo voy con mi ahorro?")) { suggestion ->
-                        SuggestionChip(onClick = { send(suggestion) }, label = { Text(suggestion, fontSize = 12.sp) }, enabled = !loading,
+                        SuggestionChip(onClick = { send(suggestion) }, label = { Text(suggestion, fontSize = 12.sp) }, enabled = !loading && remaining > 0,
                             icon = { Icon(DinexNavigationIcons.Sparkle, null, tint = Indigo, modifier = Modifier.size(15.dp)) },
                             shape = RoundedCornerShape(14.dp))
                     }
                 }
+                AiQuotaNotice(remaining)
                 Spacer(Modifier.height(5.dp))
                 Surface(shape = RoundedCornerShape(24.dp), color = CardRaised.copy(alpha = .9f), border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .35f))) {
                     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.Bottom) {
                         TextField(draft, { if (it.length <= 500) draft = it }, Modifier.weight(1f),
-                            placeholder = { Text("Escribe tu pregunta…", fontSize = 14.sp) }, maxLines = 4,
-                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent),
+                            placeholder = { Text(if (remaining > 0) "Escribe tu pregunta…" else "Vuelve mañana para preguntar", fontSize = 14.sp) }, maxLines = 4,
+                            enabled = remaining > 0,
+                            colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, disabledContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send(draft) }))
-                        Button(onClick = { send(draft) }, enabled = draft.isNotBlank() && !loading,
+                        Button(onClick = { send(draft) }, enabled = draft.isNotBlank() && !loading && remaining > 0,
                             modifier = Modifier.size(48.dp).semantics { contentDescription = "Enviar mensaje" },
                             contentPadding = PaddingValues(0.dp), shape = RoundedCornerShape(17.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = colors.onPrimary)) {
@@ -204,6 +217,31 @@ internal fun AssistantPage(
                 Text("Puede equivocarse. Revisa cualquier decisión financiera.", color = Gray, fontSize = 10.sp, modifier = Modifier.fillMaxWidth().padding(top = 7.dp), textAlign = TextAlign.Center)
             }
         }
+    }
+}
+
+private fun aiLimitMessage() =
+    "Ya usaste tus $DAILY_AI_QUERIES consultas de hoy. Mañana podrás hacer $DAILY_AI_QUERIES preguntas más a Dinex IA."
+
+/** Indica cuántas consultas quedan hoy; al llegar a 0 explica cuándo se renuevan. */
+@Composable
+private fun AiQuotaNotice(remaining: Int) {
+    val empty = remaining <= 0
+    Row(Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            repeat(DAILY_AI_QUERIES) { index ->
+                Box(Modifier.size(width = 14.dp, height = 4.dp).clip(CircleShape).background(if (index < remaining) Green else Border))
+            }
+        }
+        Spacer(Modifier.width(10.dp))
+        Text(
+            when {
+                empty -> "Usaste tus $DAILY_AI_QUERIES consultas de hoy. Se renuevan mañana."
+                remaining == 1 -> "Te queda 1 consulta hoy"
+                else -> "Te quedan $remaining de $DAILY_AI_QUERIES consultas hoy"
+            },
+            color = if (empty) Orange else Gray, fontSize = 11.sp, fontWeight = if (empty) FontWeight.SemiBold else FontWeight.Normal,
+        )
     }
 }
 

@@ -82,10 +82,16 @@ internal class DinexRepository(
         ?.split('|')?.takeIf { it.size == 2 }?.let { TermsConsent(it[0], it[1].toLongOrNull() ?: 0L) }
     fun setTermsConsent(email: String, consent: TermsConsent?) =
         store.put("terms:" + email.trim().lowercase(), consent?.let { "${it.version}|${it.acceptedAt}" })
+    /** Consultas a Dinex IA que esta cuenta hizo hoy. Al cambiar el día vuelve a 0. */
+    fun aiQueriesToday(email: String, today: Int = currentDayIndex()): Int =
+        store.get("ai_usage:" + email.trim().lowercase())?.split('|')
+            ?.takeIf { it.size == 2 && it[0].toIntOrNull() == today }?.get(1)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
+    fun recordAiQuery(email: String, today: Int = currentDayIndex()) =
+        store.put("ai_usage:" + email.trim().lowercase(), "$today|${aiQueriesToday(email, today) + 1}")
     /** Borra todo lo que este equipo guarda de una cuenta. */
     fun forgetAccount(email: String) {
         val key = email.trim().lowercase()
-        listOf(profileKey(email), "profile_at:$key", "avatar:$key", "terms:$key").forEach { store.put(it, null) }
+        listOf(profileKey(email), "profile_at:$key", "avatar:$key", "terms:$key", "ai_usage:$key").forEach { store.put(it, null) }
         saveAccounts(accounts().filterNot { it.email == key })
     }
     /** Sesión de Firebase (uid, correo y token de renovación). Nunca se guarda la contraseña. */

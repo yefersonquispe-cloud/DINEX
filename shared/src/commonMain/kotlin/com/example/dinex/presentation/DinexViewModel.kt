@@ -37,6 +37,9 @@ internal data class DinexUiState(
     val initialBalanceRequired get() = email != null && !data.onboardingCompleted && data.movements.isEmpty()
 }
 
+/** Límite de preguntas a Dinex IA por usuario y por día. */
+internal const val DAILY_AI_QUERIES = 3
+
 /** Owns session and financial actions; composables only render state and send events. */
 internal class DinexViewModel(
     private val repository: DinexRepository = DinexRepository(),
@@ -85,6 +88,10 @@ internal class DinexViewModel(
         mutableState.value = value.copy(data = repository.profile(email))
         if (value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
     }
+
+    /** Consultas a Dinex IA que le quedan hoy a la cuenta activa (máximo [DAILY_AI_QUERIES]). */
+    fun aiQueriesLeft(): Int = value.email?.let { (DAILY_AI_QUERIES - repository.aiQueriesToday(it)).coerceAtLeast(0) } ?: 0
+    fun recordAiQuery() { value.email?.let { repository.recordAiQuery(it) } }
 
     fun selectPage(page: Int) { mutableState.value = value.copy(page = page.coerceIn(0, 3)) }
     fun showMessage(message: String?) { mutableState.value = value.copy(message = message) }
