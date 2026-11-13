@@ -13,7 +13,7 @@ service cloud.firestore {
 
       function validProfile() {
         let data = request.resource.data;
-        return data.keys().hasOnly(['name', 'email', 'profile', 'updatedAt', 'termsVersion', 'termsAcceptedAt'])
+        return data.keys().hasOnly(['name', 'email', 'profile', 'updatedAt', 'termsVersion', 'termsAcceptedAt', 'aiDay', 'aiCount'])
           && data.keys().hasAll(['name', 'email', 'profile', 'updatedAt'])
           && data.name is string && data.name.size() <= 80
           && data.email is string && data.email == request.auth.token.email
@@ -21,12 +21,31 @@ service cloud.firestore {
           && data.updatedAt is int && data.updatedAt > 0
           // Constancia del consentimiento (Ley N.° 29733), opcional en cuentas antiguas.
           && (!('termsVersion' in data) || (data.termsVersion is string && data.termsVersion.size() <= 20))
-          && (!('termsAcceptedAt' in data) || data.termsAcceptedAt is int);
+          && (!('termsAcceptedAt' in data) || data.termsAcceptedAt is int)
+          && validAiUsage(data);
+      }
+
+      // Consultas a Dinex IA del día (límite diario por usuario). Van juntas: día y cantidad.
+      function validAiUsage(data) {
+        return (!('aiDay' in data) && !('aiCount' in data))
+          || (data.aiDay is int && data.aiCount is int
+            && data.aiCount >= 0 && data.aiCount <= 100
+            && data.aiDay <= request.time.toMillis() / 86400000 + 2);
+      }
+
+      // En el mismo día el conteo no puede bajar, ni volver a un día anterior.
+      function aiUsageNotLowered() {
+        let before = resource.data;
+        let after = request.resource.data;
+        return !('aiDay' in before) || !('aiDay' in after)
+          || after.aiDay > before.aiDay
+          || (after.aiDay == before.aiDay && after.aiCount >= before.aiCount);
       }
 
       allow get: if isOwner();
       allow list: if false;
-      allow create, update: if isOwner() && validProfile();
+      allow create: if isOwner() && validProfile();
+      allow update: if isOwner() && validProfile() && aiUsageNotLowered();
       allow delete: if isOwner();
     }
 

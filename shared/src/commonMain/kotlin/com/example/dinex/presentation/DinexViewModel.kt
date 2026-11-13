@@ -6,6 +6,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
@@ -91,7 +92,52 @@ internal class DinexViewModel(
 
     /** Consultas a Dinex IA que le quedan hoy a la cuenta activa (máximo [DAILY_AI_QUERIES]). */
     fun aiQueriesLeft(): Int = value.email?.let { (DAILY_AI_QUERIES - repository.aiQueriesToday(it)).coerceAtLeast(0) } ?: 0
-    fun recordAiQuery() { value.email?.let { repository.recordAiQuery(it) } }
+    fun recordAiQuery() {
+        val email = value.email ?: return
+        repository.recordAiQuery(email)
+        viewModelScope.launch { pushAiUsage(email) }
+    }
+
+    /**
+     * Antes de cada pregunta se consulta el conteo en la nube, para que el límite valga para la
+     * cuenta en todos sus equipos. Sin internet se usa el conteo guardado en este equipo.
+     */
+    suspend fun syncedAiQueriesLeft(): Int {
+        val email = value.email ?: return 0
+        val cloud = cloud
+        if (cloud != null && cloudSession != null) {
+            try {
+                withTimeoutOrNull(5_000) {
+                    val session = validSession() ?: return@withTimeoutOrNull
+                    val remote = cloud.aiUsage(session)
+                    remote?.let { repository.mergeAiUsage(email, it) }
+                    // Si este equipo tiene más consultas registradas (por ejemplo, se usó sin internet), las sube.
+                    val local = repository.aiUsage(email)
+                    if (local != null && (remote == null || local.day > remote.day || (local.day == remote.day && local.count > remote.count))) {
+                        cloud.saveAiUsage(session, local)
+                    }
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (_: Throwable) {
+                // Sin conexión: vale el conteo del equipo.
+            }
+        }
+        return aiQueriesLeft()
+    }
+
+    private suspend fun pushAiUsage(email: String) {
+        val cloud = cloud ?: return
+        if (cloudSession == null) return
+        try {
+            val session = validSession() ?: return
+            repository.aiUsage(email)?.let { cloud.saveAiUsage(session, it) }
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Throwable) {
+            // Se reintenta en la próxima consulta.
+        }
+    }
 
     fun selectPage(page: Int) { mutableState.value = value.copy(page = page.coerceIn(0, 3)) }
     fun showMessage(message: String?) { mutableState.value = value.copy(message = message) }

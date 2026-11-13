@@ -56,10 +56,13 @@ internal fun AssistantPage(
     messages: androidx.compose.runtime.snapshots.SnapshotStateList<ChatMessage>,
     categoryBudgets: Map<String, Double> = emptyMap(),
     queriesLeft: () -> Int = { DAILY_AI_QUERIES },
+    syncQueriesLeft: suspend () -> Int = { queriesLeft() },
     onQueryUsed: () -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var remaining by remember { mutableIntStateOf(queriesLeft()) }
+    // Al abrir el chat se trae el conteo de la nube, por si la cuenta usó Dinex IA en otro equipo.
+    LaunchedEffect(Unit) { remaining = syncQueriesLeft() }
     val chatListState = rememberLazyListState()
     var draft by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(false) }
@@ -82,16 +85,17 @@ internal fun AssistantPage(
     fun send(question: String) {
         val cleanQuestion = question.trim()
         if (cleanQuestion.isBlank() || loading) return
-        // Se vuelve a leer aquí por si cambió el día con la pantalla abierta.
-        remaining = queriesLeft()
-        if (remaining <= 0) {
-            messages.add(ChatMessage(aiLimitMessage(), user = false, error = true, engine = GeminiEngine.NONE))
-            return
-        }
-        messages.add(ChatMessage(cleanQuestion, user = true))
-        draft = ""
         loading = true
         scope.launch {
+            // Se vuelve a revisar aquí (también en la nube) por si cambió el día o se usó en otro equipo.
+            remaining = syncQueriesLeft()
+            if (remaining <= 0) {
+                messages.add(ChatMessage(aiLimitMessage(), user = false, error = true, engine = GeminiEngine.NONE))
+                loading = false
+                return@launch
+            }
+            messages.add(ChatMessage(cleanQuestion, user = true))
+            draft = ""
             val reply = runCatching {
                 assistant.ask(cleanQuestion, buildFinancialContext(movements, dailyLimit, streak, savings, categoryBudgets))
             }.getOrElse { GeminiReply("No pude conectarme. Inténtalo de nuevo.", successful = false, engine = GeminiEngine.NONE) }

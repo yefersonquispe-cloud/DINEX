@@ -292,7 +292,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                     }
                     HorizontalDivider(color = Border)
                     Box(Modifier.weight(1f)) { AssistantPage(assistant, movements, dailyLimit, streak, savings, chatMessages, data.categoryBudgets,
-                        queriesLeft = model::aiQueriesLeft, onQueryUsed = model::recordAiQuery) }
+                        queriesLeft = model::aiQueriesLeft, syncQueriesLeft = model::syncedAiQueriesLeft, onQueryUsed = model::recordAiQuery) }
                 }
             }
         }

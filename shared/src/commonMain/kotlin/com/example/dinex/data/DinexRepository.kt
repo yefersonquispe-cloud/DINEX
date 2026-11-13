@@ -88,6 +88,19 @@ internal class DinexRepository(
             ?.takeIf { it.size == 2 && it[0].toIntOrNull() == today }?.get(1)?.toIntOrNull()?.coerceAtLeast(0) ?: 0
     fun recordAiQuery(email: String, today: Int = currentDayIndex()) =
         store.put("ai_usage:" + email.trim().lowercase(), "$today|${aiQueriesToday(email, today) + 1}")
+    /** Día y cantidad guardados en este equipo, o null si nunca usó Dinex IA. */
+    fun aiUsage(email: String): AiUsage? = store.get("ai_usage:" + email.trim().lowercase())?.split('|')
+        ?.takeIf { it.size == 2 }?.let { parts -> parts[0].toIntOrNull()?.let { AiUsage(it, parts[1].toIntOrNull()?.coerceAtLeast(0) ?: 0) } }
+    /** Combina con el conteo de la nube: gana el día más reciente y, si es el mismo día, la cantidad mayor. */
+    fun mergeAiUsage(email: String, remote: AiUsage) {
+        val local = aiUsage(email)
+        val merged = when {
+            local == null || remote.day > local.day -> remote
+            remote.day == local.day -> AiUsage(local.day, maxOf(local.count, remote.count))
+            else -> return
+        }
+        store.put("ai_usage:" + email.trim().lowercase(), "${merged.day}|${merged.count}")
+    }
     /** Borra todo lo que este equipo guarda de una cuenta. */
     fun forgetAccount(email: String) {
         val key = email.trim().lowercase()

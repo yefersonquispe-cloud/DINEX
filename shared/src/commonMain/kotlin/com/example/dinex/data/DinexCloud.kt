@@ -48,6 +48,9 @@ internal data class CloudProfile(
 
 internal data class TermsConsent(val version: String, val acceptedAt: Long)
 
+/** Consultas a Dinex IA hechas en un día (día = días desde 1970, según el equipo). */
+internal data class AiUsage(val day: Int, val count: Int)
+
 internal class DinexCloud(
     private val apiKey: String = FirebaseConfig.API_KEY,
     private val projectId: String = FirebaseConfig.PROJECT_ID,
@@ -126,8 +129,27 @@ internal class DinexCloud(
             "\"updatedAt\":{\"integerValue\":\"${profile.updatedAt}\"}" +
             (profile.terms?.let { ",\"termsVersion\":{\"stringValue\":${jsonString(it.version)}},\"termsAcceptedAt\":{\"integerValue\":\"${it.acceptedAt}\"}" } ?: "") +
             "}}"
-        parseObject(http("PATCH", documentUrl(session.uid), body, session.idToken))
+        // Solo se reemplazan estos campos; así no se borra el conteo de Dinex IA guardado aparte.
+        val fields = listOf("name", "email", "profile", "updatedAt") + if (profile.terms != null) listOf("termsVersion", "termsAcceptedAt") else emptyList()
+        parseObject(http("PATCH", documentUrl(session.uid) + updateMask(fields), body, session.idToken))
     }
+
+    /** Lee solo el conteo de Dinex IA (sin bajar todo el perfil). */
+    suspend fun aiUsage(session: CloudSession): AiUsage? {
+        val response = http("GET", documentUrl(session.uid) + "?mask.fieldPaths=aiDay&mask.fieldPaths=aiCount", null, session.idToken)
+        if (response.status == 404) return null
+        val fields = parseObject(response).obj("fields") ?: return null
+        val day = fields.obj("aiDay")?.text("integerValue")?.toIntOrNull() ?: return null
+        return AiUsage(day, fields.obj("aiCount")?.text("integerValue")?.toIntOrNull()?.coerceAtLeast(0) ?: 0)
+    }
+
+    /** Guarda el conteo de Dinex IA sin tocar el resto del documento. */
+    suspend fun saveAiUsage(session: CloudSession, usage: AiUsage) {
+        val body = "{\"fields\":{\"aiDay\":{\"integerValue\":\"${usage.day}\"},\"aiCount\":{\"integerValue\":\"${usage.count}\"}}}"
+        parseObject(http("PATCH", documentUrl(session.uid) + updateMask(listOf("aiDay", "aiCount")), body, session.idToken))
+    }
+
+    private fun updateMask(fields: List<String>) = fields.joinToString("&", prefix = "?") { "updateMask.fieldPaths=$it" }
 
     /** Derecho de cancelación: borra el documento en Firestore y luego la cuenta de Firebase. */
     suspend fun deleteAccount(session: CloudSession) {
