@@ -41,4 +41,19 @@ class CloudSyncTest {
         assertEquals("Correo o contraseña incorrectos.", cloudErrorMessage("INVALID_LOGIN_CREDENTIALS"))
         assertTrue(sessionRevoked("TOKEN_EXPIRED"))
     }
+
+    @Test fun googleCredentialCreatesFirebaseSession() = kotlinx.coroutines.test.runTest {
+        var requestBody = ""
+        val cloud = DinexCloud(http = { method, url, body, _ ->
+            assertEquals("POST", method)
+            assertTrue(url.contains("signInWithIdp"))
+            requestBody = body.orEmpty()
+            CloudResponse(200, """{"localId":"uid-1","email":"persona@gmail.com","displayName":"Ana Quispe","idToken":"firebase-token","refreshToken":"refresh","expiresIn":"3600"}""")
+        })
+        val (session, name) = cloud.signInWithGoogle(GoogleIdentityToken("google-token", true))
+        assertTrue(requestBody.contains("id_token=google-token&providerId=google.com"))
+        assertEquals("Ana Quispe", name)
+        assertEquals("uid-1", session.uid)
+        assertEquals("firebase-token", session.idToken)
+    }
 }

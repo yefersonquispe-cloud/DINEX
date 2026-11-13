@@ -33,6 +33,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) {
     val model = viewModel { DinexViewModel(cloud = DinexCloud()) }
+    val googleIdentity = rememberGoogleIdentity()
     val state by model.state.collectAsState()
     SideEffect { onThemeChanged(state.darkMode) }
     LaunchedEffect(state.email, state.data, state.darkMode) { onDataChanged() }
@@ -54,6 +55,8 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) 
                     onRegister = model::register,
                     onSignIn = model::signIn,
                     onForgotPassword = model::sendPasswordReset,
+                    googleAvailable = googleIdentity.available,
+                    onGoogleSignIn = { model.signInWithGoogle(googleIdentity) },
                     onClearMessages = model::clearAuthMessages,
                 )
             } else {

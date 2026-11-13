@@ -41,6 +41,8 @@ internal fun AuthFlow(
     onRegister: (name: String, email: String, password: String) -> Unit,
     onSignIn: (email: String, password: String) -> Unit,
     onForgotPassword: (email: String) -> Unit,
+    googleAvailable: Boolean,
+    onGoogleSignIn: () -> Unit,
     onClearMessages: () -> Unit,
 ) {
     var createMode by remember { mutableStateOf(accounts.isEmpty()) }
@@ -245,6 +247,42 @@ internal fun AuthFlow(
                         ) {
                             if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
                             else Text(if (createMode) "Crear cuenta" else "Iniciar sesión", fontWeight = FontWeight.Bold)
+                        }
+                        if (googleAvailable) {
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = {
+                                    onClearMessages()
+                                    if (!acceptedTerms) {
+                                        attempted = true
+                                        error = "Para continuar con Google acepta los Términos y la Política de Privacidad."
+                                    } else {
+                                        // Google no usa el correo ni la contraseña: se limpian sus avisos para que se vea la respuesta de Google.
+                                        error = null
+                                        attempted = false
+                                        onGoogleSignIn()
+                                    }
+                                },
+                                enabled = !busy,
+                                modifier = Modifier.fillMaxWidth().height(50.dp),
+                                shape = RoundedCornerShape(RadiusMd),
+                            ) {
+                                Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Black, fontSize = 20.sp)
+                                Spacer(Modifier.width(10.dp))
+                                Text("Continuar con Google", fontWeight = FontWeight.SemiBold)
+                            }
+                            if (!createMode) {
+                                Row(verticalAlignment = Alignment.Top) {
+                                    Checkbox(checked = acceptedTerms, onCheckedChange = { acceptedTerms = it; error = null })
+                                    Column(Modifier.padding(top = 10.dp)) {
+                                        Text("Acepto los Términos y la Política de Privacidad para continuar con Google.", color = NightSoft, fontSize = 11.sp, lineHeight = 15.sp)
+                                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                                            LegalLink("Ver términos") { legalTab = 0 }
+                                            LegalLink("Ver privacidad") { legalTab = 1 }
+                                        }
+                                    }
+                                }
+                            }
                         }
                         if (!createMode) {
                             TextButton(

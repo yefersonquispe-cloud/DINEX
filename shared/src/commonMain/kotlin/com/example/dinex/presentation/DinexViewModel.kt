@@ -175,6 +175,16 @@ internal class DinexViewModel(
         "Si $email tiene una cuenta, te llegará un enlace para crear una nueva contraseña."
     }
 
+    fun signInWithGoogle(identity: GoogleIdentity) = launchAuth {
+        val cloud = cloud ?: return@launchAuth null
+        val token = identity.requestToken() ?: return@launchAuth null
+        val (session, googleName) = cloud.signInWithGoogle(token)
+        completeCloudLogin(session, googleName, trustLocal = false)
+        repository.setTermsConsent(session.email, TermsConsent(DinexLegal.VERSION, epochMillis()))
+        runCatching { cloud.upload(session, localCloudProfile(session.email, value.activeAccount?.name.orEmpty(), epochMillis())) }
+        null
+    }
+
     /** Derecho de cancelación (ARCO): borra la cuenta en Firebase y todos sus datos de este equipo. */
     fun deleteAccount(onDone: (String?) -> Unit) {
         val email = value.email ?: return

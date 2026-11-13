@@ -13,6 +13,7 @@ import kotlin.time.ExperimentalTime
 internal object FirebaseConfig {
     const val API_KEY = "AIzaSyAtstrFuF9wXTSkf-3JtCG-unHr0QUVwM4"
     const val PROJECT_ID = "dinex-63ed4"
+    const val GOOGLE_WEB_CLIENT_ID = "928396674848-lp2kictn2l63pmvqj338cthttbu5p9h1.apps.googleusercontent.com"
 }
 
 internal class CloudResponse(val status: Int, val body: String)
@@ -65,6 +66,20 @@ internal class DinexCloud(
         jsonObject("email" to email, "password" to password, "returnSecureToken" to true),
         email,
     )
+
+    /** Cambia el token de Google por una sesión de Firebase y devuelve también el nombre de la cuenta. */
+    suspend fun signInWithGoogle(token: GoogleIdentityToken): Pair<CloudSession, String> {
+        val credential = if (token.isIdToken) "id_token" else "access_token"
+        val body = jsonObject(
+            "postBody" to "$credential=${token.value}&providerId=google.com",
+            "requestUri" to "https://$projectId.firebaseapp.com",
+            "returnSecureToken" to true,
+            "returnIdpCredential" to true,
+        )
+        val json = parseObject(http("POST", "$identity:signInWithIdp?key=$apiKey", body, null))
+        val name = json.text("displayName") ?: json.text("fullName") ?: ""
+        return sessionFrom(json, "") to name
+    }
 
     suspend fun refresh(session: CloudSession): CloudSession {
         val response = http("POST", "https://securetoken.googleapis.com/v1/token?key=$apiKey",
@@ -124,8 +139,10 @@ internal class DinexCloud(
     private fun documentUrl(uid: String) =
         "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$uid"
 
-    private suspend fun authCall(url: String, body: String, email: String): CloudSession {
-        val json = parseObject(http("POST", url, body, null))
+    private suspend fun authCall(url: String, body: String, email: String): CloudSession =
+        sessionFrom(parseObject(http("POST", url, body, null)), email)
+
+    private fun sessionFrom(json: Map<String, Any?>, email: String): CloudSession {
         return CloudSession(
             uid = json.text("localId").orEmpty(),
             email = json.text("email") ?: email,
@@ -155,6 +172,11 @@ internal fun cloudErrorMessage(code: String): String = when (code) {
     "TOO_MANY_ATTEMPTS_TRY_LATER" -> "Demasiados intentos. Espera unos minutos y vuelve a intentarlo."
     "WEAK_PASSWORD", "PASSWORD_DOES_NOT_MEET_REQUIREMENTS" -> "La contraseña no es segura. Revisa los requisitos."
     "OPERATION_NOT_ALLOWED", "CONFIGURATION_NOT_FOUND" -> "El inicio de sesión no está disponible por ahora."
+    "GOOGLE_NO_ACCOUNT" -> "No hay una cuenta de Google en este teléfono. Agrégala en Ajustes e inténtalo de nuevo."
+    "GOOGLE_NOT_READY" -> "Google todavía está cargando. Espera unos segundos e inténtalo de nuevo."
+    "GOOGLE_POPUP_ERROR" -> "No se pudo abrir la ventana de Google. Permite ventanas emergentes e inténtalo otra vez."
+    "GOOGLE_CREDENTIAL_INVALID", "INVALID_IDP_RESPONSE", "INVALID_ID_TOKEN" -> "No pudimos verificar tu cuenta de Google. Inténtalo otra vez."
+    "FEDERATED_USER_ID_ALREADY_LINKED", "NEED_CONFIRMATION" -> "Este correo ya tiene una cuenta. Inicia sesión con el método que usaste antes."
     else -> "No pudimos conectar con tu cuenta. Inténtalo otra vez."
 }
 
