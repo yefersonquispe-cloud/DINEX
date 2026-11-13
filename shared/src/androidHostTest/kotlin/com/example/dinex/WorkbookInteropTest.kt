@@ -38,11 +38,15 @@ class WorkbookInteropTest {
     }
 
     @Test fun reportsAreReadableByStandardZipAndGenerateQaArtifacts() {
-        val movements = listOf(
-            Movement(1, "Sueldo", "Ingreso", 1500.0, true, 1, "BCP", "", 9, 2026),
-            Movement(2, "Café & pan", "Comida", 12.5, false, 15, "Yape", "Lima", 9, 2026),
-            Movement(3, "Taxi", "Transporte", 20.0, false, 3, "Plin", "Lima", 10, 2026)
-        )
+        val titles = listOf("Menú del día en el mercado", "Taxi al trabajo", "Pasaje (bus)", "Libro de matemáticas", "Cine con amigos",
+            "Recarga de celular", "Café & pan", "Útiles para la universidad con descripción bastante larga para probar el ajuste de línea", "Netflix", "Polladas")
+        val methods = listOf("Yape", "Plin", "Efectivo", "BCP", "Interbank")
+        val cats = listOf("Comida", "Transporte", "Transporte", "Estudios", "Entretenimiento", "Otros", "Comida", "Estudios", "Entretenimiento", "Comida")
+        val movements = (1..60).map { i ->
+            val month = 6 + (i % 5)
+            if (i % 7 == 0) Movement(i, "Sueldo de ${listOf("junio", "julio", "agosto", "setiembre", "octubre")[month - 6]}", "Ingreso", 1500.0 + i * 3, true, 1 + i % 27, "BCP", "", month, 2026)
+            else Movement(i, titles[i % titles.size], cats[i % cats.size], 8.5 + (i * 37 % 140), false, 1 + i % 27, methods[i % methods.size], if (i % 3 == 0) "Lima" else "", month, 2026)
+        }
         val directory = File("build/qa-transfer").apply { mkdirs() }
         ReportFormat.entries.forEach { format ->
             val report = createMovementReport(movements, format, "Todo el historial", "Persona de prueba")
@@ -52,7 +56,7 @@ class WorkbookInteropTest {
                 ZipInputStream(ByteArrayInputStream(report.bytes)).use { zip ->
                     while (zip.nextEntry != null) { assertTrue(zip.readBytes().isNotEmpty()); entries++ }
                 }
-                assertEquals(7, entries)
+                assertTrue(entries >= 13)
             }
         }
     }

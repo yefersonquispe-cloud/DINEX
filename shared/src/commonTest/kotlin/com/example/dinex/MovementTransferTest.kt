@@ -96,6 +96,26 @@ class MovementTransferTest {
         assertFalse("<f>" in readZip(exportWorkbook(original, "Todo", "QA")).getValue("xl/worksheets/sheet1.xml").decodeToString())
     }
 
+    @Test fun workbookSummaryUsesFormulasAndNativeCharts() {
+        val items = listOf(movement(), movement(2).copy(income = true, category = "Ingreso", title = "Sueldo", amount = 1500.0, method = "BCP"),
+            movement(3).copy(category = "Transporte", amount = 20.0, month = 10, method = "Plin"))
+        val files = readZip(exportWorkbook(items, "Todo", "QA")).mapValues { it.value.decodeToString() }
+        val summary = files.getValue("xl/worksheets/sheet2.xml")
+        assertTrue("<f>SUMIFS(Movimientos!\$D:\$D,Movimientos!\$E:\$E,&quot;Ingreso&quot;)</f><v>1500.000000</v>" in summary || "<f>SUMIFS(Movimientos!\$D:\$D,Movimientos!\$E:\$E,\"Ingreso\")</f><v>1500.000000</v>" in summary)
+        assertTrue("<drawing r:id=\"rId1\"/>" in summary)
+        assertTrue("<c:doughnutChart>" in files.getValue("xl/charts/chart1.xml"))
+        assertTrue("<c:barDir val=\"col\"/>" in files.getValue("xl/charts/chart2.xml"))
+        assertTrue("<c:barDir val=\"bar\"/>" in files.getValue("xl/charts/chart3.xml"))
+        assertTrue("<sheet name=\"Resumen\"" in files.getValue("xl/workbook.xml"))
+    }
+
+    @Test fun pdfMeasuresTextAndEncodesSpanishCharacters() {
+        val pdf = exportPdfReport(listOf(movement().copy(title = "Menú (sopa) — ñandú")), "Septiembre", "Ana Núñez")
+        val text = pdf.map { (it.toInt() and 255).toChar() }.joinToString("")
+        assertTrue("Men\u00FA \\(sopa\\) \u0097 \u00F1and\u00FA" in text)
+        assertTrue("Ana N\u00FA\u00F1ez" in text)
+    }
+
     @Test fun damagedFilesAndUnclosedCsvAreRejectedClearly() {
         assertFailsWith<IllegalArgumentException> { parseCsvRows("Fecha;Monto\n\"sin cerrar;10") }
         assertFails { reviewImportFile(TransferFile("roto.xlsx", ByteArray(100))) }
@@ -108,7 +128,9 @@ class MovementTransferTest {
         assertTrue(pdf.startsWith("%PDF-1.4"))
         val pageCount = Regex("/Count (\\d+)").find(pdf)!!.groupValues[1].toInt()
         assertTrue(pageCount >= 2)
-        assertTrue("2026-09-29" in pdf)
+        assertTrue("29/09/2026" in pdf)
+        assertTrue("Gastos por categor" in pdf)
+        assertTrue("/Info 5 0 R" in pdf)
         assertTrue(pdf.trimEnd().endsWith("%%EOF"))
     }
 }
