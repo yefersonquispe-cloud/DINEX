@@ -509,15 +509,15 @@ internal fun ProfileDialog(
                     Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border), shadowElevation = 2.dp) {
                         Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
                             Row(Modifier.height(IntrinsicSize.Min)) {
-                                ProfileFigure("Saldo disponible", money(income - expenses - savings), Night, DinexNavigationIcons.Wallet, Modifier.weight(1f))
+                                ProfileFigure("Saldo disponible", moneyGrouped(income - expenses - savings), Night, DinexNavigationIcons.Wallet, Modifier.weight(1f))
                                 VerticalDivider(color = Border)
-                                ProfileFigure("Ahorrado", money(savings), GreenDark, DinexNavigationIcons.Target, Modifier.weight(1f))
+                                ProfileFigure("Ahorrado", moneyGrouped(savings), GreenDark, DinexNavigationIcons.Target, Modifier.weight(1f))
                             }
                             HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 14.dp))
                             Row(Modifier.height(IntrinsicSize.Min)) {
-                                ProfileFigure("Ingresos", money(income), if (DinexThemeState.dark) Color(0xFF56FF9C) else Color(0xFF087C40), DinexNavigationIcons.ArrowUp, Modifier.weight(1f))
+                                ProfileFigure("Ingresos", moneyGrouped(income), if (DinexThemeState.dark) Color(0xFF56FF9C) else Color(0xFF087C40), DinexNavigationIcons.ArrowUp, Modifier.weight(1f))
                                 VerticalDivider(color = Border)
-                                ProfileFigure("Egresos", money(expenses), if (DinexThemeState.dark) Color(0xFFFF7182) else Color(0xFFD90F32), DinexNavigationIcons.ArrowDown, Modifier.weight(1f))
+                                ProfileFigure("Egresos", moneyGrouped(expenses), if (DinexThemeState.dark) Color(0xFFFF7182) else Color(0xFFD90F32), DinexNavigationIcons.ArrowDown, Modifier.weight(1f))
                             }
                             Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                                 Icon(DinexNavigationIcons.Check, null, tint = GreenDark, modifier = Modifier.size(13.dp))
@@ -656,14 +656,14 @@ private fun ProfileSwitchRow(icon: androidx.compose.ui.graphics.vector.ImageVect
 
 @Composable
 private fun ProfileFigure(label: String, value: String, tint: Color, icon: androidx.compose.ui.graphics.vector.ImageVector, modifier: Modifier) {
-    Column(modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+    Column(modifier.padding(horizontal = 10.dp, vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = Gray, modifier = Modifier.size(13.dp))
             Spacer(Modifier.width(5.dp))
             Text(label, color = Gray, fontSize = 11.sp)
         }
-        Spacer(Modifier.height(3.dp))
-        Text(value, color = tint, fontSize = 18.sp, fontWeight = FontWeight.Black, maxLines = 1)
+        Spacer(Modifier.height(4.dp))
+        Text(value, color = tint, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center)
     }
 }
 
