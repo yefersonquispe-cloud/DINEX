@@ -5,21 +5,24 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import kotlinx.coroutines.launch
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TÉRMINOS Y PRIVACIDAD (Perú)
@@ -27,219 +30,278 @@ import kotlinx.coroutines.launch
 // (D.S. N.° 016-2024-JUS) y la Ley N.° 29571, Código de Protección y Defensa
 // del Consumidor. Si cambias el texto, sube VERSION para volver a pedir permiso.
 // ═══════════════════════════════════════════════════════════════════════════
+
+/** Partes de un documento legal: párrafos, listas, definiciones y recuadros con subtítulo. */
+internal sealed interface LegalBlock {
+    data class Paragraph(val text: String) : LegalBlock
+    data class Bullets(val items: List<String>) : LegalBlock
+    data class Definition(val term: String, val text: String) : LegalBlock
+    data class Box(val title: String, val blocks: List<LegalBlock>) : LegalBlock
+}
+
+internal data class LegalSection(val title: String, val blocks: List<LegalBlock>)
+
+internal data class LegalDocument(val screenTitle: String, val title: String, val intro: List<String>, val sections: List<LegalSection>)
+
+private fun p(text: String) = LegalBlock.Paragraph(text)
+private fun bullets(vararg items: String) = LegalBlock.Bullets(items.toList())
+private fun term(name: String, text: String) = LegalBlock.Definition(name, text)
+private fun box(title: String, vararg blocks: LegalBlock) = LegalBlock.Box(title, blocks.toList())
+
 internal object DinexLegal {
-    const val VERSION = "2026-11-c"
-    const val UPDATED = "12 de noviembre de 2026"
+    const val VERSION = "2026-11-d"
+    const val UPDATED = "13 de noviembre de 2026"
 
     /** Correo para ejercer derechos ARCO. Si está vacío, solo se muestran las opciones de la app. */
     const val CONTACT_EMAIL = ""
 
-    private val contactLine = if (CONTACT_EMAIL.isNotBlank()) " También puedes escribir a $CONTACT_EMAIL." else ""
+    private val contactLine = if (CONTACT_EMAIL.isNotBlank()) " También puede escribir a $CONTACT_EMAIL." else ""
 
-    val terms = listOf(
-        "1. Qué es Dinex" to "Dinex es una aplicación gratuita para ordenar tus finanzas personales: registrar ingresos y gastos, crear metas de ahorro, ver reportes y recibir consejos. Funciona en Android y en la web con la misma cuenta.",
-        "2. Aceptación" to "Al crear tu cuenta declaras que leíste y aceptas estos Términos y la Política de Privacidad. Si no estás de acuerdo, no uses la aplicación. Si eres menor de 14 años, necesitas el permiso de tu madre, padre o tutor.",
-        "3. Tu cuenta" to "Debes usar un correo real y una contraseña segura que no compartas con nadie. Eres responsable de lo que se haga con tu cuenta. Si crees que alguien entró sin permiso, cambia tu contraseña con la opción \"¿Olvidaste tu contraseña?\".",
-        "4. No es asesoría financiera" to "Los consejos, el asistente Dinex IA y los reportes son orientativos. No son asesoría financiera, legal ni tributaria, y no reemplazan a un profesional. Tú decides qué hacer con tu dinero.",
-        "5. Mercado en línea" to "Los tipos de cambio y precios de criptomonedas vienen de servicios públicos de terceros. Son referenciales, pueden tener retraso y no sirven para hacer operaciones. Dinex no compra, vende ni guarda dinero o criptomonedas.",
-        "6. Uso correcto" to "No uses Dinex para actividades ilegales, para dañar el servicio ni para intentar entrar a cuentas de otras personas. Podemos suspender cuentas que incumplan estas reglas.",
-        "7. Disponibilidad" to "Hacemos lo posible para que Dinex funcione siempre, pero puede haber pausas por mantenimiento o fallas de internet. Te recomendamos exportar tus reportes de vez en cuando.",
-        "8. Cambios" to "Si cambiamos estos Términos te lo avisaremos en la aplicación y te pediremos aceptarlos de nuevo cuando el cambio sea importante.",
-        "9. Ley aplicable" to "Estos Términos se rigen por las leyes de la República del Perú, incluida la Ley N.° 29571, Código de Protección y Defensa del Consumidor. Cualquier reclamo puede presentarse ante INDECOPI.",
+    val terms = LegalDocument(
+        screenTitle = "Términos y condiciones",
+        title = "Términos y Condiciones de Uso de la aplicación DINEX",
+        intro = listOf(
+            "Los presentes Términos y Condiciones de Uso (en adelante, los “Términos”) regulan el acceso y uso de la aplicación DINEX (en adelante, la “Aplicación”), así como los derechos y obligaciones de las personas que la utilizan.",
+            "El Usuario declara haber leído y entendido todas las condiciones establecidas en los presentes Términos. Cualquier persona que no acepte o se encuentre en desacuerdo con estos Términos no podrá utilizar la Aplicación.",
+        ),
+        sections = listOf(
+            LegalSection("1. Definiciones", listOf(
+                p("Los términos en mayúsculas que se encuentren aquí definidos tendrán los significados que se les atribuyen a continuación."),
+                term("Aplicación", "la aplicación DINEX, disponible para Android y en la web, que permite registrar ingresos y gastos, crear metas de ahorro, consultar reportes y recibir recomendaciones financieras."),
+                term("Cuenta", "el registro personal del Usuario en la Aplicación, creado con un correo electrónico y una contraseña, o mediante una cuenta de Google."),
+                term("Datos Financieros", "los movimientos, metas de ahorro, presupuestos y recordatorios que el Usuario registra en la Aplicación."),
+                term("Dinex IA", "el asistente de la Aplicación que responde consultas sobre las finanzas del Usuario mediante modelos de inteligencia artificial de Google (Gemini)."),
+                term("Usuario", "toda persona natural que crea una Cuenta y utiliza la Aplicación."),
+            )),
+            LegalSection("2. Objeto", listOf(
+                p("DINEX es una aplicación gratuita de finanzas personales que permite al Usuario ordenar sus ingresos y gastos, planificar metas de ahorro, consultar reportes y recibir consejos. La Aplicación funciona en Android y en la web con la misma Cuenta."),
+            )),
+            LegalSection("3. Aceptación y capacidad", listOf(
+                p("Al crear una Cuenta, el Usuario declara que leyó y acepta estos Términos y la Política de Privacidad. Las personas menores de catorce (14) años solo podrán utilizar la Aplicación con la autorización de su madre, padre o tutor."),
+            )),
+            LegalSection("4. Registro y seguridad de la Cuenta", listOf(
+                p("El Usuario se obliga a:"),
+                bullets(
+                    "Registrarse con un correo electrónico real y vigente.",
+                    "Utilizar una contraseña segura y no compartirla con terceros.",
+                    "Cambiar su contraseña mediante la opción “¿Olvidaste tu contraseña?” si sospecha que un tercero accedió a su Cuenta.",
+                ),
+                p("El Usuario es responsable de toda actividad realizada desde su Cuenta."),
+            )),
+            LegalSection("5. Naturaleza de la información", listOf(
+                p("Los consejos, los reportes y las respuestas de Dinex IA tienen carácter orientativo. No constituyen asesoría financiera, legal ni tributaria, y no reemplazan la opinión de un profesional. Las decisiones sobre el dinero del Usuario son de su exclusiva responsabilidad."),
+                p("El uso de Dinex IA está limitado a tres (3) consultas por Usuario al día. El límite se renueva cada día."),
+            )),
+            LegalSection("6. Información de mercado", listOf(
+                p("Los tipos de cambio y los precios de criptomonedas que muestra la Aplicación provienen de servicios públicos de terceros. Son referenciales, pueden presentar retrasos y no deben utilizarse para realizar operaciones. DINEX no compra, vende ni custodia dinero ni criptomonedas."),
+            )),
+            LegalSection("7. Uso permitido", listOf(
+                p("El Usuario se compromete a no utilizar la Aplicación para:"),
+                bullets(
+                    "Realizar actividades ilícitas.",
+                    "Afectar el funcionamiento o la seguridad del servicio.",
+                    "Intentar acceder a Cuentas de otras personas.",
+                    "Eludir los límites de uso de la Aplicación, incluido el de Dinex IA.",
+                ),
+                p("DINEX podrá suspender las Cuentas que incumplan estas reglas."),
+            )),
+            LegalSection("8. Disponibilidad del servicio", listOf(
+                p("DINEX procura que la Aplicación funcione de manera continua; sin embargo, el servicio puede interrumpirse por mantenimiento o por fallas de conexión. Se recomienda al Usuario exportar sus reportes de forma periódica."),
+            )),
+            LegalSection("9. Modificaciones", listOf(
+                p("DINEX podrá modificar estos Términos. Los cambios serán informados en la Aplicación y, cuando sean relevantes, se solicitará al Usuario que los acepte nuevamente."),
+            )),
+            LegalSection("10. Ley aplicable y solución de controversias", listOf(
+                p("Los presentes Términos se rigen por las leyes de la República del Perú, incluida la Ley N.° 29571, Código de Protección y Defensa del Consumidor. Lo anterior no impide que el Usuario acuda al INDECOPI o a las demás entidades competentes para exigir el cumplimiento de sus derechos."),
+            )),
+        ),
     )
 
-    val privacy = listOf(
-        "1. Responsable" to "El responsable de tus datos es Dinex. Cumplimos la Ley N.° 29733, Ley de Protección de Datos Personales, y su Reglamento aprobado por el D.S. N.° 016-2024-JUS.",
-        "2. Qué datos usamos" to "Tu nombre y correo; los movimientos, metas, presupuestos y recordatorios que registras; y, solo si das permiso, la ubicación de cada gasto, fotos de boletas, tu voz y avisos de pago de Yape, Plin o tu banco. Tu contraseña la protege Firebase de Google y Dinex nunca la ve ni la guarda.",
-        "3. Datos sensibles" to "La ley peruana considera tus ingresos económicos como datos sensibles. Por eso pedimos tu consentimiento expreso y por escrito (la casilla al crear tu cuenta) y los protegemos con medidas de seguridad reforzadas.",
-        "4. Para qué los usamos" to "Solo para darte el servicio: guardar y sincronizar tus finanzas, mostrarte reportes, el mapa de calor, alertas de presupuesto, recordatorios y consejos. No vendemos tus datos, no los usamos para publicidad y no los compartimos con bancos ni empresas de cobranza.",
-        "5. Permisos del teléfono" to "Cámara: escanear boletas y poner tu foto. Micrófono: registrar gastos con la voz y \"Oye Dinex\". Ubicación: guardar dónde gastaste para el mapa de calor. Notificaciones: avisarte del presupuesto y recordarte ahorrar. Acceso a notificaciones: leer solo los avisos de pago de Yape, Plin y bancos para registrarlos por ti. Cada permiso es opcional y puedes quitarlo cuando quieras desde los ajustes del teléfono.",
-        "6. Dónde se guardan" to "En tu equipo y en Firebase (Google Cloud): la cuenta en Firebase Authentication y tus datos en Cloud Firestore, en servidores de Santiago de Chile y otros países. Esto es un flujo transfronterizo de datos permitido por la ley, con proveedores que aplican estándares de seguridad internacionales.",
-        "7. Otros servicios" to "El asistente usa Gemini Nano dentro de tu teléfono cuando está disponible. Algunas funciones, como leer boletas, pueden enviar solo la imagen necesaria a Google Gemini. La ilustración de cada meta se crea en tu teléfono, sin internet. El mapa usa OpenStreetMap y el mercado usa servicios públicos de precios; a ellos no les enviamos tu nombre ni tu correo.",
-        "8. Seguridad" to "Toda la información viaja cifrada (HTTPS). Cada cuenta solo puede leer y cambiar sus propios datos gracias a reglas de acceso en Firebase. Las ilustraciones de metas y tu foto de perfil se quedan solo en tu equipo.",
-        "9. Cuánto tiempo" to "Guardamos tus datos mientras tengas la cuenta. Si la eliminas, borramos tu cuenta y tus datos de la nube y de este equipo.",
-        "10. Tus derechos (ARCO)" to "Puedes acceder a tus datos, rectificarlos, cancelarlos u oponerte a su uso. En la app puedes ver y corregir todo, exportar un reporte y eliminar tu cuenta desde Perfil → Eliminar mi cuenta.$contactLine Si no quedas conforme, puedes acudir a la Autoridad Nacional de Protección de Datos Personales del Ministerio de Justicia y Derechos Humanos.",
-        "11. Consentimiento" to "Al marcar la casilla autorizas el tratamiento de tus datos para los fines descritos. Puedes retirar tu consentimiento en cualquier momento eliminando tu cuenta.",
+    val privacy = LegalDocument(
+        screenTitle = "Política de privacidad",
+        title = "Política de Privacidad y Protección de Datos Personales de DINEX",
+        intro = listOf(
+            "DINEX valora a las personas que utilizan la aplicación DINEX (en adelante, la “Aplicación”) y está comprometido con la protección de su privacidad. Como parte de dicho compromiso, ha elaborado la presente Política de Privacidad (en adelante, la “Política”), que describe la manera en que trata la información del Usuario que califica como datos personales.",
+            "Esta Política se rige por la Ley N.° 29733, Ley de Protección de Datos Personales, y su Reglamento, aprobado por el Decreto Supremo N.° 016-2024-JUS.",
+        ),
+        sections = listOf(
+            LegalSection("1. Tratamiento de datos personales", listOf(
+                box("1.1. Responsable del tratamiento",
+                    p("El responsable del tratamiento de los datos personales del Usuario es DINEX."),
+                ),
+                box("1.2. Información que recolectamos",
+                    p("DINEX recolecta la información necesaria para brindar el servicio:"),
+                    bullets(
+                        "Nombres y apellidos.",
+                        "Correo electrónico.",
+                        "Movimientos, metas de ahorro, presupuestos y recordatorios registrados por el Usuario.",
+                        "Cantidad de consultas diarias realizadas a Dinex IA, para aplicar el límite de uso.",
+                    ),
+                    p("Solo con la autorización del Usuario, DINEX también trata:"),
+                    bullets(
+                        "La ubicación de cada gasto.",
+                        "Fotografías de comprobantes de pago.",
+                        "La voz, para registrar gastos por comando de voz.",
+                        "Los avisos de pago de Yape, Plin y bancos recibidos en el teléfono.",
+                    ),
+                    p("La contraseña es protegida por Firebase Authentication (Google). DINEX no tiene acceso a ella ni la almacena."),
+                ),
+                box("1.3. Datos sensibles",
+                    p("La legislación peruana considera los ingresos económicos como datos sensibles. Por ello, DINEX solicita el consentimiento expreso y por escrito del Usuario, mediante la casilla de aceptación al crear la Cuenta, y los protege con medidas de seguridad reforzadas."),
+                ),
+                box("1.4. Finalidades del tratamiento",
+                    p("Los datos personales se utilizan únicamente para:"),
+                    bullets(
+                        "Guardar y sincronizar las finanzas del Usuario entre sus dispositivos.",
+                        "Mostrar reportes, el mapa de calor y las alertas de presupuesto.",
+                        "Enviar recordatorios y consejos de ahorro.",
+                        "Responder las consultas realizadas a Dinex IA.",
+                    ),
+                    p("DINEX no vende los datos del Usuario, no los utiliza con fines publicitarios y no los comparte con bancos ni con empresas de cobranza."),
+                ),
+                box("1.5. Permisos del dispositivo",
+                    bullets(
+                        "Cámara: escanear comprobantes y tomar la foto de perfil.",
+                        "Micrófono: registrar gastos por voz y activar “Oye Dinex”.",
+                        "Ubicación: registrar el lugar de cada gasto para el mapa de calor.",
+                        "Notificaciones: enviar alertas de presupuesto y recordatorios de ahorro.",
+                        "Acceso a notificaciones: leer únicamente los avisos de pago de Yape, Plin y bancos para registrarlos automáticamente.",
+                    ),
+                    p("Cada permiso es opcional y puede retirarse en cualquier momento desde los ajustes del teléfono."),
+                ),
+            )),
+            LegalSection("2. Almacenamiento y seguridad", listOf(
+                box("2.1. Lugar de almacenamiento",
+                    p("La información se guarda en el dispositivo del Usuario y en Firebase (Google Cloud): la Cuenta en Firebase Authentication y los datos en Cloud Firestore, en servidores ubicados en Santiago de Chile y otros países. Ello constituye un flujo transfronterizo de datos permitido por la ley, con proveedores que aplican estándares internacionales de seguridad."),
+                ),
+                box("2.2. Servicios de terceros",
+                    p("Dinex IA utiliza Gemini Nano dentro del teléfono cuando está disponible. Algunas funciones, como la lectura de comprobantes, pueden enviar a Google Gemini únicamente la imagen necesaria. La ilustración de cada meta se genera en el teléfono, sin conexión. El mapa utiliza OpenStreetMap y la información de mercado proviene de servicios públicos de precios; a ninguno de ellos se envía el nombre ni el correo del Usuario."),
+                ),
+                box("2.3. Medidas de seguridad",
+                    p("Toda la información viaja cifrada (HTTPS). Las reglas de acceso de Firebase garantizan que cada Cuenta solo pueda leer y modificar sus propios datos. Las ilustraciones de las metas y la foto de perfil se conservan únicamente en el dispositivo del Usuario."),
+                ),
+                box("2.4. Plazo de conservación",
+                    p("Los datos se conservan mientras la Cuenta permanezca activa. Si el Usuario elimina su Cuenta, DINEX borra la Cuenta y sus datos de la nube y del dispositivo."),
+                ),
+            )),
+            LegalSection("3. Derechos del Usuario", listOf(
+                box("3.1. Derechos ARCO",
+                    p("El Usuario puede ejercer en cualquier momento los derechos de:"),
+                    bullets(
+                        "Acceso: conocer los datos que DINEX trata.",
+                        "Rectificación: corregir datos inexactos o incompletos.",
+                        "Cancelación: solicitar la eliminación de sus datos.",
+                        "Oposición: oponerse al tratamiento de sus datos.",
+                    ),
+                    p("Desde la Aplicación puede ver y corregir su información, exportar un reporte y eliminar su Cuenta en Perfil → Eliminar mi cuenta.$contactLine Si no queda conforme, puede acudir a la Autoridad Nacional de Protección de Datos Personales del Ministerio de Justicia y Derechos Humanos."),
+                ),
+                box("3.2. Consentimiento",
+                    p("Al marcar la casilla de aceptación, el Usuario autoriza el tratamiento de sus datos para las finalidades descritas. Puede revocar su consentimiento en cualquier momento eliminando su Cuenta."),
+                ),
+            )),
+            LegalSection("4. Modificaciones", listOf(
+                p("DINEX podrá actualizar esta Política. Los cambios serán informados en la Aplicación y, cuando sean relevantes, se solicitará al Usuario que la acepte nuevamente."),
+            )),
+        ),
     )
 }
 
-/** Puntos clave que se muestran antes del texto completo. No reemplazan el documento. */
-private val termsSummary = listOf(
-    "Dinex te ayuda a ordenar tus finanzas personales; no es asesoría financiera.",
-    "Eres responsable de tu cuenta y de usar la aplicación de forma correcta.",
-    "Se rige por las leyes del Perú y puedes presentar reclamos ante INDECOPI.",
-)
-private val privacySummary = listOf(
-    "No vendemos tus datos ni los usamos para publicidad.",
-    "Tu información viaja cifrada y solo tu cuenta puede verla.",
-    "Puedes ver, corregir, exportar o eliminar tus datos cuando quieras.",
-)
+// Verde fijo de DINEX para la barra: no cambia con el modo oscuro, así el texto blanco siempre se lee.
+private val LegalBar = Color(0xFF115B38)
 
-/** Pantalla completa con los Términos y la Política de Privacidad, con formato de documento. */
+/** Pantalla completa con los Términos o la Política de Privacidad, con formato de documento formal. */
 @Composable
 internal fun LegalDialog(initialTab: Int = 0, onDismiss: () -> Unit) {
     var tab by remember { mutableIntStateOf(initialTab.coerceIn(0, 1)) }
+    val document = if (tab == 0) DinexLegal.terms else DinexLegal.privacy
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
     LaunchedEffect(tab) { listState.scrollToItem(0) }
-    val sections = if (tab == 0) DinexLegal.terms else DinexLegal.privacy
     Dialog(onDismissRequest = onDismiss, properties = fullScreenDialogProperties()) {
-        Surface(Modifier.fillMaxSize(), color = AppBg) {
-            Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-                // Barra superior
-                Row(Modifier.fillMaxWidth().background(Card).padding(start = 4.dp, end = 16.dp, top = 6.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) { Icon(DinexNavigationIcons.Back, "Volver", tint = Night) }
-                    Column(Modifier.weight(1f)) {
-                        Text("Información legal", color = Night, fontWeight = FontWeight.SemiBold, fontSize = 17.sp)
-                        Text("DINEX · República del Perú", color = Gray, fontSize = 11.sp)
+        Surface(Modifier.fillMaxSize(), color = Card) {
+            Column(Modifier.fillMaxSize()) {
+                // Barra superior verde con título centrado.
+                Box(Modifier.fillMaxWidth().background(LegalBar).statusBarsPadding().height(56.dp), contentAlignment = Alignment.Center) {
+                    IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterStart).padding(start = 4.dp)) {
+                        Icon(DinexNavigationIcons.Back, "Volver", tint = Color.White)
                     }
+                    Text(document.screenTitle, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Medium)
                 }
-                LegalTabs(tab) { tab = it }
-                HorizontalDivider(color = Border)
-
                 LazyColumn(
-                    Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).align(Alignment.CenterHorizontally),
+                    Modifier.weight(1f).fillMaxWidth().widthIn(max = 720.dp).align(Alignment.CenterHorizontally).navigationBarsPadding(),
                     state = listState,
-                    contentPadding = PaddingValues(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 32.dp),
+                    contentPadding = PaddingValues(start = 22.dp, end = 22.dp, top = 24.dp, bottom = 36.dp),
                 ) {
-                    item(key = "header-$tab") {
-                        Text(
-                            if (tab == 0) "TÉRMINOS Y CONDICIONES" else "POLÍTICA DE PRIVACIDAD",
-                            color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.6.sp,
-                        )
-                        Spacer(Modifier.height(8.dp))
-                        Text(
-                            if (tab == 0) "Términos y condiciones de uso" else "Política de privacidad y protección de datos personales",
-                            color = Night, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 31.sp,
-                        )
-                        Spacer(Modifier.height(18.dp))
-                        LegalFacts(
-                            listOf(
-                                "Versión" to DinexLegal.VERSION,
-                                "Vigente desde" to DinexLegal.UPDATED,
-                                "Normativa" to if (tab == 0) "Ley N.° 29571" else "Ley N.° 29733 y D.S. N.° 016-2024-JUS",
-                            ),
-                        )
-                        Spacer(Modifier.height(20.dp))
-                    }
-                    item(key = "summary-$tab") {
-                        LegalSummary(if (tab == 0) termsSummary else privacySummary)
-                        Spacer(Modifier.height(28.dp))
-                    }
-                    item(key = "index-$tab") {
-                        Text("CONTENIDO", color = Gray, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 1.4.sp)
+                    item(key = "title-$tab") {
+                        Text(document.title, color = Night, fontSize = 25.sp, lineHeight = 31.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(6.dp))
-                        sections.forEachIndexed { index, (title, _) ->
-                            val (number, name) = legalHeading(title, index)
-                            Row(
-                                Modifier.fillMaxWidth()
-                                    .clickable(onClickLabel = "Ir a $name") { scope.launch { listState.animateScrollToItem(3 + index) } }
-                                    .padding(vertical = 9.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                            ) {
-                                Text(number, color = Gray, fontSize = 13.sp, modifier = Modifier.width(34.dp))
-                                Text(name, color = NightSoft, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                            }
-                        }
+                        Text("Última actualización: ${DinexLegal.UPDATED}", color = Gray, fontSize = 12.sp)
                         Spacer(Modifier.height(18.dp))
-                        HorizontalDivider(color = Border)
+                        document.intro.forEach { LegalParagraph(it); Spacer(Modifier.height(14.dp)) }
                     }
-                    itemsIndexed(sections, key = { index, _ -> "section-$tab-$index" }) { index, (title, body) ->
-                        val (number, name) = legalHeading(title, index)
-                        Column(Modifier.fillMaxWidth().padding(vertical = 22.dp)) {
-                            Row(verticalAlignment = Alignment.Top) {
-                                Text(number, color = GreenDark, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(34.dp).padding(top = 1.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text(name, color = Night, fontSize = 17.sp, fontWeight = FontWeight.SemiBold, lineHeight = 23.sp)
-                                    Spacer(Modifier.height(8.dp))
-                                    Text(body, color = NightSoft, fontSize = 14.sp, lineHeight = 22.sp)
-                                }
-                            }
-                        }
-                        if (index < sections.lastIndex) HorizontalDivider(color = Border, modifier = Modifier.padding(start = 34.dp))
+                    items(document.sections, key = { "$tab-${it.title}" }) { section ->
+                        Text(section.title.uppercase(), color = Night, fontSize = 14.sp, fontWeight = FontWeight.Bold, lineHeight = 20.sp,
+                            modifier = Modifier.padding(top = 14.dp, bottom = 12.dp))
+                        LegalBlocks(section.blocks)
                     }
                     item(key = "footer-$tab") {
+                        Spacer(Modifier.height(24.dp))
                         HorizontalDivider(color = Border)
-                        Spacer(Modifier.height(18.dp))
+                        Spacer(Modifier.height(16.dp))
+                        Text("Versión ${DinexLegal.VERSION} · Vigente desde el ${DinexLegal.UPDATED}", color = Gray, fontSize = 12.sp)
+                        Spacer(Modifier.height(10.dp))
                         Text(
-                            "Este documento se elaboró conforme a la legislación peruana vigente. Ante cualquier diferencia, prevalece el texto completo sobre el resumen.",
-                            color = Gray, fontSize = 12.sp, lineHeight = 18.sp,
+                            if (tab == 0) "Ver la Política de privacidad" else "Ver los Términos y condiciones",
+                            color = GreenDark, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, textDecoration = TextDecoration.Underline,
+                            modifier = Modifier.clickable { tab = 1 - tab }.padding(vertical = 6.dp),
                         )
-                        Spacer(Modifier.height(6.dp))
-                        Text("Versión ${DinexLegal.VERSION} · Actualizado el ${DinexLegal.UPDATED}", color = Gray, fontSize = 12.sp)
                     }
                 }
-
-                // Barra inferior
-                HorizontalDivider(color = Border)
-                Box(Modifier.fillMaxWidth().background(Card).padding(horizontal = 20.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
-                    Button(
-                        onClick = onDismiss,
-                        modifier = Modifier.fillMaxWidth().widthIn(max = 720.dp).height(48.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
-                    ) { Text("Entendido", fontWeight = FontWeight.SemiBold, fontSize = 15.sp) }
-                }
             }
         }
     }
 }
 
-/** "1. Qué es Dinex" → ("01", "Qué es Dinex"). */
-private fun legalHeading(title: String, index: Int): Pair<String, String> {
-    val match = Regex("^(\\d+)\\.\\s*(.*)$").find(title)
-    val number = match?.groupValues?.get(1)?.toIntOrNull() ?: (index + 1)
-    return number.toString().padStart(2, '0') to (match?.groupValues?.get(2) ?: title)
-}
-
-/** Pestañas sobrias con línea inferior, como las de un documento. */
 @Composable
-private fun LegalTabs(selected: Int, onSelect: (Int) -> Unit) {
-    Row(Modifier.fillMaxWidth().background(Card).padding(horizontal = 12.dp)) {
-        listOf("Términos de uso", "Privacidad").forEachIndexed { index, label ->
-            val active = selected == index
-            Column(
-                Modifier.weight(1f).clickable(onClickLabel = "Ver $label") { onSelect(index) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(
-                    label, color = if (active) Night else Gray, fontSize = 14.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                    modifier = Modifier.padding(top = 10.dp, bottom = 10.dp),
+private fun LegalBlocks(blocks: List<LegalBlock>) {
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        blocks.forEach { block ->
+            when (block) {
+                is LegalBlock.Paragraph -> LegalParagraph(block.text)
+                is LegalBlock.Bullets -> LegalBulletList(block.items)
+                is LegalBlock.Definition -> Text(
+                    buildAnnotatedString {
+                        withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = Night)) { append(block.term) }
+                        append(": ")
+                        append(legalText(block.text))
+                    },
+                    color = NightSoft, fontSize = 15.sp, lineHeight = 23.sp, fontStyle = FontStyle.Italic, textAlign = TextAlign.Justify,
                 )
-                Box(Modifier.fillMaxWidth(0.6f).height(2.dp).background(if (active) GreenDark else Color.Transparent, RoundedCornerShape(1.dp)))
-            }
-        }
-    }
-}
-
-/** Ficha con versión, vigencia y normativa. */
-@Composable
-private fun LegalFacts(facts: List<Pair<String, String>>) {
-    Column(Modifier.fillMaxWidth().border(1.dp, Border, RoundedCornerShape(12.dp)).background(Card, RoundedCornerShape(12.dp))) {
-        facts.forEachIndexed { index, (label, value) ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(label, color = Gray, fontSize = 13.sp, modifier = Modifier.width(110.dp))
-                Text(value, color = Night, fontSize = 13.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
-            }
-            if (index < facts.lastIndex) HorizontalDivider(color = Border, modifier = Modifier.padding(horizontal = 16.dp))
-        }
-    }
-}
-
-/** Resumen con una línea vertical a la izquierda, sin colores llamativos. */
-@Composable
-private fun LegalSummary(points: List<String>) {
-    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(CardRaised, RoundedCornerShape(12.dp))) {
-        Box(Modifier.width(3.dp).fillMaxHeight().background(GreenDark, RoundedCornerShape(topStart = 12.dp, bottomStart = 12.dp)))
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text("En resumen", color = Night, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            points.forEach { point ->
-                Row(verticalAlignment = Alignment.Top) {
-                    Box(Modifier.padding(top = 8.dp).size(4.dp).background(GreenDark, CircleShape))
-                    Spacer(Modifier.width(10.dp))
-                    Text(point, color = NightSoft, fontSize = 13.sp, lineHeight = 19.sp)
+                is LegalBlock.Box -> Column(Modifier.fillMaxWidth().border(1.dp, Border, RoundedCornerShape(14.dp))) {
+                    Text(block.title, color = Night, fontSize = 16.sp, fontWeight = FontWeight.Bold, lineHeight = 22.sp,
+                        modifier = Modifier.padding(horizontal = 18.dp, vertical = 15.dp))
+                    HorizontalDivider(color = Border)
+                    Box(Modifier.padding(horizontal = 18.dp, vertical = 16.dp)) { LegalBlocks(block.blocks) }
                 }
+            }
+        }
+    }
+}
+
+/** Evita que "N.° 29733" quede partido en dos líneas. */
+private fun legalText(text: String) = text.replace("N.° ", "N.\u2060°\u00A0")
+
+@Composable
+private fun LegalParagraph(text: String) {
+    Text(legalText(text), color = NightSoft, fontSize = 15.sp, lineHeight = 23.sp, textAlign = TextAlign.Justify)
+}
+
+@Composable
+private fun LegalBulletList(items: List<String>) {
+    Column(Modifier.padding(start = 6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        items.forEach { item ->
+            Row {
+                Text("•", color = Night, fontSize = 15.sp, lineHeight = 23.sp, modifier = Modifier.width(20.dp))
+                Text(legalText(item), color = NightSoft, fontSize = 15.sp, lineHeight = 23.sp)
             }
         }
     }
