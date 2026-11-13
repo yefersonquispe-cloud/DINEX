@@ -62,3 +62,29 @@ globalThis.dinexHttp = {
       .catch(function (error) { onError(String((error && error.message) || error)); });
   }
 };
+
+/* Google OAuth sends only its short-lived access token to Firebase Authentication. */
+globalThis.dinexGoogle = {
+  request: function (clientId, onToken, onError) {
+    if (!globalThis.google || !google.accounts || !google.accounts.oauth2) {
+      onError('GOOGLE_NOT_READY');
+      return;
+    }
+    try {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'openid email profile',
+        callback: function (response) {
+          if (response && response.access_token) onToken(response.access_token);
+          else onError((response && response.error) || 'GOOGLE_CREDENTIAL_INVALID');
+        },
+        error_callback: function (error) {
+          onError(error && error.type === 'popup_closed' ? 'CANCELLED' : 'GOOGLE_POPUP_ERROR');
+        }
+      });
+      client.requestAccessToken({ prompt: 'select_account' });
+    } catch (_) {
+      onError('GOOGLE_POPUP_ERROR');
+    }
+  }
+};
