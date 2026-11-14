@@ -2,6 +2,7 @@
 
 package com.example.dinex
 
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -39,6 +40,10 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
@@ -61,6 +66,7 @@ import dinex.shared.generated.resources.dinex_app_icon
 import dinex.shared.generated.resources.manrope
 import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.painterResource
+import kotlinx.coroutines.launch
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
@@ -86,6 +92,8 @@ internal enum class WebPage(val title: String, val subtitle: String) {
     GOALS("Metas", "Ahorro con propósito"),
     ANALYSIS("Análisis", "Patrones y tendencias de tus gastos"),
     ASSISTANT("Dinex IA", "Pregunta lo que quieras sobre tus finanzas"),
+    MARKET("Mercado", "Tipos de cambio, metales y criptomonedas"),
+    TIPS("Consejos", "Recomendaciones según tus números"),
 }
 
 private fun WebPage.icon(): ImageVector = when (this) {
@@ -95,6 +103,8 @@ private fun WebPage.icon(): ImageVector = when (this) {
     WebPage.GOALS -> DinexNavigationIcons.Target
     WebPage.ANALYSIS -> DinexNavigationIcons.Analysis
     WebPage.ASSISTANT -> DinexNavigationIcons.Sparkle
+    WebPage.MARKET -> DinexNavigationIcons.Market
+    WebPage.TIPS -> DinexNavigationIcons.Tips
 }
 
 /** Acciones que abren los mismos diálogos de la app (registrar, ahorrar, importar…). */
@@ -225,9 +235,18 @@ internal fun WebWorkspace(
                         WebPage.BUDGET -> BudgetWebPage(model, data, actions)
                         WebPage.GOALS -> GoalsWebPage(data, actions)
                         WebPage.ANALYSIS -> AnalysisWebPage(data.movements, actions)
-                        WebPage.ASSISTANT -> PageFrame(scroll = false) {
-                            Box(Modifier.fillMaxSize().clip(CardShape).background(W.surface).border(1.dp, W.line, CardShape)) { assistant() }
-                        }
+                        WebPage.ASSISTANT -> assistant()
+                        // Mercado y Consejos se muestran dentro del escritorio, sin tapar la barra lateral.
+                        WebPage.MARKET -> MarketScreen(onClose = { page = WebPage.SUMMARY })
+                        WebPage.TIPS -> TipsScreen(data, onClose = { page = WebPage.SUMMARY }, onAction = { action ->
+                            when (action) {
+                                TipAction.AddMovement -> actions.onExpense()
+                                TipAction.Save -> actions.onSave(null)
+                                TipAction.Plan -> page = WebPage.BUDGET
+                                TipAction.Analysis -> page = WebPage.ANALYSIS
+                                TipAction.Assistant -> page = WebPage.ASSISTANT
+                            }
+                        })
                     }
                 }
             }
@@ -277,14 +296,15 @@ private fun WebSidebar(
         NewMovementButton(compact, actions)
         Spacer(Modifier.height(26.dp))
         if (!compact) SidebarLabel("PRINCIPAL")
-        WebPage.entries.filter { it != WebPage.ASSISTANT }.forEach { item ->
+        WebPage.entries.take(5).forEach { item ->
             SidebarItem(item.title, item.icon(), page == item, compact) { onSelect(item) }
         }
         Spacer(Modifier.height(18.dp))
         if (!compact) SidebarLabel("HERRAMIENTAS")
         SidebarItem(WebPage.ASSISTANT.title, WebPage.ASSISTANT.icon(), page == WebPage.ASSISTANT, compact) { onSelect(WebPage.ASSISTANT) }
-        SidebarItem("Mercado", DinexNavigationIcons.Market, false, compact, onClick = actions.onMarket)
-        SidebarItem("Consejos", DinexNavigationIcons.Tips, false, compact, onClick = actions.onTips)
+        listOf(WebPage.MARKET, WebPage.TIPS).forEach { item ->
+            SidebarItem(item.title, item.icon(), page == item, compact) { onSelect(item) }
+        }
         Spacer(Modifier.weight(1f))
         // Usuario
         val shape = RoundedCornerShape(12.dp)
@@ -550,17 +570,34 @@ private fun EmptyNote(title: String, body: String, action: String? = null, onAct
     }
 }
 
-/** Dos columnas en pantallas anchas; una sola columna cuando no alcanza el espacio. */
+/**
+ * Dos columnas en pantallas anchas; una sola columna cuando no alcanza el espacio.
+ * Con [equalHeight], ambas columnas miden lo mismo y la tarjeta que recibe `stretch`
+ * se estira para que no queden huecos en blanco.
+ */
 @Composable
-private fun Columns(ratio: Float = 1.6f, gap: Dp = 20.dp, left: @Composable ColumnScope.() -> Unit, right: @Composable ColumnScope.() -> Unit) {
+private fun Columns(
+    ratio: Float = 1.6f,
+    gap: Dp = 20.dp,
+    equalHeight: Boolean = true,
+    left: @Composable ColumnScope.(stretch: Modifier) -> Unit,
+    right: @Composable ColumnScope.(stretch: Modifier) -> Unit,
+) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         if (maxWidth >= 860.dp) {
-            Row(horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.Top) {
-                Column(Modifier.weight(ratio), verticalArrangement = Arrangement.spacedBy(gap), content = left)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(gap), content = right)
+            Row(
+                Modifier.fillMaxWidth().then(if (equalHeight) Modifier.height(IntrinsicSize.Max) else Modifier),
+                horizontalArrangement = Arrangement.spacedBy(gap), verticalAlignment = Alignment.Top,
+            ) {
+                Column(Modifier.weight(ratio).then(if (equalHeight) Modifier.fillMaxHeight() else Modifier), verticalArrangement = Arrangement.spacedBy(gap)) {
+                    left(if (equalHeight) Modifier.weight(1f) else Modifier)
+                }
+                Column(Modifier.weight(1f).then(if (equalHeight) Modifier.fillMaxHeight() else Modifier), verticalArrangement = Arrangement.spacedBy(gap)) {
+                    right(if (equalHeight) Modifier.weight(1f) else Modifier)
+                }
             }
         } else {
-            Column(verticalArrangement = Arrangement.spacedBy(gap)) { left(); right() }
+            Column(verticalArrangement = Arrangement.spacedBy(gap)) { left(Modifier); right(Modifier) }
         }
     }
 }
@@ -578,31 +615,31 @@ private fun SummaryPage(data: FinancialData, actions: WebActions, onNavigate: (W
     val monthIncome = month.filter { it.income }.sumOf { it.amount }
     val monthExpense = month.filterNot { it.income }.sumOf { it.amount }
     PageFrame {
-        Columns(ratio = 1.55f, left = {
-            BalanceHero(available, monthIncome, monthExpense, data.savings, month, today, actions)
-        }, right = {
+        Columns(ratio = 1.55f, left = { stretch ->
+            BalanceHero(available, monthIncome, monthExpense, data.savings, month, today, actions, stretch)
+        }, right = { stretch ->
             TodayCard(movements.filter { !it.income && it.isToday() }.sumOf { it.amount }, data.dailyLimit.toDouble(), data.activeStreak(),
-                data.streakDay == currentDayIndex(), actions) { onNavigate(WebPage.BUDGET) }
+                data.streakDay == currentDayIndex(), actions, stretch) { onNavigate(WebPage.BUDGET) }
         })
-        Columns(ratio = 1.55f, left = {
-            DailySpendingCard(month, today.year, today.month)
-        }, right = {
-            CategoryDonutCard(month.filterNot { it.income })
+        Columns(ratio = 1.55f, left = { stretch ->
+            DailySpendingCard(month, today.year, today.month, stretch)
+        }, right = { stretch ->
+            CategoryDonutCard(month.filterNot { it.income }, stretch)
         })
-        Columns(ratio = 1.55f, left = {
-            RecentMovementsCard(movements.sortedWith(compareByDescending<Movement> { it.epochDay() }.thenByDescending { it.id }).take(7)) { onNavigate(WebPage.MOVEMENTS) }
-        }, right = {
+        Columns(ratio = 1.55f, left = { stretch ->
+            RecentMovementsCard(movements.sortedWith(compareByDescending<Movement> { it.epochDay() }.thenByDescending { it.id }).take(7), stretch) { onNavigate(WebPage.MOVEMENTS) }
+        }, right = { stretch ->
             GoalsCompactCard(data.savingGoals(), actions) { onNavigate(WebPage.GOALS) }
-            RemindersCard(data.reminders, actions)
+            RemindersCard(data.reminders, actions, stretch)
         })
     }
 }
 
 @Composable
-private fun BalanceHero(available: Double, monthIncome: Double, monthExpense: Double, savings: Double, month: List<Movement>, today: DinexDate, actions: WebActions) {
+private fun BalanceHero(available: Double, monthIncome: Double, monthExpense: Double, savings: Double, month: List<Movement>, today: DinexDate, actions: WebActions, modifier: Modifier = Modifier) {
     val shape = CardShape
     Column(
-        Modifier.fillMaxWidth().clip(shape).background(Brush.linearGradient(listOf(W.forest, W.forest2))).drawBehind {
+        modifier.fillMaxWidth().clip(shape).background(Brush.linearGradient(listOf(W.forest, W.forest2))).drawBehind {
             // Cuadrícula sutil de fondo.
             val step = 28.dp.toPx()
             var x = step
@@ -622,7 +659,7 @@ private fun BalanceHero(available: Double, monthIncome: Double, monthExpense: Do
         val net = month.sumOf { if (it.income) it.amount else -it.amount }
         val base = available + savings - net
         val points = (1..today.day).map { day -> base + month.filter { it.day <= day }.sumOf { if (it.income) it.amount else -it.amount } }
-        Sparkline(points, Modifier.fillMaxWidth().height(56.dp))
+        Sparkline(points, Modifier.fillMaxWidth().weight(1f).heightIn(min = 56.dp))
         Spacer(Modifier.height(18.dp))
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             HeroStat("Ingresos del mes", "+ ${moneyGrouped(monthIncome)}", Color(0xFF8BE3B4), Modifier.weight(1f))
@@ -631,10 +668,10 @@ private fun BalanceHero(available: Double, monthIncome: Double, monthExpense: Do
             Box(Modifier.width(1.dp).fillMaxHeight().background(Color.White.copy(alpha = .12f)))
             HeroStat("Ahorrado", moneyGrouped(savings), W.lime, Modifier.weight(1f).padding(start = 18.dp))
         }
-        Spacer(Modifier.height(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Spacer(Modifier.height(22.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
             Row(
-                Modifier.height(40.dp).clip(RoundedCornerShape(10.dp)).background(W.lime).clickable(onClick = actions.onExpense)
+                Modifier.height(42.dp).clip(RoundedCornerShape(10.dp)).background(W.lime).clickable(onClick = actions.onExpense)
                     .pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -643,7 +680,7 @@ private fun BalanceHero(available: Double, monthIncome: Double, monthExpense: Do
                 Text("Registrar gasto", color = W.forest, fontSize = 13.sp, fontWeight = FontWeight.Bold)
             }
             Row(
-                Modifier.height(40.dp).clip(RoundedCornerShape(10.dp)).border(1.dp, Color.White.copy(alpha = .25f), RoundedCornerShape(10.dp))
+                Modifier.height(42.dp).clip(RoundedCornerShape(10.dp)).border(1.dp, Color.White.copy(alpha = .25f), RoundedCornerShape(10.dp))
                     .clickable(onClick = actions.onIncome).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -682,8 +719,8 @@ private fun Sparkline(points: List<Double>, modifier: Modifier) {
 }
 
 @Composable
-private fun TodayCard(spent: Double, limit: Double, streak: Int, savedToday: Boolean, actions: WebActions, onBudget: () -> Unit) {
-    WCard(Modifier.fillMaxWidth()) {
+private fun TodayCard(spent: Double, limit: Double, streak: Int, savedToday: Boolean, actions: WebActions, modifier: Modifier = Modifier, onBudget: () -> Unit) {
+    WCard(modifier.fillMaxWidth()) {
         CardTitle("Gasto de hoy", "Límite diario ${moneyGrouped(limit)}") { LinkButton("Ajustar", onBudget) }
         Spacer(Modifier.height(16.dp))
         val progress = if (limit > 0) (spent / limit).toFloat() else 0f
@@ -713,7 +750,7 @@ private fun TodayCard(spent: Double, limit: Double, streak: Int, savedToday: Boo
                 )
             }
         }
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
         HorizontalDivider(color = W.line)
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -730,20 +767,20 @@ private fun TodayCard(spent: Double, limit: Double, streak: Int, savedToday: Boo
 }
 
 @Composable
-private fun DailySpendingCard(month: List<Movement>, year: Int, monthNumber: Int) {
+private fun DailySpendingCard(month: List<Movement>, year: Int, monthNumber: Int, modifier: Modifier = Modifier) {
     val days = daysInMonth(year, monthNumber)
     val today = civilDateFromEpochDays().day
     val values = (1..days).map { d -> month.filter { !it.income && it.day == d }.sumOf { it.amount } }
     val total = values.sum()
     val average = if (today > 0) values.take(today).sum() / today else 0.0
     var hover by remember { mutableStateOf<Int?>(null) }
-    WCard(Modifier.fillMaxWidth()) {
+    WCard(modifier.fillMaxWidth()) {
         CardTitle("Gasto diario", "${currentMonthName(monthNumber)} · total ${moneyGrouped(total)} · promedio ${moneyGrouped(average)} por día")
         Spacer(Modifier.height(18.dp))
         val measurer = rememberTextMeasurer()
         val labelStyle = TextStyle(color = W.ink3, fontSize = 10.sp, fontFamily = MaterialTheme.typography.bodySmall.fontFamily)
         val brand = W.brand; val faded = W.line; val ink = W.ink; val lime = W.lime; val ink3 = W.ink3
-        Box(Modifier.fillMaxWidth().height(200.dp)) {
+        Box(Modifier.fillMaxWidth().weight(1f).heightIn(min = 200.dp)) {
             Canvas(
                 Modifier.fillMaxSize().pointerInput(days) {
                     awaitPointerEventScope {
@@ -823,10 +860,10 @@ private fun Legend(color: Color, label: String, dashed: Boolean = false) {
 }
 
 @Composable
-private fun CategoryDonutCard(expenses: List<Movement>) {
+private fun CategoryDonutCard(expenses: List<Movement>, modifier: Modifier = Modifier) {
     val total = expenses.sumOf { it.amount }
     val groups = expenses.groupBy { it.category }.map { (name, list) -> name to list.sumOf { it.amount } }.sortedByDescending { it.second }
-    WCard(Modifier.fillMaxWidth()) {
+    WCard(modifier.fillMaxWidth()) {
         CardTitle("Gastos por categoría", "Este mes")
         Spacer(Modifier.height(18.dp))
         if (groups.isEmpty()) { EmptyNote("Sin gastos este mes", "Cuando registres un gasto verás aquí en qué se va tu dinero."); return@WCard }
@@ -863,8 +900,8 @@ private fun CategoryDonutCard(expenses: List<Movement>) {
 }
 
 @Composable
-private fun RecentMovementsCard(items: List<Movement>, onAll: () -> Unit) {
-    WCard(Modifier.fillMaxWidth(), padding = 0.dp) {
+private fun RecentMovementsCard(items: List<Movement>, modifier: Modifier = Modifier, onAll: () -> Unit) {
+    WCard(modifier.fillMaxWidth(), padding = 0.dp) {
         Box(Modifier.padding(start = 22.dp, end = 14.dp, top = 18.dp, bottom = 8.dp)) {
             CardTitle("Últimos movimientos", "Los más recientes primero") { LinkButton("Ver todos", onAll) }
         }
@@ -914,12 +951,20 @@ private fun GoalsCompactCard(goals: List<SavingsGoal>, actions: WebActions, onAl
 }
 
 @Composable
-private fun RemindersCard(reminders: List<PaymentReminder>, actions: WebActions) {
-    WCard(Modifier.fillMaxWidth()) {
+private fun RemindersCard(reminders: List<PaymentReminder>, actions: WebActions, modifier: Modifier = Modifier) {
+    WCard(modifier.fillMaxWidth()) {
         CardTitle("Próximos pagos", if (reminders.isEmpty()) "Sin pagos pendientes" else "${reminders.size} pendientes") {
             IconSquare(DinexNavigationIcons.Add, "Agregar recordatorio", actions.onAddReminder)
         }
-        if (reminders.isNotEmpty()) Spacer(Modifier.height(10.dp))
+        if (reminders.isEmpty()) {
+            Column(Modifier.fillMaxWidth().weight(1f).heightIn(min = 96.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                Icon(DinexNavigationIcons.Bell, null, tint = W.ink3, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.height(8.dp))
+                Text("Agrega tus pagos fijos y DINEX te los recordará.", color = W.ink3, fontSize = 12.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(12.dp))
+                WButton("Agregar recordatorio", DinexNavigationIcons.Add, onClick = actions.onAddReminder)
+            }
+        } else Spacer(Modifier.height(10.dp))
         reminders.sortedBy { it.date }.take(4).forEach { reminder ->
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(W.surfaceAlt).border(1.dp, W.line, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
@@ -1094,7 +1139,7 @@ private fun BudgetWebPage(model: DinexViewModel, data: FinancialData, actions: W
     var editor by remember { mutableStateOf(false) }
     val spentToday = data.movements.filter { !it.income && it.isToday() }.sumOf { it.amount }
     PageFrame {
-        Columns(ratio = 1f, left = {
+        Columns(ratio = 1f, left = { stretch ->
             WCard(Modifier.fillMaxWidth()) {
                 CardTitle("Límite diario", "Lo máximo que quieres gastar en un día")
                 Spacer(Modifier.height(16.dp))
@@ -1121,9 +1166,9 @@ private fun BudgetWebPage(model: DinexViewModel, data: FinancialData, actions: W
                 Spacer(Modifier.height(10.dp))
                 Text("Al mes son ${moneyGrouped(data.dailyLimit * 30.0)} como máximo.", color = W.ink3, fontSize = 12.sp)
             }
-            RemindersCard(data.reminders, actions)
-        }, right = {
-            WCard(Modifier.fillMaxWidth()) {
+            RemindersCard(data.reminders, actions, stretch)
+        }, right = { stretch ->
+            WCard(stretch.fillMaxWidth()) {
                 CardTitle("Presupuesto por categoría", "${currentMonthName()} · sugerido según tus ingresos e historial") {
                     WButton("Editar límites", DinexNavigationIcons.Settings) { editor = true }
                 }
@@ -1262,12 +1307,12 @@ private fun AnalysisWebPage(movements: List<Movement>, actions: WebActions) {
                 else -> "-${percentLabel(previous - expense, previous)} en gastos"
             }, if (previous > 0 && expense > previous) W.negative else W.ink, Modifier.weight(1f))
         }
-        Columns(ratio = 1.4f, left = {
-            MonthlyComparisonCard(movements, selected)
-        }, right = {
-            WeekdayCard(expenses)
+        Columns(ratio = 1.4f, left = { stretch ->
+            MonthlyComparisonCard(movements, selected, stretch)
+        }, right = { stretch ->
+            WeekdayCard(expenses, stretch)
         })
-        Columns(ratio = 1f, left = {
+        Columns(ratio = 1f, equalHeight = false, left = {
             CategoryTableCard(expenses)
         }, right = {
             WCard(Modifier.fillMaxWidth()) {
@@ -1282,19 +1327,19 @@ private fun AnalysisWebPage(movements: List<Movement>, actions: WebActions) {
 }
 
 @Composable
-private fun MonthlyComparisonCard(movements: List<Movement>, selected: Int) {
+private fun MonthlyComparisonCard(movements: List<Movement>, selected: Int, modifier: Modifier = Modifier) {
     val keys = (selected - 5..selected).toList()
     val series = keys.map { key ->
         val list = movements.filter { it.monthKey() == key }
         list.filter { it.income }.sumOf { it.amount } to list.filterNot { it.income }.sumOf { it.amount }
     }
-    WCard(Modifier.fillMaxWidth()) {
+    WCard(modifier.fillMaxWidth()) {
         CardTitle("Ingresos y gastos", "Últimos 6 meses")
         Spacer(Modifier.height(18.dp))
         val measurer = rememberTextMeasurer()
         val labelStyle = TextStyle(color = W.ink3, fontSize = 10.sp, fontFamily = MaterialTheme.typography.bodySmall.fontFamily)
         val positive = W.brand; val negative = W.negative; val line = W.line
-        Canvas(Modifier.fillMaxWidth().height(220.dp)) {
+        Canvas(Modifier.fillMaxWidth().weight(1f).heightIn(min = 220.dp)) {
             val left = 48.dp.toPx(); val bottom = size.height - 22.dp.toPx(); val top = 6.dp.toPx()
             val top0 = niceTop(max(series.maxOf { max(it.first, it.second) }, 1.0))
             for (i in 0..4) {
@@ -1321,13 +1366,13 @@ private fun MonthlyComparisonCard(movements: List<Movement>, selected: Int) {
 }
 
 @Composable
-private fun WeekdayCard(expenses: List<Movement>) {
+private fun WeekdayCard(expenses: List<Movement>, modifier: Modifier = Modifier) {
     val names = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
     val totals = DoubleArray(7)
     expenses.forEach { totals[((it.epochDay() % 7) + 7 + 3) % 7] += it.amount }
     val top = totals.maxOrNull()?.takeIf { it > 0 } ?: 1.0
     val busiest = totals.indices.maxByOrNull { totals[it] } ?: 0
-    WCard(Modifier.fillMaxWidth()) {
+    WCard(modifier.fillMaxWidth()) {
         CardTitle("Por día de la semana", if (expenses.isEmpty()) "Sin gastos en el mes" else "Gastas más los ${weekdayName(busiest + 4).lowercase()}")
         Spacer(Modifier.height(16.dp))
         names.forEachIndexed { i, name ->
@@ -1480,5 +1525,260 @@ private fun ShowcasePreview() {
         Row(Modifier.align(Alignment.TopEnd).offset(y = (-14).dp), horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
             listOf(2, 4, 14).forEach { index -> StreakBadge(streakLevels[index], 54.dp) }
         }
+    }
+}
+
+// ---------------------------------------------------------------- Dinex IA (web)
+
+/** Chat de Dinex IA para la web: conversación a la izquierda y contexto y consultas a la derecha. */
+@Composable
+internal fun WebAssistantPage(
+    assistant: GeminiAssistant,
+    data: FinancialData,
+    messages: androidx.compose.runtime.snapshots.SnapshotStateList<ChatMessage>,
+    queriesLeft: () -> Int,
+    syncQueriesLeft: suspend () -> Int,
+    onQueryUsed: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    var draft by remember { mutableStateOf("") }
+    var loading by remember { mutableStateOf(false) }
+    var remaining by remember { mutableIntStateOf(queriesLeft()) }
+    LaunchedEffect(Unit) { remaining = syncQueriesLeft() }
+    LaunchedEffect(messages.size, loading) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1 + if (loading) 1 else 0) }
+    val movements = data.movements
+    val streak = data.activeStreak()
+
+    fun send(question: String) {
+        val clean = question.trim()
+        if (clean.isBlank() || loading) return
+        loading = true
+        scope.launch {
+            remaining = syncQueriesLeft()
+            if (remaining <= 0) {
+                messages.add(ChatMessage("Ya usaste tus $DAILY_AI_QUERIES consultas de hoy. Mañana podrás hacer $DAILY_AI_QUERIES preguntas más a Dinex IA.", user = false, error = true))
+                loading = false
+                return@launch
+            }
+            messages.add(ChatMessage(clean, user = true))
+            draft = ""
+            val reply = runCatching {
+                assistant.ask(clean, buildFinancialContext(movements, data.dailyLimit, streak, data.savings, data.categoryBudgets))
+            }.getOrElse { GeminiReply("No pude conectarme. Inténtalo de nuevo.", successful = false, engine = GeminiEngine.NONE) }
+            if (reply.successful) { onQueryUsed(); remaining = queriesLeft() }
+            messages.add(ChatMessage(reply.text, user = false, error = !reply.successful, engine = reply.engine))
+            loading = false
+        }
+    }
+
+    PageFrame(scroll = false) {
+        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
+            val side = maxWidth >= 980.dp
+            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                // Conversación
+                Column(Modifier.weight(1f).fillMaxHeight().clip(CardShape).background(W.surface).border(1.dp, W.line, CardShape)) {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        AssistantAvatar(38.dp)
+                        Spacer(Modifier.width(12.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text("Dinex IA", color = W.ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(Modifier.size(7.dp).clip(CircleShape).background(W.positive))
+                                Spacer(Modifier.width(6.dp))
+                                Text("En línea · responde con tus datos de DINEX", color = W.ink3, fontSize = 12.sp)
+                            }
+                        }
+                        QuotaPill(remaining)
+                    }
+                    HorizontalDivider(color = W.line)
+                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                        if (messages.none { it.user } && !loading) {
+                            AssistantWelcome(remaining > 0) { send(it) }
+                        } else {
+                            LazyColumn(
+                                Modifier.fillMaxSize(), state = listState,
+                                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 20.dp),
+                                verticalArrangement = Arrangement.spacedBy(14.dp),
+                            ) {
+                                items(messages) { ChatRow(it) }
+                                if (loading) item { ThinkingRow() }
+                            }
+                        }
+                    }
+                    HorizontalDivider(color = W.line)
+                    ChatInput(draft, { if (it.length <= 500) draft = it }, enabled = remaining > 0 && !loading, onSend = { send(draft) })
+                }
+                // Contexto
+                if (side) Column(Modifier.width(300.dp).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    val income = movements.filter { it.income }.sumOf { it.amount }
+                    val expense = movements.filterNot { it.income }.sumOf { it.amount }
+                    val monthExpense = movements.filter { !it.income && it.isInCurrentMonth() }.sumOf { it.amount }
+                    WCard(Modifier.fillMaxWidth()) {
+                        CardTitle("Lo que Dinex IA sabe", "Solo tu resumen de DINEX")
+                        Spacer(Modifier.height(12.dp))
+                        ContextLine("Saldo disponible", moneyGrouped(income - expense - data.savings), W.ink)
+                        ContextLine("Gastos del mes", moneyGrouped(monthExpense), W.negative)
+                        ContextLine("Ahorrado", moneyGrouped(data.savings), W.brand)
+                        ContextLine("Racha", "$streak ${if (streak == 1) "día" else "días"}", W.ink)
+                        ContextLine("Límite diario", moneyGrouped(data.dailyLimit.toDouble()), W.ink)
+                    }
+                    WCard(Modifier.fillMaxWidth()) {
+                        CardTitle("Consultas de hoy", "Se renuevan cada día")
+                        Spacer(Modifier.height(14.dp))
+                        Row(verticalAlignment = Alignment.Bottom) {
+                            Text("$remaining", color = W.ink, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+                            Text(" de $DAILY_AI_QUERIES disponibles", color = W.ink3, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
+                        }
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            repeat(DAILY_AI_QUERIES) { i -> Box(Modifier.weight(1f).height(6.dp).clip(CircleShape).background(if (i < remaining) W.brand else W.line)) }
+                        }
+                    }
+                    WCard(Modifier.fillMaxWidth()) {
+                        Row(verticalAlignment = Alignment.Top) {
+                            Icon(DinexNavigationIcons.Shield, null, tint = W.brand, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(10.dp))
+                            Text("Dinex IA no accede a tus bancos ni pide claves. Puede equivocarse: revisa cualquier decisión importante.",
+                                color = W.ink2, fontSize = 12.sp, lineHeight = 18.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AssistantAvatar(size: Dp) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(size * .3f)).background(Brush.linearGradient(listOf(W.forest, W.forest2))), contentAlignment = Alignment.Center) {
+        Icon(DinexNavigationIcons.Sparkle, null, tint = W.lime, modifier = Modifier.size(size * .5f))
+    }
+}
+
+@Composable
+private fun QuotaPill(remaining: Int) {
+    Row(Modifier.clip(CircleShape).border(1.dp, W.line, CircleShape).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        repeat(DAILY_AI_QUERIES) { i ->
+            Box(Modifier.padding(end = 3.dp).size(width = 12.dp, height = 4.dp).clip(CircleShape).background(if (i < remaining) W.brand else W.line))
+        }
+        Spacer(Modifier.width(6.dp))
+        Text(if (remaining > 0) "$remaining de $DAILY_AI_QUERIES hoy" else "Sin consultas hoy", color = if (remaining > 0) W.ink2 else W.negative, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun AssistantWelcome(enabled: Boolean, onAsk: (String) -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        AssistantAvatar(64.dp)
+        Spacer(Modifier.height(18.dp))
+        Text("¿En qué te ayudo hoy?", color = W.ink, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.4).sp)
+        Spacer(Modifier.height(6.dp))
+        Text("Pregunta sobre tus gastos, una compra o tu plan de ahorro. Respondo con tus números reales.",
+            color = W.ink2, fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 460.dp))
+        Spacer(Modifier.height(26.dp))
+        val prompts = listOf(
+            Triple(DinexNavigationIcons.Analysis, "¿En qué gasto más?", "Compara tus categorías del mes"),
+            Triple(DinexNavigationIcons.Plan, "Hazme un plan semanal", "Tres pasos medibles para esta semana"),
+            Triple(DinexNavigationIcons.Wallet, "¿Puedo gastar S/ 80?", "Calcula cómo queda tu saldo"),
+            Triple(DinexNavigationIcons.Target, "¿Cómo voy con mi ahorro?", "Avance de tus metas y racha"),
+        )
+        Column(Modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            prompts.chunked(2).forEach { row ->
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { (icon, title, hint) ->
+                        val shape = RoundedCornerShape(14.dp)
+                        Row(
+                            Modifier.weight(1f).clip(shape).background(W.surfaceAlt).border(1.dp, W.line, shape)
+                                .clickable(enabled = enabled) { onAsk(title) }.pointerHoverIcon(PointerIcon.Hand).padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(icon, null, tint = W.brand, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                Text(title, color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text(hint, color = W.ink3, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (!enabled) {
+            Spacer(Modifier.height(18.dp))
+            Text("Usaste tus $DAILY_AI_QUERIES consultas de hoy. Vuelve mañana.", color = W.negative, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
+private fun ChatRow(message: ChatMessage) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.user) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Top) {
+        if (!message.user) { AssistantAvatar(30.dp); Spacer(Modifier.width(10.dp)) }
+        val shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (message.user) 16.dp else 4.dp, bottomEnd = if (message.user) 4.dp else 16.dp)
+        androidx.compose.foundation.text.selection.SelectionContainer {
+            Text(
+                message.text,
+                color = when { message.user -> Color.White; message.error -> W.negative; else -> W.ink },
+                fontSize = 14.sp, lineHeight = 22.sp,
+                modifier = Modifier.widthIn(max = 560.dp).clip(shape)
+                    .background(when { message.user -> W.brand; message.error -> W.negative.copy(alpha = .08f); else -> W.surfaceAlt })
+                    .then(if (message.user) Modifier else Modifier.border(1.dp, W.line, shape))
+                    .padding(horizontal = 16.dp, vertical = 11.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ThinkingRow() {
+    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "pensando")
+    val phase by transition.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(1100)), label = "puntos")
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        AssistantAvatar(30.dp)
+        Spacer(Modifier.width(10.dp))
+        Row(Modifier.clip(RoundedCornerShape(16.dp)).background(W.surfaceAlt).border(1.dp, W.line, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp)) {
+            repeat(3) { i ->
+                val alpha = ((kotlin.math.sin((phase * 2 * PI) - i * .9) + 1) / 2).toFloat() * .7f + .3f
+                Box(Modifier.padding(end = 5.dp).size(7.dp).clip(CircleShape).background(W.brand.copy(alpha = alpha)))
+            }
+            Spacer(Modifier.width(4.dp))
+            Text("Revisando tus números…", color = W.ink3, fontSize = 13.sp)
+        }
+    }
+}
+
+@Composable
+private fun ChatInput(value: String, onChange: (String) -> Unit, enabled: Boolean, onSend: () -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        val shape = RoundedCornerShape(14.dp)
+        Box(Modifier.weight(1f).heightIn(min = 48.dp).clip(shape).background(W.surfaceAlt).border(1.dp, W.line, shape).padding(horizontal = 16.dp, vertical = 14.dp)) {
+            if (value.isEmpty()) Text(if (enabled) "Escribe tu pregunta y presiona Enter…" else "Vuelve mañana para preguntar", color = W.ink3, fontSize = 14.sp)
+            BasicTextField(
+                value, onChange, enabled = enabled, maxLines = 4,
+                textStyle = TextStyle(color = W.ink, fontSize = 14.sp, fontFamily = MaterialTheme.typography.bodyMedium.fontFamily),
+                cursorBrush = SolidColor(W.brand),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { onSend() }),
+                modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
+                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && event.key == androidx.compose.ui.input.key.Key.Enter && !event.isShiftPressed) { onSend(); true } else false
+                },
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        val active = enabled && value.isNotBlank()
+        Box(
+            Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(if (active) W.brand else W.line)
+                .clickable(enabled = active, onClickLabel = "Enviar", onClick = onSend).pointerHoverIcon(PointerIcon.Hand),
+            contentAlignment = Alignment.Center,
+        ) { Icon(DinexNavigationIcons.Send, "Enviar", tint = if (active) Color.White else W.ink3, modifier = Modifier.size(20.dp)) }
+    }
+}
+
+@Composable
+private fun ContextLine(label: String, value: String, tint: Color) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, color = W.ink2, fontSize = 13.sp, modifier = Modifier.weight(1f))
+        Text(value, color = tint, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }

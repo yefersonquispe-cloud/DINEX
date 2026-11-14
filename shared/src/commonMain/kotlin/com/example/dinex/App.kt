@@ -155,7 +155,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 onTips = { tipsOpen = true },
             ),
             assistant = {
-                AssistantPage(assistant, movements, dailyLimit, streak, savings, chatMessages, data.categoryBudgets,
+                WebAssistantPage(assistant, data, chatMessages,
                     queriesLeft = model::aiQueriesLeft, syncQueriesLeft = model::syncedAiQueriesLeft, onQueryUsed = model::recordAiQuery)
             },
         )
