@@ -7,8 +7,10 @@ import androidx.compose.runtime.remember
 actual fun rememberGeminiAssistant(): GeminiAssistant = remember {
     object : GeminiAssistant {
         override val isConfigured = true
+        // Con clave configurada usa Gemini; sin ella, respuestas locales con tus datos.
         override suspend fun ask(message: String, financialContext: String) =
-            GeminiReply(webFinancialReply(message, financialContext))
+            if (WEB_GEMINI_API_KEY.isNotBlank()) askWebGemini(WEB_GEMINI_API_KEY, message, financialContext)
+            else GeminiReply(webFinancialReply(message, financialContext))
     }
 }
 

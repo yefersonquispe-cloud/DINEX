@@ -49,11 +49,13 @@ globalThis.dinexHttp = {
       })
       .then(onText, function (error) { onError(String((error && error.message) || error)); });
   },
-  // Firebase Authentication y Firestore: solo HTTPS, sin cookies ni caché.
+  // Firebase Authentication, Firestore y Gemini: solo HTTPS, sin cookies ni caché.
   request: function (method, url, body, bearer, onDone, onError) {
     if (String(url).indexOf('https://') !== 0) { onError('Solo se permiten conexiones seguras'); return; }
     var headers = { Accept: 'application/json' };
-    if (bearer) headers.Authorization = 'Bearer ' + bearer;
+    // "x-goog-api-key:CLAVE" envía la clave de Gemini en su encabezado; lo demás es un token de Firebase.
+    if (bearer && String(bearer).indexOf('x-goog-api-key:') === 0) headers['x-goog-api-key'] = String(bearer).slice(15);
+    else if (bearer) headers.Authorization = 'Bearer ' + bearer;
     if (body != null) headers['Content-Type'] = 'application/json; charset=utf-8';
     fetch(url, { method: method, headers: headers, body: body == null ? undefined : body, credentials: 'omit', cache: 'no-store' })
       .then(function (response) {

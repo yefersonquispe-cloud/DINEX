@@ -8,6 +8,26 @@ plugins {
     alias(libs.plugins.composeCompiler)
 }
 
+// Clave de Gemini solo para la web (GEMINI_WEB_API_KEY en local.properties). Se genera en build/,
+// nunca se guarda en el repositorio. Sin clave, Dinex IA en la web usa respuestas locales.
+val webGeminiKey = providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText.orElse("")
+    .map { text -> text.lineSequence().map { it.trim() }.firstOrNull { it.startsWith("GEMINI_WEB_API_KEY=") }?.substringAfter('=')?.trim().orEmpty() }
+    .orElse(providers.environmentVariable("GEMINI_WEB_API_KEY"))
+val webSecretsDir = layout.buildDirectory.dir("generated/webSecrets/kotlin")
+val generateWebSecrets = tasks.register("generateWebSecrets") {
+    val key = webGeminiKey
+    val output = webSecretsDir
+    inputs.property("geminiWebKey", key)
+    outputs.dir(output)
+    doLast {
+        val dir = output.get().asFile.resolve("com/example/dinex").apply { mkdirs() }
+        val safe = key.get().filter { it.isLetterOrDigit() || it in "._-" }
+        dir.resolve("WebSecrets.kt").writeText(
+            "package com.example.dinex\n\n/** Generado desde local.properties. No editar. */\ninternal const val WEB_GEMINI_API_KEY = \"$safe\"\n",
+        )
+    }
+}
+
 kotlin {
     listOf(
         iosArm64(),
@@ -89,9 +109,11 @@ kotlin {
         jsMain.dependencies {
             implementation(libs.wrappers.browser)
         }
+        jsMain { kotlin.srcDir(generateWebSecrets) }
         wasmJsMain.dependencies {
             implementation(libs.wrappers.browser)
         }
+        wasmJsMain { kotlin.srcDir(generateWebSecrets) }
     }
 }
 

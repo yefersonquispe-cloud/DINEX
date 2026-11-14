@@ -8,6 +8,8 @@ actual fun rememberGeminiAssistant(): GeminiAssistant = remember {
     object : GeminiAssistant {
         override val isConfigured = true
         override suspend fun ask(message: String, financialContext: String): GeminiReply {
+            // Con clave configurada usa Gemini; sin ella, respuestas locales con tus datos.
+            if (WEB_GEMINI_API_KEY.isNotBlank()) return askWebGemini(WEB_GEMINI_API_KEY, message, financialContext)
             val income = Regex("Ingresos:\\s*(S/\\s*-?[0-9]+(?:\\.[0-9]+)?)").find(financialContext)?.groupValues?.getOrNull(1) ?: "tu ingreso"
             val expenses = Regex("Gastos:\\s*(S/\\s*-?[0-9]+(?:\\.[0-9]+)?)").find(financialContext)?.groupValues?.getOrNull(1) ?: "tus gastos"
             val balance = Regex("Saldo disponible:\\s*(S/\\s*-?[0-9]+(?:\\.[0-9]+)?)").find(financialContext)?.groupValues?.getOrNull(1) ?: "tu saldo"
