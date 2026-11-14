@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
 
 /** View layer: navigation, screens and presentation-only dialog state. */
 @Composable
-fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) {
+fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}, webLayout: Boolean = false) {
     val model = viewModel { DinexViewModel(cloud = DinexCloud()) }
     val googleIdentity = rememberGoogleIdentity()
     val state by model.state.collectAsState()
@@ -41,8 +41,9 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) 
     CompositionLocalProvider(
         LocalDensity provides Density(density.density, density.fontScale * if (state.largeText) 1.2f else 1f),
         LocalDinexReducedMotion provides state.reduceMotion,
+        LocalWebLayout provides webLayout,
     ) {
-        MaterialTheme(colorScheme = colors, typography = dinexTypography, shapes = dinexShapes) {
+        MaterialTheme(colorScheme = colors, typography = if (webLayout) webTypography() else dinexTypography, shapes = dinexShapes) {
             var launchVisible by rememberSaveable { mutableStateOf(true) }
             if (launchVisible) {
                 DinexLaunchScreen(reduceMotion = state.reduceMotion, onReduceMotion = model::setReduceMotion) { launchVisible = false }
@@ -67,7 +68,7 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}) 
 }
 
 @Composable
-private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
+internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     val data = state.data
     val movements = data.movements
     val reminders = data.reminders
@@ -132,7 +133,33 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     }
     val name = state.activeAccount?.name ?: state.email.orEmpty().substringBefore('@')
 
-    Box(Modifier.fillMaxSize()) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+      // En la web, con pantalla ancha, se usa el diseño de escritorio (WebWorkspace.kt).
+      if (LocalWebLayout.current && maxWidth >= WebDesktopMinWidth) {
+        WebWorkspace(
+            model = model,
+            state = state,
+            actions = WebActions(
+                onExpense = { manualIncome = false },
+                onIncome = { manualIncome = true },
+                onScan = { scanner() },
+                onImport = { importDialog = true },
+                onExport = { exportDialog = true },
+                onDeleteMovement = { movementToDelete = it },
+                onSave = { goalId -> savingGoalId = goalId; savingDialog = true },
+                onOpenGoal = { goalId -> selectedGoalId = goalId; goalDetails = true },
+                onAddReminder = { reminderDialog = true },
+                onResolveReminder = { reminderToResolve = it },
+                onProfile = { profileOpen = true },
+                onMarket = { marketOpen = true },
+                onTips = { tipsOpen = true },
+            ),
+            assistant = {
+                AssistantPage(assistant, movements, dailyLimit, streak, savings, chatMessages, data.categoryBudgets,
+                    queriesLeft = model::aiQueriesLeft, syncQueriesLeft = model::syncedAiQueriesLeft, onQueryUsed = model::recordAiQuery)
+            },
+        )
+      } else {
         DinexAppShell(
             page = state.page,
             onSelectPage = model::selectPage,
@@ -213,6 +240,7 @@ private fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 }
             }
         }
+      }
     }
 
     if (quickAdd) QuickAddDialog(
