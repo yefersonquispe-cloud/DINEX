@@ -74,9 +74,9 @@ internal fun AuthFlow(
         DinexAuroraBackground()
         val formSide = maxWidth * .54f
         if (wideLayout) {
-            AuthBrandStory(
-                modifier = Modifier.align(Alignment.CenterStart).fillMaxHeight().width(maxWidth - formSide),
-            )
+            val panel = Modifier.align(Alignment.CenterStart).fillMaxHeight().width(maxWidth - formSide)
+            // En la web, el panel de marca muestra una vista previa del producto (WebWorkspace.kt).
+            if (LocalWebLayout.current) WebAuthShowcase(panel) else AuthBrandStory(modifier = panel)
         }
         LazyColumn(
             modifier = Modifier

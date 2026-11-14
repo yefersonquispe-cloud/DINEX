@@ -1370,3 +1370,115 @@ private fun CategoryTableCard(expenses: List<Movement>) {
         Spacer(Modifier.height(8.dp))
     }
 }
+
+// ---------------------------------------------------------------- Acceso (panel de marca en la web)
+
+/** Panel izquierdo de la pantalla de acceso en la web: titular y una vista previa del producto. */
+@Composable
+internal fun WebAuthShowcase(modifier: Modifier = Modifier) {
+    BoxWithConstraints(
+        modifier.background(Brush.linearGradient(listOf(Color(0xFF0B1912), W.forest, W.forest2))).drawBehind {
+            val step = 34.dp.toPx()
+            var x = step
+            while (x < size.width) { drawLine(Color.White.copy(alpha = .04f), Offset(x, 0f), Offset(x, size.height), 1f); x += step }
+            var y = step
+            while (y < size.height) { drawLine(Color.White.copy(alpha = .04f), Offset(0f, y), Offset(size.width, y), 1f); y += step }
+            drawCircle(Brush.radialGradient(listOf(W.lime.copy(alpha = .16f), Color.Transparent), Offset(size.width * .85f, size.height * .62f), size.minDimension * .55f),
+                size.minDimension * .55f, Offset(size.width * .85f, size.height * .62f))
+        },
+    ) {
+        val tall = maxHeight >= 760.dp
+        Column(Modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 44.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(painterResource(Res.drawable.dinex_app_icon), "DINEX", Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)), contentScale = ContentScale.Crop)
+                Spacer(Modifier.width(12.dp))
+                Text("DINEX", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 3.sp)
+                Spacer(Modifier.width(6.dp))
+                Box(Modifier.size(7.dp).clip(CircleShape).background(W.lime))
+            }
+            Spacer(Modifier.weight(1f))
+            Text(
+                androidx.compose.ui.text.buildAnnotatedString {
+                    append("Tu dinero,\ncon un ")
+                    pushStyle(androidx.compose.ui.text.SpanStyle(color = W.lime)); append("plan claro."); pop()
+                },
+                color = Color.White, fontSize = 46.sp, lineHeight = 52.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1.2).sp,
+            )
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "Registra tus gastos en segundos, ahorra para tus metas y entiende a dónde va cada sol. En el celular y en la web, siempre sincronizado.",
+                color = Color.White.copy(alpha = .72f), fontSize = 15.sp, lineHeight = 23.sp, modifier = Modifier.widthIn(max = 480.dp),
+            )
+            if (tall) {
+                Spacer(Modifier.height(36.dp))
+                ShowcasePreview()
+            }
+            Spacer(Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
+                listOf(DinexNavigationIcons.Shield to "Datos cifrados", DinexNavigationIcons.Refresh to "Android y web", DinexNavigationIcons.Sparkle to "Consejos con IA")
+                    .forEach { (icon, label) ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(icon, null, tint = W.lime, modifier = Modifier.size(15.dp))
+                            Spacer(Modifier.width(7.dp))
+                            Text(label, color = Color.White.copy(alpha = .7f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                        }
+                    }
+            }
+        }
+    }
+}
+
+/** Composición "flotante" con piezas reales del producto: saldo, meta y medallas. */
+@Composable
+private fun ShowcasePreview() {
+    val glass = Color.White.copy(alpha = .07f)
+    val edge = Color.White.copy(alpha = .14f)
+    Box(Modifier.widthIn(max = 520.dp).fillMaxWidth().height(250.dp)) {
+        // Tarjeta principal: saldo y su evolución.
+        Column(
+            Modifier.fillMaxWidth(.82f).clip(RoundedCornerShape(18.dp)).background(glass).border(1.dp, edge, RoundedCornerShape(18.dp)).padding(22.dp),
+        ) {
+            Text("SALDO DISPONIBLE", color = W.lime, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+            Spacer(Modifier.height(6.dp))
+            Text("S/ 2,480.50", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.6).sp)
+            Spacer(Modifier.height(10.dp))
+            Sparkline(listOf(1820.0, 1790.0, 1930.0, 1880.0, 2040.0, 1995.0, 2150.0, 2110.0, 2290.0, 2260.0, 2480.0), Modifier.fillMaxWidth().height(54.dp))
+            Spacer(Modifier.height(12.dp))
+            Row {
+                Column(Modifier.weight(1f)) {
+                    Text("Ingresos", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
+                    Text("+ S/ 3,200.00", color = Color(0xFF8BE3B4), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+                Column(Modifier.weight(1f)) {
+                    Text("Gastos", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
+                    Text("- S/ 719.50", color = Color(0xFFFFA697), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        // Tarjeta flotante: una meta en progreso.
+        Column(
+            Modifier.align(Alignment.BottomEnd).offset(y = 10.dp).width(220.dp).clip(RoundedCornerShape(16.dp)).background(Color.White)
+                .padding(16.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(Color(0xFFE1F0E6)), contentAlignment = Alignment.Center) {
+                    Icon(DinexNavigationIcons.Target, null, tint = Color(0xFF0D6A43), modifier = Modifier.size(16.dp))
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text("Meta: Laptop", color = Color(0xFF101B15), fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Text("S/ 1,984 de S/ 3,200", color = Color(0xFF8A978E), fontSize = 11.sp)
+                }
+                Text("62%", color = Color(0xFF0D6A43), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Spacer(Modifier.height(10.dp))
+            Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(Color(0xFFE2E7E1))) {
+                Box(Modifier.fillMaxWidth(.62f).fillMaxHeight().clip(CircleShape).background(Color(0xFF0D6A43)))
+            }
+        }
+        // Medallas de racha.
+        Row(Modifier.align(Alignment.TopEnd).offset(y = (-14).dp), horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
+            listOf(2, 4, 14).forEach { index -> StreakBadge(streakLevels[index], 54.dp) }
+        }
+    }
+}
