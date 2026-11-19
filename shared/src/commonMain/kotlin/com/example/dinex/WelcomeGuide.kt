@@ -3,14 +3,19 @@ package com.example.dinex
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.*
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -26,6 +31,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -39,13 +45,14 @@ import dinex.shared.generated.resources.dinex_mascot_ai
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.resources.painterResource
+import kotlin.math.abs
 
 // ═══════════════════════════════════════════════════════════════════════════
 // GUÍA DE BIENVENIDA
-// Se abre al crear la cuenta y desde Perfil → Ver guía. Cada cartilla tiene una
-// pequeña demostración que se puede tocar para entender la función.
+// Se abre al crear la cuenta y desde Perfil → Ver guía. Es un recorrido corto:
+// cada paso tiene una demostración que se puede tocar para entender la función.
 // ═══════════════════════════════════════════════════════════════════════════
-internal enum class GuideAction { Automation, Market, Tips, Assistant }
+internal enum class GuideAction { Automation, Market, Assistant }
 
 private class GuideCard(
     val tag: String,
@@ -62,55 +69,60 @@ private class GuideCard(
 @Composable
 internal fun WelcomeGuideDialog(name: String, onDismiss: () -> Unit, onAction: (GuideAction) -> Unit) {
     var legalTab by remember { mutableStateOf<Int?>(null) }
-    val firstName = name.trim().substringBefore(' ').ifBlank { "" }
-    val cards = remember(firstName) { guideCards(firstName) { legalTab = it } }
+    val firstName = name.trim().substringBefore(' ')
+    val web = LocalWebLayout.current
+    val cards = remember(firstName, web) { guideCards(firstName, web) { legalTab = it } }
     val pager = rememberPagerState(pageCount = { cards.size })
     val scope = rememberCoroutineScope()
     val page = pager.currentPage
     val last = page == cards.lastIndex
+    val accent by animateColorAsState(cards[page].accent, tween(350), label = "color de la guía")
 
     Dialog(onDismissRequest = onDismiss, properties = fullScreenDialogProperties()) {
-        BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .35f)).statusBarsPadding().navigationBarsPadding(), contentAlignment = Alignment.Center) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = .45f)), contentAlignment = Alignment.Center) {
             val compact = maxWidth < 560.dp
             Surface(
-                modifier = Modifier
-                    .then(if (compact) Modifier.fillMaxSize() else Modifier.widthIn(max = 520.dp).heightIn(max = 820.dp).fillMaxHeight(.94f))
-                    .padding(if (compact) 0.dp else 8.dp),
-                shape = RoundedCornerShape(if (compact) 0.dp else 32.dp),
+                modifier = if (compact) Modifier.fillMaxSize() else Modifier.widthIn(max = 500.dp).heightIn(max = 800.dp).fillMaxHeight(.94f),
+                shape = RoundedCornerShape(if (compact) 0.dp else 28.dp),
                 color = AppBg,
             ) {
-                Column(Modifier.fillMaxSize()) {
-                    // Barra de progreso por cartillas + saltar.
-                    Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            cards.indices.forEach { index ->
-                                val fill by animateFloatAsState(if (index <= page) 1f else 0f, tween(300), label = "progreso")
-                                Box(Modifier.weight(1f).height(5.dp).clip(CircleShape).background(Border)) {
-                                    Box(Modifier.fillMaxHeight().fillMaxWidth(fill).background(cards[page].accent))
-                                }
-                            }
-                        }
-                        TextButton(onClick = onDismiss) { Text(if (last) "Cerrar" else "Saltar", color = Gray, fontWeight = FontWeight.SemiBold) }
+                Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
+                    Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text("${page + 1} de ${cards.size}", color = Gray, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        if (!last) TextButton(onClick = onDismiss) { Text("Saltar", color = Gray, fontWeight = FontWeight.SemiBold) }
+                        else Spacer(Modifier.height(48.dp))
                     }
-                    HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index -> GuidePage(cards[index], index, cards.size, onAction) }
+                    // Progreso continuo: avanza junto con el dedo al deslizar.
+                    Box(Modifier.padding(horizontal = 22.dp).fillMaxWidth().height(4.dp).clip(CircleShape).background(Border)) {
+                        val progress = ((page + pager.currentPageOffsetFraction + 1) / cards.size).coerceIn(0f, 1f)
+                        Box(Modifier.fillMaxHeight().fillMaxWidth(progress).clip(CircleShape).background(accent))
+                    }
+                    HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
+                        val offset = (page - index) + pager.currentPageOffsetFraction
+                        GuidePage(cards[index], offset, onAction)
+                    }
                     Row(
-                        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+                        Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        if (page > 0) OutlinedButton(
-                            onClick = { scope.launch { pager.animateScrollToPage(page - 1) } },
-                            modifier = Modifier.height(52.dp),
-                            shape = RoundedCornerShape(RadiusMd),
-                            border = BorderStroke(1.dp, Border),
-                        ) { Icon(DinexNavigationIcons.Back, "Atrás", tint = Night, modifier = Modifier.size(20.dp)) }
+                        AnimatedVisibility(page > 0, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
+                            OutlinedIconButton(
+                                onClick = { scope.launch { pager.animateScrollToPage(page - 1) } },
+                                modifier = Modifier.size(54.dp),
+                                shape = CircleShape,
+                                border = BorderStroke(1.dp, Border),
+                            ) { Icon(DinexNavigationIcons.Back, "Atrás", tint = Night, modifier = Modifier.size(20.dp)) }
+                        }
+                        val interaction = remember { MutableInteractionSource() }
                         Button(
                             onClick = { if (last) onDismiss() else scope.launch { pager.animateScrollToPage(page + 1) } },
-                            modifier = Modifier.weight(1f).height(52.dp),
-                            shape = RoundedCornerShape(RadiusMd),
+                            interactionSource = interaction,
+                            modifier = Modifier.weight(1f).height(54.dp).dinexPress(interaction),
+                            shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
                         ) {
-                            Text(if (last) "Empezar a usar Dinex" else if (page == 0) "Comenzar recorrido" else "Siguiente", fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                            Text(if (last) "Empezar a usar Dinex" else if (page == 0) "Comenzar" else "Siguiente", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                         }
                     }
                 }
@@ -121,125 +133,112 @@ internal fun WelcomeGuideDialog(name: String, onDismiss: () -> Unit, onAction: (
 }
 
 @Composable
-private fun GuidePage(card: GuideCard, index: Int, total: Int, onAction: (GuideAction) -> Unit) {
+private fun GuidePage(card: GuideCard, offset: Float, onAction: (GuideAction) -> Unit) {
+    val distance = abs(offset).coerceIn(0f, 1f)
     Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        // Escenario con la demostración interactiva.
+        // Escenario con la demostración: se mueve más lento que el texto al deslizar.
         Box(
-            Modifier.fillMaxWidth().heightIn(min = 210.dp).clip(RoundedCornerShape(28.dp))
-                .background(Brush.linearGradient(listOf(card.accent.copy(alpha = .22f), card.accent.copy(alpha = .06f))))
+            Modifier.fillMaxWidth().heightIn(min = 230.dp)
+                .graphicsLayer {
+                    translationX = offset * size.width * .22f
+                    val scale = 1f - distance * .08f
+                    scaleX = scale; scaleY = scale; alpha = 1f - distance * .5f
+                }
+                .clip(RoundedCornerShape(26.dp))
+                .background(Brush.linearGradient(listOf(card.accent.copy(alpha = .20f), card.accent.copy(alpha = .05f))))
+                .border(1.dp, card.accent.copy(alpha = .18f), RoundedCornerShape(26.dp))
                 .padding(16.dp),
             contentAlignment = Alignment.Center,
         ) { card.demo() }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            Surface(shape = RoundedCornerShape(14.dp), color = card.accent.copy(alpha = .16f)) {
-                Icon(card.icon, null, tint = readableAccent(card.accent), modifier = Modifier.padding(9.dp).size(22.dp))
+        Column(
+            Modifier.graphicsLayer { translationX = offset * size.width * -.12f; alpha = 1f - distance },
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(card.icon, null, tint = readableAccent(card.accent), modifier = Modifier.size(18.dp))
+                Text(card.tag.uppercase(), color = readableAccent(card.accent), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
             }
-            Column {
-                Text(card.tag.uppercase(), color = readableAccent(card.accent), fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
-                Text("${index + 1} de $total", color = Gray, fontSize = 11.sp)
-            }
-        }
-        Text(card.title, color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp, lineHeight = 31.sp)
-        Text(card.body, color = NightSoft, fontSize = 14.sp, lineHeight = 21.sp)
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(card.title, color = Night, fontWeight = FontWeight.Bold, fontSize = 27.sp, lineHeight = 33.sp, letterSpacing = (-.5).sp)
+            Text(card.body, color = NightSoft, fontSize = 15.sp, lineHeight = 22.sp)
             card.points.forEach { point ->
                 Row(verticalAlignment = Alignment.Top) {
-                    Box(Modifier.padding(top = 2.dp).size(18.dp).clip(CircleShape).background(card.accent.copy(alpha = .18f)), contentAlignment = Alignment.Center) {
-                        Icon(DinexNavigationIcons.Check, null, tint = readableAccent(card.accent), modifier = Modifier.size(12.dp))
-                    }
+                    Icon(DinexNavigationIcons.Check, null, tint = readableAccent(card.accent), modifier = Modifier.padding(top = 2.dp).size(16.dp))
                     Spacer(Modifier.width(10.dp))
-                    Text(point, color = Night, fontSize = 13.sp, lineHeight = 19.sp)
+                    Text(point, color = Night, fontSize = 14.sp, lineHeight = 20.sp)
                 }
             }
-        }
-        if (card.where.isNotBlank()) Surface(shape = RoundedCornerShape(RadiusSm), color = Card, border = BorderStroke(1.dp, Border)) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(DinexNavigationIcons.MapPin, null, tint = Gray, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(card.where, color = Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+            if (card.where.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(DinexNavigationIcons.MapPin, null, tint = Gray, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(card.where, color = Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
+            card.action?.let { (label, action) ->
+                OutlinedButton(
+                    onClick = { onAction(action) },
+                    shape = CircleShape,
+                    border = BorderStroke(1.dp, card.accent.copy(alpha = .6f)),
+                ) { Text(label, color = readableAccent(card.accent), fontWeight = FontWeight.SemiBold) }
             }
         }
-        card.action?.let { (label, action) ->
-            OutlinedButton(
-                onClick = { onAction(action) },
-                shape = RoundedCornerShape(RadiusMd),
-                border = BorderStroke(1.dp, card.accent.copy(alpha = .6f)),
-            ) { Text(label, color = readableAccent(card.accent), fontWeight = FontWeight.Bold) }
-        }
-        Spacer(Modifier.height(8.dp))
     }
 }
 
-private fun guideCards(firstName: String, openLegal: (Int) -> Unit): List<GuideCard> = listOf(
+private fun guideCards(firstName: String, web: Boolean, openLegal: (Int) -> Unit): List<GuideCard> = listOf(
     GuideCard(
-        "Bienvenida", if (firstName.isBlank()) "¡Hola! Te presento Dinex" else "¡Hola, $firstName! Te presento Dinex",
-        "Soy tu compañero para ordenar tu dinero. En un minuto te enseño todo lo que puedes hacer. Desliza o toca Siguiente.",
+        "Bienvenida", if (firstName.isBlank()) "Te damos la bienvenida a Dinex" else "Hola, $firstName. Bienvenido a Dinex",
+        "En menos de un minuto verás cómo ordenar tu dinero, ahorrar para tus metas y entender tus gastos.",
         DinexNavigationIcons.Sparkle, Color(0xFF2B8456), "",
-        listOf("Registra lo que gastas y lo que ganas.", "Ahorra para metas reales con tu racha diaria.", "Entiende a dónde se va tu dinero."),
+        emptyList(),
     ) { MascotDemo() },
     GuideCard(
-        "Registrar", "Anota un gasto en segundos",
-        "Toca el botón + y elige si es gasto o ingreso. Pon el monto, la categoría y cómo pagaste: Yape, Plin, efectivo, tarjeta o transferencia.",
-        DinexNavigationIcons.Add, Color(0xFF176B43), "Botón + en el centro de la barra de abajo",
-        listOf("Cada gasto guarda el lugar para tu mapa de calor.", "Puedes editar o borrar cualquier movimiento.", "Importa o exporta tus movimientos en Excel o CSV."),
+        "Registrar", "Anota cada movimiento en segundos",
+        "Elige gasto o ingreso, escribe el monto y listo. Funciona con Yape, Plin, efectivo, tarjeta o transferencia.",
+        DinexNavigationIcons.Add, Color(0xFF176B43), if (web) "Botón Nuevo movimiento" else "Botón + de la barra inferior",
+        listOf("Importa o exporta tus movimientos en Excel o CSV."),
     ) { RegisterDemo() },
     GuideCard(
-        "Escanear y voz", "Escanea boletas o dilo con tu voz",
-        "Con la cámara, Dinex lee el total de una boleta. Con el micrófono, solo di lo que gastaste y se registra solo.",
-        DinexNavigationIcons.Microphone, Color(0xFF326D91), "Inicio → Escanear o Voz",
-        listOf("Ejemplo: \"registra 20 soles en comida\".", "También crea recordatorios: \"recuérdame pagar la luz el 15\".", "Tú revisas antes de guardar."),
+        "Registro rápido", if (web) "Escanea tus comprobantes" else "Escanea boletas o usa tu voz",
+        if (web) "Sube la foto de una boleta y Dinex lee el total por ti. Siempre revisas antes de guardar."
+        else "Toma una foto de la boleta o di \"registra 20 soles en comida\". También puede anotar tus avisos de Yape y Plin si le das permiso.",
+        DinexNavigationIcons.ScanReceipt, Color(0xFF326D91), if (web) "Nuevo movimiento → Escanear comprobante" else "Inicio → Escanear o Voz",
+        if (web) emptyList() else listOf("Solo detecta avisos de pago; no lee tus chats.", "Puedes apagarlo cuando quieras."),
+        action = if (web) null else "Activar registro automático" to GuideAction.Automation,
     ) { VoiceDemo() },
     GuideCard(
-        "Registro automático", "Dinex anota tus Yape y Plin por ti",
-        "Si das permiso, Dinex lee solo los avisos de pago de Yape, Plin y tu banco, y los convierte en movimientos. También puedes decir \"Oye Dinex\".",
-        DinexNavigationIcons.Bell, Color(0xFF6959A5), "Perfil → Voz y notificaciones",
-        listOf("Solo detecta montos de pagos; no lee tus chats.", "Todo se procesa dentro de tu teléfono.", "Puedes apagarlo cuando quieras."),
-        action = "Activar registro automático" to GuideAction.Automation,
-    ) { NotificationDemo() },
-    GuideCard(
-        "Metas y racha", "Ahorra con propósito",
+        "Metas y racha", "Ahorra con un propósito",
         "Crea metas como un viaje o un celular y separa dinero de tu saldo. Cada día que ahorras sube tu racha y ganas medallas.",
-        DinexNavigationIcons.Wallet, Color(0xFFA66822), "Inicio → Metas",
-        listOf("Dinex IA crea una ilustración para cada meta.", "Te celebra cuando llegas a tu objetivo.", "Un recordatorio diario te ayuda a no romper la racha."),
+        DinexNavigationIcons.Target, Color(0xFFA66822), if (web) "Menú → Metas" else "Inicio → Metas",
+        listOf("Un recordatorio diario te ayuda a mantener la racha."),
     ) { GoalDemo() },
     GuideCard(
-        "Tu plan", "Pon un límite y Dinex te avisa",
-        "Elige cuánto quieres gastar al día y cuánto por categoría. Si te pasas, Dinex te avisa antes de guardar el gasto.",
-        DinexNavigationIcons.Plan, Color(0xFFB84754), "Barra de abajo → Plan",
-        listOf("Presupuestos por categoría sugeridos o a tu medida.", "Recordatorios de pagos: luz, agua, internet.", "Alertas en tu celular cuando superas el límite."),
+        "Presupuesto", "Pon un límite y Dinex te avisa",
+        "Elige cuánto quieres gastar al día y por categoría. Si te pasas, te avisamos antes de guardar el gasto.",
+        DinexNavigationIcons.Plan, Color(0xFFB84754), if (web) "Menú → Presupuesto" else "Barra inferior → Plan",
+        listOf("También guarda recordatorios de pagos como luz, agua o internet."),
     ) { LimitDemo() },
     GuideCard(
         "Análisis", "Mira a dónde se va tu dinero",
-        "Gráficos por categoría y por mes, tu salud financiera y un mapa de calor con los lugares donde más gastas.",
-        DinexNavigationIcons.Analysis, Color(0xFFD9480F), "Barra de abajo → Análisis",
-        listOf("El mapa se llena solo con la ubicación de cada gasto.", "Los puntos más intensos son donde más gastas.", "Descarga un reporte cuando lo necesites."),
+        "Revisa gráficos por categoría y por mes, y un mapa con los lugares donde más gastas. Además, consulta el dólar y otras monedas.",
+        DinexNavigationIcons.Analysis, Color(0xFFD9480F), if (web) "Menú → Análisis" else "Barra inferior → Análisis",
+        emptyList(),
+        action = "Abrir el mercado" to GuideAction.Market,
     ) { HeatmapDemo() },
     GuideCard(
-        "Mercado en vivo", "Dólar, euro y cripto al día",
-        "Consulta el tipo de cambio y el precio de las criptomonedas en soles, con gráficos y un convertidor rápido.",
-        DinexNavigationIcons.Market, Color(0xFF0B7285), "Icono de tendencia arriba en Inicio",
-        listOf("Más de 10 monedas y criptomonedas.", "Convierte montos al instante.", "Precios referenciales, no para operar."),
-        action = "Abrir el mercado" to GuideAction.Market,
-    ) { MarketDemo() },
-    GuideCard(
-        "Consejos y Dinex IA", "Consejos hechos para ti",
-        "Dinex revisa tus gastos y te da consejos personalizados. Pregúntale a Dinex IA lo que quieras sobre tu dinero.",
-        DinexNavigationIcons.Tips, Color(0xFF438A53), "Foco de ideas arriba · Mascota abajo a la derecha",
-        listOf("Ejemplo: \"¿en qué gasté más esta semana?\".", "Funciona con Gemini Nano dentro del teléfono si es compatible.", "Es una guía; tú decides."),
+        "Dinex IA", "Pregunta lo que quieras",
+        "Dinex IA responde con tus propios números y te da consejos prácticos. Tienes $DAILY_AI_QUERIES consultas al día.",
+        DinexNavigationIcons.Tips, Color(0xFF438A53), "",
+        listOf("Es una orientación: la decisión siempre es tuya."),
         action = "Probar Dinex IA" to GuideAction.Assistant,
     ) { ChatDemo() },
     GuideCard(
-        "Privacidad", "Tus datos, protegidos",
-        "Tu cuenta está en Firebase de Google y tus datos se sincronizan entre tu celular y la web. Solo tú puedes verlos.",
-        DinexNavigationIcons.Shield, Color(0xFF115B38), "Perfil → Términos y privacidad",
-        listOf(
-            "Cada permiso (cámara, micrófono, ubicación, notificaciones) es opcional.",
-            "Tu contraseña nunca se guarda en el teléfono.",
-            "Puedes eliminar tu cuenta y tus datos cuando quieras (Ley N.° 29733).",
-        ),
+        "Privacidad", "Tus datos son tuyos",
+        "Solo tú puedes ver tu información. Cada permiso es opcional y puedes eliminar tu cuenta cuando quieras.",
+        DinexNavigationIcons.Shield, Color(0xFF115B38), "",
+        emptyList(),
     ) { PrivacyDemo(openLegal) },
 )
 
@@ -276,7 +275,7 @@ private fun RegisterDemo() {
         Surface(shape = RoundedCornerShape(20.dp), color = Card, border = BorderStroke(1.dp, Border), modifier = Modifier.fillMaxWidth()) {
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(40.dp).clip(CircleShape).background(tone.copy(alpha = .15f)), contentAlignment = Alignment.Center) {
-                    Icon(if (income) DinexNavigationIcons.ArrowDown else DinexNavigationIcons.ArrowUp, null, tint = tone, modifier = Modifier.size(20.dp))
+                    Icon(if (income) DinexNavigationIcons.ArrowUp else DinexNavigationIcons.ArrowDown, null, tint = tone, modifier = Modifier.size(20.dp))
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
@@ -306,11 +305,12 @@ private fun VoiceDemo() {
         delay(500)
         listening = false
     }
+    val still = LocalDinexReducedMotion.current
     val pulse = rememberInfiniteTransition(label = "voz")
-    val scale by pulse.animateFloat(1f, if (listening) 1.18f else 1f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "pulso")
+    val scale by pulse.animateFloat(1f, if (listening && !still) 1.18f else 1f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "pulso")
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Box(
-            Modifier.size((64 * scale).dp).clip(CircleShape).background(ElectricBlue).clickable(onClickLabel = "Probar la voz") { listening = true },
+            Modifier.size(64.dp).graphicsLayer { scaleX = scale; scaleY = scale }.clip(CircleShape).background(ElectricBlue).clickable(onClickLabel = "Probar la voz") { listening = true },
             contentAlignment = Alignment.Center,
         ) { Icon(DinexNavigationIcons.Microphone, null, tint = Color.White, modifier = Modifier.size(28.dp)) }
         Text(
@@ -320,39 +320,6 @@ private fun VoiceDemo() {
         AnimatedVisibility(shown == phrase.length && !listening, enter = fadeIn() + slideInVertically { it / 2 }) {
             Surface(shape = RoundedCornerShape(14.dp), color = Mint) {
                 Text("Gasto guardado: Comida · S/ 20.00", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun NotificationDemo() {
-    var captured by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Surface(shape = RoundedCornerShape(16.dp), color = Card, shadowElevation = 3.dp, modifier = Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFF6C1D82)), contentAlignment = Alignment.Center) {
-                    Text("Y", color = Color.White, fontWeight = FontWeight.Black)
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Yape", color = Night, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                    Text("Recibiste S/ 50.00 de Ana", color = Gray, fontSize = 12.sp)
-                }
-            }
-        }
-        Button(
-            onClick = { captured = !captured },
-            colors = ButtonDefaults.buttonColors(containerColor = Indigo, contentColor = Color.White),
-            modifier = Modifier.align(Alignment.CenterHorizontally),
-        ) { Text(if (captured) "Ver otra vez" else "Ver cómo se registra") }
-        AnimatedVisibility(captured, enter = fadeIn() + slideInVertically { it / 2 }) {
-            Surface(shape = RoundedCornerShape(16.dp), color = Mint, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Icon(DinexNavigationIcons.Check, null, tint = GreenDark, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text("Ingreso de S/ 50.00 guardado · Yape", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                }
             }
         }
     }
@@ -423,29 +390,6 @@ private fun HeatmapDemo() {
             }
         }
         Text("Toca el mapa para agregar un gasto (${spots.size} lugares)", color = Gray, fontSize = 12.sp)
-    }
-}
-
-@Composable
-private fun MarketDemo() {
-    val quotes = listOf(Triple("Dólar", "S/ 3.74", true), Triple("Euro", "S/ 4.31", false), Triple("Bitcoin", "S/ 412,900", true))
-    var amount by remember { mutableIntStateOf(100) }
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        quotes.forEach { (label, price, up) ->
-            Surface(shape = RoundedCornerShape(14.dp), color = Card, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(label, color = Night, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    Text(price, color = Night, fontWeight = FontWeight.Black)
-                    Spacer(Modifier.width(8.dp))
-                    Icon(if (up) DinexNavigationIcons.ArrowUp else DinexNavigationIcons.ArrowDown, null, tint = if (up) Green else Red, modifier = Modifier.size(16.dp))
-                }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            listOf(50, 100, 500).forEach { value -> FilterChip(amount == value, { amount = value }, { Text("$$value") }) }
-            Text("= S/ ${format2(amount * 3.74)}", color = GreenDark, fontWeight = FontWeight.Black)
-        }
-        Text("Precios de ejemplo", color = Gray, fontSize = 10.sp)
     }
 }
 
