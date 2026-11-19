@@ -28,9 +28,11 @@ class MainActivity : ComponentActivity() {
         prefs.edit().putBoolean(DinexHotwordService.KEY_APP_VISIBLE, visible).apply()
         if (prefs.getBoolean(DinexHotwordService.KEY_ENABLED, false)) {
             runCatching {
-                startService(Intent(this, DinexHotwordService::class.java).setAction(
+                val intent = Intent(this, DinexHotwordService::class.java).setAction(
                     if (visible) DinexHotwordService.ACTION_APP_VISIBLE else DinexHotwordService.ACTION_APP_HIDDEN,
-                ))
+                )
+                // Con Dinex a la vista se puede volver a encender el servicio si el sistema lo cerró.
+                if (visible) androidx.core.content.ContextCompat.startForegroundService(this, intent) else startService(intent)
             }
         }
     }

@@ -70,6 +70,34 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     override val hotwordEnabled: Boolean get() = hotwordPrefs.getBoolean("enabled", false)
     override val supportsBackgroundVoice = true
     override val overlayAvailable: Boolean get() = Settings.canDrawOverlays(context)
+    override val microphoneAvailable: Boolean
+        get() = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+    override val xiaomiDevice: Boolean
+        get() = Build.MANUFACTURER.lowercase(Locale.ROOT).let { it.contains("xiaomi") || it.contains("redmi") || it.contains("poco") }
+    override val needsRestrictedSettings: Boolean
+        get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && !runCatching {
+            val installer = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) context.packageManager.getInstallSourceInfo(context.packageName).installingPackageName
+            else @Suppress("DEPRECATION") context.packageManager.getInstallerPackageName(context.packageName)
+            installer == "com.android.vending"
+        }.getOrDefault(false)
+
+    override fun requestMicrophonePermission() {
+        context.findActivity()?.let { ActivityCompat.requestPermissions(it, arrayOf(Manifest.permission.RECORD_AUDIO), 7003) }
+    }
+
+    override fun openXiaomiPermissions() {
+        // Pantalla "Otros permisos" de MIUI/HyperOS; si no existe, la información de la app.
+        val editor = Intent("miui.intent.action.APP_PERM_EDITOR")
+            .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+            .putExtra("extra_pkgname", context.packageName)
+        runCatching { context.startActivity(editor.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            .recoverCatching {
+                context.startActivity(Intent("miui.intent.action.APP_PERM_EDITOR")
+                    .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.AppPermissionsEditorActivity")
+                    .putExtra("extra_pkgname", context.packageName).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            .recoverCatching { openAppDetailsSettings() }
+    }
     override val notificationListenerConnected: Boolean
         get() = context.getSharedPreferences("dinex_notification_status", Context.MODE_PRIVATE).getBoolean("connected", false)
     override val systemNotificationsSupported = true

@@ -154,19 +154,19 @@ internal fun AutomationDialog(
                         color = Gray, fontSize = 13.sp, lineHeight = 18.sp,
                     )
                     if (!notificationAccess) {
-                        Surface(shape = RoundedCornerShape(12.dp), color = Orange.copy(alpha = .09f), border = androidx.compose.foundation.BorderStroke(1.dp, Orange.copy(alpha = .25f))) {
-                            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Text("Para activarlo", color = Orange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                                AutomationStep("1", "Abre Información de la app y, en el menú de tres puntos, toca Permitir ajustes restringidos (si aparece).")
-                                AutomationStep("2", "Entra a Acceso a notificaciones y habilita Dinex.")
-                            }
-                        }
-                        OutlinedButton(onClick = { automation.openAppDetailsSettings() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                            Text("1. Abrir información de la app", color = Orange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
-                        OutlinedButton(onClick = { automation.openNotificationSettings() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                            Text("2. Dar acceso a notificaciones", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                        }
+                        // Pasos guiados: cada uno abre la pantalla exacta y se marca solo al volver.
+                        var step = 1
+                        if (automation.needsRestrictedSettings) PermissionStep(
+                            number = step++, title = "Desbloquea el permiso",
+                            detail = "Se abrirá la información de Dinex. Toca ⋮ (arriba a la derecha) y luego “Permitir ajustes restringidos”.",
+                            done = false, actionLabel = "Abrir", onAction = { automation.openAppDetailsSettings() },
+                        )
+                        PermissionStep(
+                            number = step, title = "Enciende Dinex en Acceso a notificaciones",
+                            detail = "Busca Dinex en la lista y activa el interruptor. Al volver, Dinex lo detecta solo.",
+                            done = notificationAccess, actionLabel = "Activar", primary = true,
+                            onAction = { automation.openNotificationSettings() },
+                        )
                         TextButton(onClick = { accessRefresh++ }, modifier = Modifier.fillMaxWidth()) {
                             Text("Ya lo activé, comprobar", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
@@ -208,31 +208,59 @@ internal fun AutomationDialog(
                     status = if (hotwordActive) "Activo" to true else "Apagado" to false,
                 ) {
                     Text(
-                        "Con la pantalla desbloqueada di “Oye Dinex” para registrar gastos, ingresos o recordatorios. Android muestra una notificación mientras escucha.",
+                        "Di “Oye Dinex” o toca la burbuja con la mascota para registrar gastos, ingresos o preguntar cuánto gastaste. Android muestra una notificación mientras escucha.",
                         color = Gray, fontSize = 13.sp, lineHeight = 18.sp,
                     )
-                    if (overlayAccess) {
-                        Text("Burbuja lista: al salir de Dinex podrás arrastrarla y hablarle.", color = GreenDark, fontSize = 13.sp)
-                    } else {
-                        OutlinedButton(
-                            onClick = { automation.openOverlaySettings() },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                        ) { Text("Permitir burbuja flotante", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
+                    // Lista de permisos: se marca sola al volver de cada pantalla.
+                    val micAccess = accessRefresh.let { automation.microphoneAvailable }
+                    var step = 1
+                    PermissionStep(step++, "Micrófono", "Para escucharte solo cuando Oye Dinex está activo.", micAccess, "Permitir",
+                        onAction = { automation.requestMicrophonePermission() })
+                    PermissionStep(step++, "Burbuja flotante", "Busca Dinex y activa “Mostrar sobre otras apps”.", overlayAccess, "Permitir",
+                        onAction = { automation.openOverlaySettings() })
+                    if (automation.xiaomiDevice) {
+                        PermissionStep(step++, "Permisos de Xiaomi",
+                            "En “Otros permisos” activa “Mostrar ventanas emergentes mientras se ejecuta en segundo plano”. Sin esto, tu Xiaomi esconde la burbuja.",
+                            null, "Abrir", onAction = { automation.openXiaomiPermissions() })
+                        PermissionStep(step++, "Inicio automático y batería",
+                            "Activa “Inicio automático” y pon el ahorro de batería de Dinex en “Sin restricciones” para que no se apague solo.",
+                            null, "Abrir", onAction = { automation.openBatterySettings() })
                     }
                     Button(
                         onClick = {
-                            val requested = !hotwordActive
-                            val result = automation.setHotwordEnabled(requested)
-                            error = result
-                            hotwordActive = if (result == null) requested else automation.hotwordEnabled
+                            error = null
+                            when {
+                                // Un solo botón: si falta algo, abre el siguiente permiso; si no, activa.
+                                !hotwordActive && !micAccess -> automation.requestMicrophonePermission()
+                                !hotwordActive && !overlayAccess -> automation.openOverlaySettings()
+                                else -> {
+                                    val requested = !hotwordActive
+                                    val result = automation.setHotwordEnabled(requested)
+                                    error = result
+                                    hotwordActive = if (result == null) requested else automation.hotwordEnabled
+                                }
+                            }
                         },
                         modifier = Modifier.fillMaxWidth().height(46.dp),
                         shape = RoundedCornerShape(14.dp),
                         colors = if (hotwordActive) ButtonDefaults.buttonColors(containerColor = Red.copy(alpha = .12f), contentColor = Red)
                         else ButtonDefaults.buttonColors(containerColor = Green),
-                    ) { Text(if (hotwordActive) "Desactivar Oye Dinex" else "Activar Oye Dinex", fontWeight = FontWeight.Bold) }
-                    if (hotwordActive) {
+                    ) {
+                        Text(
+                            when {
+                                hotwordActive -> "Desactivar Oye Dinex"
+                                !micAccess -> "Siguiente: permitir micrófono"
+                                !overlayAccess -> "Siguiente: permitir burbuja"
+                                else -> "Activar Oye Dinex"
+                            },
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    if (hotwordActive) Text(
+                        "Listo. Sal de Dinex y verás la burbuja con la mascota. Tócala para hablar.",
+                        color = GreenDark, fontSize = 12.sp, lineHeight = 16.sp,
+                    )
+                    if (hotwordActive && !automation.xiaomiDevice) {
                         TextButton(onClick = { automation.openBatterySettings() }, modifier = Modifier.fillMaxWidth()) {
                             Text("Revisar batería e inicio automático", color = Orange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
@@ -970,6 +998,47 @@ internal fun BudgetWarningDialog(
                         onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
                     ) { Text("Entendido", fontWeight = FontWeight.SemiBold) }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Paso de un permiso: número (o ✓ si ya está listo), qué hacer y un botón que abre la pantalla exacta.
+ * [done] = null cuando Android no permite saber si ya se activó (por ejemplo, permisos de Xiaomi).
+ */
+@Composable
+private fun PermissionStep(number: Int, title: String, detail: String, done: Boolean?, actionLabel: String, primary: Boolean = false, onAction: () -> Unit) {
+    val ready = done == true
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = if (ready) Green.copy(alpha = .07f) else CardRaised,
+        border = androidx.compose.foundation.BorderStroke(1.dp, if (ready) Green.copy(alpha = .25f) else Border),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.Top) {
+                Box(
+                    Modifier.size(28.dp).clip(CircleShape).background(if (ready) Green else Border),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (ready) Icon(DinexNavigationIcons.Check, null, tint = Color.White, modifier = Modifier.size(15.dp))
+                    else Text("$number", color = Night, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                Spacer(Modifier.width(10.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(if (ready) "Listo" else detail, color = if (ready) GreenDark else Gray, fontSize = 12.sp, lineHeight = 16.sp)
+                }
+            }
+            if (!ready) {
+                if (primary) Button(onClick = onAction, shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = Green),
+                    modifier = Modifier.fillMaxWidth().height(40.dp)) {
+                    Text(actionLabel, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                else OutlinedButton(onClick = onAction, shape = CircleShape, modifier = Modifier.fillMaxWidth().height(40.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .45f))) {
+                    Text(actionLabel, color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

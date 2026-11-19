@@ -78,27 +78,35 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_APP_VISIBLE -> {
-                if (!foregroundStarted) { clearStaleActivation(); return START_NOT_STICKY }
-                handler.removeCallbacks(restartWake)
-                if (!commandActive) stopRecognizer()
-                overlay.hide(); return START_NOT_STICKY
+                // Si el sistema (por ejemplo, el ahorro de batería de Xiaomi) cerró el servicio,
+                // al volver a Dinex se vuelve a encender en vez de apagar Oye Dinex.
+                if (!foregroundStarted) {
+                    if (!prefs().getBoolean(KEY_ENABLED, false)) { stopSelf(); return START_NOT_STICKY }
+                } else {
+                    // Llamado con startForegroundService: se confirma el primer plano (no cambia nada visible).
+                    runCatching { startForeground(NOTIFICATION_ID, listeningNotification()) }
+                    handler.removeCallbacks(restartWake)
+                    if (!commandActive) stopRecognizer()
+                    overlay.hide(); return START_NOT_STICKY
+                }
             }
             ACTION_APP_HIDDEN -> {
-                if (!foregroundStarted) { clearStaleActivation(); return START_NOT_STICKY }
+                // Sin servicio activo no se puede abrir el micrófono desde segundo plano: se espera a que vuelva la app.
+                if (!foregroundStarted) { stopSelf(); return START_NOT_STICKY }
                 if (prefs().getBoolean(KEY_ENABLED, false)) overlay.render(idleUi(), openPanel = false)
                 if (!commandActive) scheduleWake(600)
                 return START_NOT_STICKY
             }
             ACTION_STOP -> { disable(); return START_NOT_STICKY }
             ACTION_RESUME -> {
-                if (!foregroundStarted) { clearStaleActivation(); return START_NOT_STICKY }
+                if (!foregroundStarted) { stopSelf(); return START_NOT_STICKY }
                 commandActive = false
                 touch()
                 scheduleWake(400)
                 return START_NOT_STICKY
             }
             ACTION_RESUME_HANDS_FREE -> {
-                if (!foregroundStarted) { clearStaleActivation(); return START_NOT_STICKY }
+                if (!foregroundStarted) { stopSelf(); return START_NOT_STICKY }
                 handsFree = true
                 touch()
                 updateNotification()
@@ -440,8 +448,6 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
         prefs().edit().putBoolean(KEY_ENABLED, false).apply()
         stopSelf()
     }
-
-    private fun clearStaleActivation() = disable()
 
     private fun touch() { lastInteraction = SystemClock.elapsedRealtime() }
 
