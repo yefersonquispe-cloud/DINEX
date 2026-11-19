@@ -98,9 +98,9 @@ internal fun DinexPageHeading(eyebrow: String, title: String, subtitle: String, 
     Column(modifier.dinexEntrance(), verticalArrangement = Arrangement.spacedBy(7.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
             Box(Modifier.size(6.dp).clip(CircleShape).background(accent))
-            Text(eyebrow.uppercase(), color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp)
+            Text(t(eyebrow).uppercase(), color = accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp)
         }
-        Text(title, color = Night, fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.8f).sp, lineHeight = 33.sp, modifier = Modifier.semantics { heading() })
-        Text(subtitle, color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
+        Text(t(title), color = Night, fontSize = 28.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.8f).sp, lineHeight = 33.sp, modifier = Modifier.semantics { heading() })
+        Text(t(subtitle), color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
     }
 }

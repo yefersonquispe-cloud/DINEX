@@ -83,9 +83,9 @@ internal fun PeriodCashFlow(movements: List<Movement>, dates: List<String>) {
     val futureColor = Border.copy(alpha = .5f)
 
     DinexCard {
-        Text("PULSO DEL DINERO", color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Text(t("PULSO DEL DINERO"), color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         Spacer(Modifier.height(2.dp))
-        Text("Ingresos y gastos del periodo", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(t("Ingresos y gastos del periodo"), color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(Modifier.height(12.dp))
         // Totales del periodo en tres píldoras.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -186,7 +186,7 @@ internal fun PeriodCashFlow(movements: List<Movement>, dates: List<String>) {
                     )
                 }
                 Column(horizontalAlignment = Alignment.End) {
-                    Text("Balance", color = Gray, fontSize = 11.sp)
+                    Text(t("Balance"), color = Gray, fontSize = 11.sp)
                     val net = day.first - day.second
                     Text((if (net > 0) "+" else "") + money(net), color = if (net >= 0) GreenDark else expenseColor, fontWeight = FontWeight.Black, fontSize = 17.sp)
                 }
@@ -201,7 +201,7 @@ private fun FlowPill(label: String, value: String, tint: Color, modifier: Modifi
         modifier.clip(RoundedCornerShape(16.dp)).background(tint.copy(alpha = .09f)).padding(horizontal = 10.dp, vertical = 9.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(label, color = Gray, fontSize = 11.sp, maxLines = 1)
+        Text(t(label), color = Gray, fontSize = 11.sp, maxLines = 1)
         Text(value, color = tint, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
@@ -211,7 +211,7 @@ private fun LegendDot(color: Color, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(5.dp))
-        Text(label, color = Gray, fontSize = 11.sp)
+        Text(t(label), color = Gray, fontSize = 11.sp)
     }
 }
 
@@ -235,7 +235,7 @@ internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpoch
     val firstWeekday = ((epochDaysOf(year, month, 1) + 3) % 7 + 7) % 7
 
     DinexCard(accent = Indigo) {
-        Text("CALENDARIO DE GASTO", color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+        Text(t("CALENDARIO DE GASTO"), color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         Spacer(Modifier.height(2.dp))
         Text("Gasto diario · ${currentMonthName(month)}", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(Modifier.height(12.dp))
@@ -272,9 +272,9 @@ internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpoch
         }
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            LegendDot(Green, if (dailyLimit > 0) "Dentro del límite" else "Poco gasto")
+            LegendDot(Green, if (dailyLimit > 0) t("Dentro del límite") else t("Poco gasto"))
             LegendDot(Orange, "Cerca")
-            LegendDot(Red, if (dailyLimit > 0) "Te pasaste" else "Mucho gasto")
+            LegendDot(Red, if (dailyLimit > 0) t("Te pasaste") else t("Mucho gasto"))
         }
         Spacer(Modifier.height(14.dp))
         Surface(shape = RoundedCornerShape(18.dp), color = CardRaised, border = BorderStroke(1.dp, if (selectedMovements.isEmpty()) Border else Indigo.copy(alpha = .3f))) {
@@ -296,7 +296,7 @@ internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpoch
                     )
                 }
                 Spacer(Modifier.height(6.dp))
-                if (selectedMovements.isEmpty()) Text("No registraste gastos este día.", color = Gray, fontSize = 12.sp)
+                if (selectedMovements.isEmpty()) Text(t("No registraste gastos este día."), color = Gray, fontSize = 12.sp)
                 else selectedMovements.forEach { movement ->
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(8.dp).clip(CircleShape).background(categories.firstOrNull { it.name == movement.category }?.color ?: Gray))

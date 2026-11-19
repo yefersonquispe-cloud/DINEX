@@ -131,16 +131,16 @@ internal fun AuthFlow(
                         }
                         Spacer(Modifier.width(12.dp))
                         Column {
-                            Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 24.sp, letterSpacing = 2.sp)
-                            Text("Tu dinero, con propósito.", color = Gray, fontSize = 12.sp)
+                            Text(t("DINEX"), color = Night, fontWeight = FontWeight.Black, fontSize = 24.sp, letterSpacing = 2.sp)
+                            Text(t("Tu dinero, con propósito."), color = Gray, fontSize = 12.sp)
                         }
                     }
                     Spacer(Modifier.height(30.dp))
                 }
-                Text(if (createMode) "Crea tu cuenta" else "Bienvenido de nuevo", color = Night, fontWeight = FontWeight.Black, fontSize = 30.sp)
+                Text(if (createMode) t("Crea tu cuenta") else t("Bienvenido de nuevo"), color = Night, fontWeight = FontWeight.Black, fontSize = 30.sp)
                 Text(
-                    if (createMode) "Un espacio financiero personal, privado y hecho para ti."
-                    else "Inicia sesión para continuar con tu dashboard.",
+                    if (createMode) t("Un espacio financiero personal, privado y hecho para ti.")
+                    else t("Inicia sesión para continuar con tu dashboard."),
                     color = Gray,
                     fontSize = 12.sp,
                     lineHeight = 18.sp,
@@ -158,13 +158,13 @@ internal fun AuthFlow(
                 ) {
                     Column(Modifier.padding(20.dp)) {
                         if (createMode) {
-                            Text("NOMBRE", color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+                            Text(t("NOMBRE"), color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                             Spacer(Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = name,
                                 onValueChange = { name = it.take(50); error = null },
                                 modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Juan Pérez") },
+                                placeholder = { Text(t("Juan Pérez")) },
                                 singleLine = true,
                                 isError = attempted && !nameValid,
                                 trailingIcon = { if (nameValid) Icon(DinexNavigationIcons.Check, null, tint = Lime, modifier = Modifier.size(18.dp)) },
@@ -174,13 +174,13 @@ internal fun AuthFlow(
                             Spacer(Modifier.height(12.dp))
                         }
 
-                        Text("EMAIL", color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+                        Text(t("EMAIL"), color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                         Spacer(Modifier.height(6.dp))
                         OutlinedTextField(
                             value = email,
                             onValueChange = { email = it.take(80); error = null },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("usuario@ejemplo.com") },
+                            placeholder = { Text(t("usuario@ejemplo.com")) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                             isError = (attempted || email.isNotBlank()) && !emailValid,
@@ -190,13 +190,13 @@ internal fun AuthFlow(
                         if ((attempted || email.isNotBlank()) && !emailValid) ValidationHint("Ingresa un email válido", false)
                         Spacer(Modifier.height(12.dp))
 
-                        Text("CONTRASEÑA", color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+                        Text(t("CONTRASEÑA"), color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                         Spacer(Modifier.height(6.dp))
                         OutlinedTextField(
                             value = password,
                             onValueChange = { password = it.take(64); error = null },
                             modifier = Modifier.fillMaxWidth(),
-                            placeholder = { Text("Tu contraseña segura") },
+                            placeholder = { Text(t("Tu contraseña segura")) },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                             visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -208,13 +208,13 @@ internal fun AuthFlow(
                             Spacer(Modifier.height(9.dp))
                             passwordRules.forEach { (label, valid) -> ValidationHint(label, valid) }
                             Spacer(Modifier.height(12.dp))
-                            Text("CONFIRMAR CONTRASEÑA", color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
+                            Text(t("CONFIRMAR CONTRASEÑA"), color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, letterSpacing = 1.sp)
                             Spacer(Modifier.height(6.dp))
                             OutlinedTextField(
                                 value = confirmation,
                                 onValueChange = { confirmation = it.take(64); error = null },
                                 modifier = Modifier.fillMaxWidth(),
-                                placeholder = { Text("Repítela") },
+                                placeholder = { Text(t("Repítela")) },
                                 singleLine = true,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                                 visualTransformation = if (showConfirmation) VisualTransformation.None else PasswordVisualTransformation(),
@@ -238,8 +238,7 @@ internal fun AuthFlow(
                                 Row(Modifier.fillMaxWidth().padding(end = 10.dp), verticalAlignment = Alignment.Top) {
                                     Checkbox(checked = acceptedTerms, onCheckedChange = { acceptedTerms = it; error = null })
                                     Column(Modifier.padding(top = 12.dp)) {
-                                        Text(
-                                            "Leí y acepto los Términos y la Política de Privacidad, y autorizo a Dinex a tratar mis datos personales y financieros según la Ley N.° 29733.",
+                                        Text(t("Leí y acepto los Términos y la Política de Privacidad, y autorizo a Dinex a tratar mis datos personales y financieros según la Ley N.° 29733."),
                                             color = NightSoft, fontSize = 11.sp, lineHeight = 15.sp,
                                         )
                                         Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -286,7 +285,7 @@ internal fun AuthFlow(
                             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
                         ) {
                             if (busy) CircularProgressIndicator(color = Color.White, strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
-                            else Text(if (createMode) "Crear cuenta" else "Iniciar sesión", fontWeight = FontWeight.Bold)
+                            else Text(if (createMode) t("Crear cuenta") else t("Iniciar sesión"), fontWeight = FontWeight.Bold)
                         }
                         if (googleAvailable) {
                             Spacer(Modifier.height(12.dp))
@@ -306,19 +305,19 @@ internal fun AuthFlow(
                                     if (emailValid) onForgotPassword(normalizedEmail) else error = "Escribe tu correo para enviarte el enlace."
                                 },
                                 modifier = Modifier.align(Alignment.CenterHorizontally),
-                            ) { Text("¿Olvidaste tu contraseña?", color = Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
+                            ) { Text(t("¿Olvidaste tu contraseña?"), color = Gray, fontSize = 12.sp, fontWeight = FontWeight.SemiBold) }
                         }
                         TextButton(
                             onClick = { createMode = !createMode; attempted = false; error = null; password = ""; confirmation = ""; onClearMessages() },
                             modifier = Modifier.align(Alignment.CenterHorizontally),
                         ) {
-                            Text(if (createMode) "¿Ya tienes cuenta? Iniciar sesión" else "¿Primera vez? Crear nueva cuenta", color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text(if (createMode) t("¿Ya tienes cuenta? Iniciar sesión") else t("¿Primera vez? Crear nueva cuenta"), color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
                 Spacer(Modifier.height(15.dp))
                 if (!createMode) {
-                    Text("Al iniciar sesión aceptas los Términos y la Política de Privacidad vigentes.", color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Text(t("Al iniciar sesión aceptas los Términos y la Política de Privacidad vigentes."), color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterHorizontally)) {
                         LegalLink("Términos") { legalTab = 0 }
                         LegalLink("Privacidad") { legalTab = 1 }
@@ -340,15 +339,14 @@ private fun GoogleTermsDialog(busy: Boolean, error: String?, onAccept: () -> Uni
         onDismissRequest = {},
         containerColor = Card,
         shape = RoundedCornerShape(RadiusLg),
-        title = { Text("Un último paso", color = Night, fontWeight = FontWeight.Bold) },
+        title = { Text(t("Un último paso"), color = Night, fontWeight = FontWeight.Bold) },
         text = {
             Column {
-                Text("Estás creando tu cuenta de Dinex con Google. Solo te lo pedimos esta vez.", color = NightSoft, fontSize = 14.sp, lineHeight = 20.sp)
+                Text(t("Estás creando tu cuenta de Dinex con Google. Solo te lo pedimos esta vez."), color = NightSoft, fontSize = 14.sp, lineHeight = 20.sp)
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.Top) {
                     Checkbox(accepted, { accepted = it }, enabled = !busy)
-                    Text(
-                        "Leí y acepto los Términos y la Política de Privacidad, y autorizo a Dinex a tratar mis datos personales y financieros según la Ley N.° 29733.",
+                    Text(t("Leí y acepto los Términos y la Política de Privacidad, y autorizo a Dinex a tratar mis datos personales y financieros según la Ley N.° 29733."),
                         color = NightSoft, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 10.dp),
                     )
                 }
@@ -364,10 +362,10 @@ private fun GoogleTermsDialog(busy: Boolean, error: String?, onAccept: () -> Uni
         },
         confirmButton = {
             Button(onClick = onAccept, enabled = accepted && !busy, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
-                Text("Crear mi cuenta", fontWeight = FontWeight.SemiBold)
+                Text(t("Crear mi cuenta"), fontWeight = FontWeight.SemiBold)
             }
         },
-        dismissButton = { TextButton(onClick = onDecline, enabled = !busy) { Text("Cancelar", color = Gray) } },
+        dismissButton = { TextButton(onClick = onDecline, enabled = !busy) { Text(t("Cancelar"), color = Gray) } },
     )
 }
 
@@ -421,7 +419,7 @@ private fun GoogleSignInButton(busy: Boolean, onClick: () -> Unit) {
             if (busy && started) CircularProgressIndicator(color = Color(0xFF4285F4), strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
             else Icon(GoogleMark, null, tint = Color.Unspecified, modifier = Modifier.size(22.dp))
         }
-        Text(if (busy && started) "Conectando con Google…" else "Continuar con Google", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, letterSpacing = .1.sp)
+        Text(if (busy && started) t("Conectando con Google…") else t("Continuar con Google"), color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, letterSpacing = .1.sp)
     }
 }
 
@@ -458,13 +456,12 @@ private fun AuthBrandStory(modifier: Modifier = Modifier) {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column {
-                    Text("DINEX", color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = 2.sp)
-                    Text("Tu dinero, con propósito.", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
+                    Text(t("DINEX"), color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = 2.sp)
+                    Text(t("Tu dinero, con propósito."), color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
                 }
             }
             Spacer(Modifier.weight(1f))
-            Text(
-                "Convierte cada sol\nen una mejor decisión.",
+            Text(t("Convierte cada sol\nen una mejor decisión."),
                 color = Color.White,
                 fontWeight = FontWeight.Black,
                 fontSize = 40.sp,
@@ -472,8 +469,7 @@ private fun AuthBrandStory(modifier: Modifier = Modifier) {
                 letterSpacing = (-.6).sp,
             )
             Spacer(Modifier.height(14.dp))
-            Text(
-                "Controla tus gastos, crea metas y deja que Dinex te acompañe con una visión clara de tu dinero.",
+            Text(t("Controla tus gastos, crea metas y deja que Dinex te acompañe con una visión clara de tu dinero."),
                 color = Color.White.copy(alpha = .8f),
                 fontSize = 15.sp,
                 lineHeight = 23.sp,
@@ -486,7 +482,7 @@ private fun AuthBrandStory(modifier: Modifier = Modifier) {
                 AuthBenefit(DinexNavigationIcons.Sparkle, "Inteligente", "Dinex IA te da consejos con tu contexto.")
             }
             Spacer(Modifier.weight(1f))
-            Text("Tus finanzas, en soles y a tu ritmo.", color = Color.White.copy(alpha = .6f), fontSize = 12.sp)
+            Text(t("Tus finanzas, en soles y a tu ritmo."), color = Color.White.copy(alpha = .6f), fontSize = 12.sp)
         }
     }
 }

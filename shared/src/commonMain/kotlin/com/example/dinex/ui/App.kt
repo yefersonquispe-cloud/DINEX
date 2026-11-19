@@ -426,6 +426,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         onOpenGuide = { profileOpen = false; welcomeGuideOpen = true },
         onOpenLegal = { legalTab = it },
         onDeleteAccount = { done -> model.deleteAccount { error -> if (error == null) automation.setHotwordEnabled(false); done(error) } },
+        onLanguage = model::setLanguage,
     )
     premiumLoading?.let { PremiumLoadingDialog(it) }
 }

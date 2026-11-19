@@ -43,15 +43,9 @@ internal fun civilDateFromEpochDays(epochDays: Int = currentDayIndex()): DinexDa
 
 internal fun currentDayOfMonth(): Int = civilDateFromEpochDays().day
 
-internal fun currentMonthShort(month: Int = civilDateFromEpochDays().month): String = when (month) {
-    1 -> "ENE"; 2 -> "FEB"; 3 -> "MAR"; 4 -> "ABR"; 5 -> "MAY"; 6 -> "JUN"
-    7 -> "JUL"; 8 -> "AGO"; 9 -> "SET"; 10 -> "OCT"; 11 -> "NOV"; else -> "DIC"
-}
+internal fun currentMonthShort(month: Int = civilDateFromEpochDays().month): String = localizedMonthShort(month)
 
-internal fun currentMonthName(month: Int = civilDateFromEpochDays().month): String = when (month) {
-    1 -> "Enero"; 2 -> "Febrero"; 3 -> "Marzo"; 4 -> "Abril"; 5 -> "Mayo"; 6 -> "Junio"
-    7 -> "Julio"; 8 -> "Agosto"; 9 -> "Septiembre"; 10 -> "Octubre"; 11 -> "Noviembre"; else -> "Diciembre"
-}
+internal fun currentMonthName(month: Int = civilDateFromEpochDays().month): String = localizedMonthName(month)
 
 internal fun currentMonthYearLabel(): String {
     val date = civilDateFromEpochDays()

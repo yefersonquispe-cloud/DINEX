@@ -127,6 +127,9 @@ internal class DinexRepository(
     fun setSaveReminderHour(hour: Int) = store.put("save_reminder_hour", hour.coerceIn(0, 23).toString())
     fun darkMode(): Boolean = store.get("theme_dark") == "true"
     fun setDarkMode(value: Boolean) = store.put("theme_dark", value.toString())
+    /** Idioma elegido en el perfil (es, en o qu). */
+    fun language(): String? = store.get("language_v1")
+    fun setLanguage(code: String) = store.put("language_v1", code)
     fun widgetPrivate(): Boolean = store.get("widget_private") == "true"
     fun setWidgetPrivate(value: Boolean) = store.put("widget_private", value.toString())
     fun profilePhoto(email: String): String = store.get("avatar:${email.trim().lowercase()}").orEmpty()

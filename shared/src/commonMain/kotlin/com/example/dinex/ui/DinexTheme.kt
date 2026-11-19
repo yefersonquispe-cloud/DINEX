@@ -126,12 +126,12 @@ internal fun DinexCard(
 internal fun SectionHeader(title: String, subtitle: String? = null, action: String? = null, onAction: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
-            Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            if (subtitle != null) Text(subtitle, color = Gray, fontSize = 11.sp)
+            Text(t(title), color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            if (subtitle != null) Text(t(subtitle), color = Gray, fontSize = 11.sp)
         }
         if (action != null && onAction != null) {
             Text(
-                action,
+                t(action),
                 color = GreenDark,
                 fontWeight = FontWeight.Bold,
                 fontSize = 11.sp,

@@ -96,11 +96,11 @@ internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Doubl
     DinexCard(accent = Lime) {
         Row(verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
-                Text("PRESUPUESTO DEL MES", color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text("Presupuestos por categoría", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Night)
+                Text(t("PRESUPUESTO DEL MES"), color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(t("Presupuestos por categoría"), fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Night)
             }
             Text(
-                if (customCount > 0) "$customCount personalizados" else "Sugeridos",
+                if (customCount > 0) t("{0} personalizados", customCount) else t("Sugeridos"),
                 color = NightSoft, fontSize = 11.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.clip(CircleShape).background(Border.copy(alpha = .45f)).padding(horizontal = 10.dp, vertical = 4.dp),
             )
@@ -108,10 +108,10 @@ internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Doubl
         Spacer(Modifier.height(14.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(money(totalSpent), color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp)
-            Text("  de ${money(totalLimit)}", color = Gray, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
+            Text(t("  de {0}", money(totalLimit)), color = Gray, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
         }
         Text(
-            if (income > 0) "Repartido según tus ingresos del mes (${money(income)})" else "Registra tus ingresos para afinar estas sugerencias",
+            if (income > 0) t("Repartido según tus ingresos del mes ({0})", money(income)) else t("Registra tus ingresos para afinar estas sugerencias"),
             color = Gray, fontSize = 12.sp,
         )
         Spacer(Modifier.height(12.dp))
@@ -137,23 +137,23 @@ internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Doubl
 private fun CategoryBudgetRow(category: CategoryInfo, spent: Double, limit: Double) {
     val ratio = if (limit > 0) spent / limit else 0.0
     val (label, tone) = when {
-        limit <= 0 -> "Sin límite" to Gray
-        ratio > 1.0 -> "Te pasaste" to Red
-        ratio >= .8 -> "Cerca del límite" to Orange
-        spent <= 0 -> "Sin gastos" to GreenDark
-        else -> "Va bien" to GreenDark
+        limit <= 0 -> t("Sin límite") to Gray
+        ratio > 1.0 -> t("Te pasaste") to Red
+        ratio >= .8 -> t("Cerca del límite") to Orange
+        spent <= 0 -> t("Sin gastos") to GreenDark
+        else -> t("Va bien") to GreenDark
     }
     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             CategoryMark(category.code, category.color, 40.dp)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(category.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Night)
+                Text(t(category.name), fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Night)
                 Text(
                     when {
-                        limit <= 0 -> "${money(spent)} gastados"
-                        spent > limit -> "${money(spent)} de ${money(limit)} · ${money(spent - limit)} de más"
-                        else -> "${money(spent)} de ${money(limit)} · quedan ${money(limit - spent)}"
+                        limit <= 0 -> t("{0} gastados", money(spent))
+                        spent > limit -> t("{0} de {1} · {2} de más", money(spent), money(limit), money(spent - limit))
+                        else -> t("{0} de {1} · quedan {2}", money(spent), money(limit), money(limit - spent))
                     },
                     color = Gray, fontSize = 12.sp, maxLines = 1,
                 )
@@ -205,24 +205,24 @@ internal fun CategoryBudgetEditorDialog(
     val income = suggestions.values.sum()
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Ajustar presupuestos", color = Night) },
+        title = { Text(t("Ajustar presupuestos"), color = Night) },
         text = {
             Column(Modifier.heightIn(max = 390.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Estos importes se sugieren a partir de tus ingresos del mes. Cámbialos solo si lo deseas; no se mueve dinero.", color = Gray, fontSize = 12.sp)
+                Text(t("Estos importes se sugieren a partir de tus ingresos del mes. Cámbialos solo si lo deseas; no se mueve dinero."), color = Gray, fontSize = 12.sp)
                 categories.forEach { category ->
                     OutlinedTextField(
                         value = amounts[category.name].orEmpty(),
                         onValueChange = { amounts[category.name] = it },
                         label = { Text(category.name) },
-                        prefix = { Text("S/ ") },
+                        prefix = { Text(t("S/ ")) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
                 Text("Total destinado: ${money(total)} · Ingresos: ${money(income)}", color = if (total > income) Orange else Gray, fontSize = 11.sp)
-                if (total > income) Text("El total supera tus ingresos registrados.", color = Orange, fontSize = 11.sp)
-                TextButton(onClick = onReset) { Text("Volver a sugerencias automáticas") }
+                if (total > income) Text(t("El total supera tus ingresos registrados."), color = Orange, fontSize = 11.sp)
+                TextButton(onClick = onReset) { Text(t("Volver a sugerencias automáticas")) }
             }
         },
         confirmButton = {
@@ -232,9 +232,9 @@ internal fun CategoryBudgetEditorDialog(
                     if (amount != null && amount != initial[name]) updated[name] = amount
                 }
                 onSave(updated)
-            }) { Text("Guardar cambios") }
+            }) { Text(t("Guardar cambios")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancelar")) } },
     )
 }
 
@@ -254,11 +254,11 @@ internal fun PaymentPlanner(
     DinexCard(elevated = true) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("RECORDATORIOS", color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                Text("Próximos pagos", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(t("RECORDATORIOS"), color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text(t("Próximos pagos"), color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
             if (reminders.isNotEmpty()) Column(horizontalAlignment = Alignment.End) {
-                Text("Por pagar", color = Gray, fontSize = 11.sp)
+                Text(t("Por pagar"), color = Gray, fontSize = 11.sp)
                 Text(money(total), color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp)
             }
         }
@@ -271,8 +271,8 @@ internal fun PaymentPlanner(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text("Estás al día", color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                        Text("Anota la luz, el internet o tu pensión y te avisamos a tiempo.", color = Gray, fontSize = 12.sp)
+                        Text(t("Estás al día"), color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text(t("Anota la luz, el internet o tu pensión y te avisamos a tiempo."), color = Gray, fontSize = 12.sp)
                     }
                 }
             }
@@ -294,7 +294,7 @@ internal fun PaymentPlanner(
         ) {
             Icon(DinexNavigationIcons.Bell, null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(8.dp))
-            Text("Agregar recordatorio", fontWeight = FontWeight.SemiBold)
+            Text(t("Agregar recordatorio"), fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -375,26 +375,26 @@ internal fun ReminderPaymentDialog(
         containerColor = Card,
         icon = {
             Box(Modifier.size(44.dp).clip(CircleShape).background(Orange.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
-                Text("S/", color = Orange, fontWeight = FontWeight.Black, fontSize = 14.sp)
+                Text(t("S/"), color = Orange, fontWeight = FontWeight.Black, fontSize = 14.sp)
             }
         },
-        title = { Text("¿Este pago ya se realizó?", fontWeight = FontWeight.Black, textAlign = TextAlign.Center, color = Night) },
+        title = { Text(t("¿Este pago ya se realizó?"), fontWeight = FontWeight.Black, textAlign = TextAlign.Center, color = Night) },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("${reminder.title} · ${money(reminder.amount)}", color = Night, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
-                Text("Si ya pagaste, Dinex puede quitar el recordatorio y registrarlo como egreso.", color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center)
+                Text(t("Si ya pagaste, Dinex puede quitar el recordatorio y registrarlo como egreso."), color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center)
             }
         },
         confirmButton = {
             Button(onClick = onRegisterExpense, colors = ButtonDefaults.buttonColors(containerColor = Indigo)) {
-                Text("Sí, agregar egreso", fontWeight = FontWeight.Bold)
+                Text(t("Sí, agregar egreso"), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             Column(horizontalAlignment = Alignment.End) {
-                TextButton(onClick = onRemoveOnly) { Text("No, solo eliminar", color = Red) }
-                TextButton(onClick = onDismiss) { Text("Cancelar", color = Gray) }
+                TextButton(onClick = onRemoveOnly) { Text(t("No, solo eliminar"), color = Red) }
+                TextButton(onClick = onDismiss) { Text(t("Cancelar"), color = Gray) }
             }
         },
     )

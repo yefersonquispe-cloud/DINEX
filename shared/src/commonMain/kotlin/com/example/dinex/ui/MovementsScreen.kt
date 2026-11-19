@@ -63,7 +63,7 @@ internal fun HistoryPage(movements: List<Movement>, onAdd: () -> Unit, onDelete:
                     value = query,
                     onValueChange = { query = it },
                     modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text("Buscar por nombre, categoría o método") },
+                    placeholder = { Text(t("Buscar por nombre, categoría o método")) },
                     singleLine = true,
                     shape = RoundedCornerShape(RadiusMd),
                 )
@@ -71,10 +71,10 @@ internal fun HistoryPage(movements: List<Movement>, onAdd: () -> Unit, onDelete:
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = onImport, modifier = Modifier.weight(1f), shape = RoundedCornerShape(RadiusMd)) {
-                        Text("Importar Excel/CSV", fontSize = 11.sp)
+                        Text(t("Importar Excel/CSV"), fontSize = 11.sp)
                     }
                     OutlinedButton(onClick = onExport, modifier = Modifier.weight(1f), shape = RoundedCornerShape(RadiusMd)) {
-                        Text("Exportar reporte", fontSize = 11.sp)
+                        Text(t("Exportar reporte"), fontSize = 11.sp)
                     }
                 }
             }
@@ -89,8 +89,7 @@ internal fun HistoryPage(movements: List<Movement>, onAdd: () -> Unit, onDelete:
                     MovementFilterMenu("Categoría", categoryFilter, "Todas", categoryOptions) { categoryFilter = it }
                     MovementFilterMenu("Medio", methodFilter, "Todos", methods) { methodFilter = it }
                     MovementFilterMenu("Fecha", dayFilter, "Todos", days, display = { if (it == "Todos") "Todas" else shortDate(it) }) { dayFilter = it }
-                    if (anyFilter) Text(
-                        "Limpiar", color = GreenDark, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                    if (anyFilter) Text(t("Limpiar"), color = GreenDark, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable {
                             categoryFilter = "Todas"; methodFilter = "Todos"; dayFilter = "Todos"
                         }.padding(horizontal = 10.dp, vertical = 9.dp),
@@ -111,7 +110,7 @@ internal fun HistoryPage(movements: List<Movement>, onAdd: () -> Unit, onDelete:
             } else {
                 item {
                     DinexCard {
-                        Text(if (visible.size == 1) "1 movimiento" else "${visible.size} movimientos", color = Gray, fontSize = 12.sp)
+                        Text(if (visible.size == 1) t("1 movimiento") else "${visible.size} movimientos", color = Gray, fontSize = 12.sp)
                     }
                 }
                 items(visible, key = { it.id }) { movement ->
@@ -137,7 +136,7 @@ internal fun MovementListRow(movement: Movement, onClick: () -> Unit) {
 @Composable
 internal fun MonthPass(income: Double, expense: Double, movementCount: Int) {
     DinexCard(elevated = true, accent = GreenDark, vibrant = true) {
-        Text("BALANCE DE LOS MOVIMIENTOS VISIBLES", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
+        Text(t("BALANCE DE LOS MOVIMIENTOS VISIBLES"), color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
         Text(money(income - expense), color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp)
         Spacer(Modifier.height(12.dp))
         // Solo las tres cifras van centradas, cada una en su columna.
@@ -152,7 +151,7 @@ internal fun MonthPass(income: Double, expense: Double, movementCount: Int) {
 @Composable
 internal fun PassValue(label: String, text: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(label, color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1)
+        Text(t(label), color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1)
         Text(text, color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center, maxLines = 1)
     }
 }
@@ -184,9 +183,9 @@ internal fun MovementDetailDialog(movement: Movement, onDismiss: () -> Unit, onD
             }
         },
         confirmButton = {
-            TextButton(onClick = onDelete) { Text("Eliminar", color = Red, fontWeight = FontWeight.Bold) }
+            TextButton(onClick = onDelete) { Text(t("Eliminar"), color = Red, fontWeight = FontWeight.Bold) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cerrar")) } },
     )
 }
 

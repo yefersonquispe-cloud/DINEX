@@ -89,8 +89,8 @@ internal fun SpendingPlacesSection(
     DinexCard(accent = Red) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("¿Dónde gastas más?", color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("Mapa de calor de tus lugares", color = Gray, fontSize = 11.sp)
+                Text(t("¿Dónde gastas más?"), color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(t("Mapa de calor de tus lugares"), color = Gray, fontSize = 11.sp)
             }
             if (places.isNotEmpty()) {
                 Text("${places.size} ${if (places.size == 1) "lugar" else "lugares"}", color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)

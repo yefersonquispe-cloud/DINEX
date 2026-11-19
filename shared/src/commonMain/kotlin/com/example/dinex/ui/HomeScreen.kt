@@ -121,9 +121,8 @@ internal fun NotificationsNudge(onEnable: () -> Unit) {
     DinexCard(accent = Orange) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Activa tus alertas", color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                Text(
-                    "Te avisamos si superas tu presupuesto diario y te recordamos ahorrar antes de que termine el día.",
+                Text(t("Activa tus alertas"), color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                Text(t("Te avisamos si superas tu presupuesto diario y te recordamos ahorrar antes de que termine el día."),
                     color = Gray, fontSize = 11.sp,
                 )
             }
@@ -131,7 +130,7 @@ internal fun NotificationsNudge(onEnable: () -> Unit) {
             Button(
                 onClick = onEnable,
                 colors = ButtonDefaults.buttonColors(containerColor = Green),
-            ) { Text("Activar", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            ) { Text(t("Activar"), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -207,7 +206,7 @@ internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, sav
                 .padding(22.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text("SALDO DISPONIBLE", color = Color.White.copy(alpha = .82f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
+                Text(t("SALDO DISPONIBLE"), color = Color.White.copy(alpha = .82f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
                 Icon(DinexNavigationIcons.Wallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.height(6.dp))
@@ -227,7 +226,7 @@ private fun BalanceStat(label: String, value: String, modifier: Modifier, expens
     Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = Color(0xFF082B1D).copy(alpha = .96f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = .23f))) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, color = Color.White.copy(alpha = .82f), fontSize = 12.sp, textAlign = TextAlign.Center)
+            Text(t(label), color = Color.White.copy(alpha = .82f), fontSize = 12.sp, textAlign = TextAlign.Center)
             Text(value, color = amountColor, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2, textAlign = TextAlign.Center)
         }
     }
@@ -239,7 +238,7 @@ internal fun MiniStat(label: String, value: String, tint: Color, modifier: Modif
         Column(Modifier.padding(horizontal = 10.dp, vertical = 9.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                 if (label == "Ingresos" || label == "Gastos") Icon(if (label == "Ingresos") DinexNavigationIcons.ArrowUp else DinexNavigationIcons.ArrowDown, null, tint = tint, modifier = Modifier.size(14.dp))
-                Text(label, color = Gray, fontSize = 12.sp)
+                Text(t(label), color = Gray, fontSize = 12.sp)
             }
             Text(value, color = tint, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2)
         }
@@ -271,11 +270,11 @@ internal fun SavingsHero(
             ) { Icon(DinexNavigationIcons.Target, null, tint = GreenDark, modifier = Modifier.size(18.dp)) }
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("Mis ahorros", color = Night, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                Text("Cada sol te acerca a tu meta", color = Gray, fontSize = 12.sp)
+                Text(t("Mis ahorros"), color = Night, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+                Text(t("Cada sol te acerca a tu meta"), color = Gray, fontSize = 12.sp)
             }
             Text(
-                when (goals.size) { 0 -> "Sin metas"; 1 -> "1 meta"; else -> "${goals.size} metas" },
+                when (goals.size) { 0 -> t("Sin metas"); 1 -> t("1 meta"); else -> t("{0} metas", goals.size) },
                 color = NightSoft, fontSize = 11.sp, fontWeight = FontWeight.Medium,
                 modifier = Modifier.border(1.dp, Border, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
             )
@@ -283,7 +282,7 @@ internal fun SavingsHero(
 
         // Total ahorrado y avance general
         Spacer(Modifier.height(18.dp))
-        Text("Total ahorrado", color = Gray, fontSize = 12.sp)
+        Text(t("Total ahorrado"), color = Gray, fontSize = 12.sp)
         Row(verticalAlignment = Alignment.Bottom) {
             Text(moneyGrouped(savings), color = Night, fontWeight = FontWeight.Bold, fontSize = 30.sp, letterSpacing = (-0.5).sp, modifier = Modifier.weight(1f))
             if (totalTarget > 0) Text(savingsPercent(progress), color = GreenDark, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
@@ -293,15 +292,15 @@ internal fun SavingsHero(
             SavingsProgress(progress, Green, 12.dp)
             Spacer(Modifier.height(8.dp))
             Row {
-                Text("Meta total ${moneyGrouped(totalTarget)}", color = Gray, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                Text(if (missing > 0) "Faltan ${moneyGrouped(missing)}" else "¡Metas cumplidas!", color = Gray, fontSize = 11.sp)
+                Text(t("Meta total {0}", moneyGrouped(totalTarget)), color = Gray, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                Text(if (missing > 0) t("Faltan {0}", moneyGrouped(missing)) else t("¡Metas cumplidas!"), color = Gray, fontSize = 11.sp)
             }
         }
 
         // Metas
         Spacer(Modifier.height(18.dp))
         if (goals.isEmpty()) {
-            Text("Crea una meta para darle un propósito a tu ahorro.", color = Gray, fontSize = 13.sp)
+            Text(t("Crea una meta para darle un propósito a tu ahorro."), color = Gray, fontSize = 13.sp)
         } else {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(Card).border(1.dp, Border.copy(alpha = .8f), RoundedCornerShape(14.dp))) {
                 // Se muestran primero las metas con más avance, sin alterar sus importes.
@@ -313,14 +312,14 @@ internal fun SavingsHero(
             }
             if (goals.size > 3) {
                 Spacer(Modifier.height(8.dp))
-                Text("Y ${goals.size - 3} ${if (goals.size - 3 == 1) "meta más" else "metas más"}", color = Gray, fontSize = 11.sp)
+                Text("Y ${goals.size - 3} ${if (goals.size - 3 == 1) t("meta más") else t("metas más")}", color = Gray, fontSize = 11.sp)
             }
         }
 
         if (onClick != null) {
             Spacer(Modifier.height(14.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(if (goals.isEmpty()) "Crear mi primera meta" else "Ver todas mis metas",
+                Text(if (goals.isEmpty()) t("Crear mi primera meta") else t("Ver todas mis metas"),
                     color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Icon(DinexNavigationIcons.Chevron, null, tint = GreenDark, modifier = Modifier.size(16.dp))
             }
@@ -348,8 +347,8 @@ private fun SavingsGoalRow(goal: SavingsGoal, onOpen: () -> Unit) {
         Spacer(Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.Bottom) {
             Text(moneyGrouped(goal.saved), color = Night, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            if (goal.target > 0) Text(" de ${moneyGrouped(goal.target)}", color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            else Text(" ahorrados", color = Gray, fontSize = 12.sp)
+            if (goal.target > 0) Text(t(" de {0}", moneyGrouped(goal.target)), color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            else Text(t(" ahorrados"), color = Gray, fontSize = 12.sp)
         }
         if (goal.target > 0) {
             Spacer(Modifier.height(10.dp))
@@ -429,7 +428,7 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
             StreakBadge(level, 58.dp, locked = streak == 0)
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Racha actual", color = Gray, fontSize = 10.sp)
+                Text(t("Racha actual"), color = Gray, fontSize = 10.sp)
                 Text(countLabel(streak, "día", "días"), color = Night, fontWeight = FontWeight.Black, fontSize = 22.sp)
                 Text("Nivel ${level.name.uppercase()}", color = readableAccent(level.color), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 if (next != null) Text("Progreso hacia ${next.name}", color = Gray, fontSize = 10.sp)
@@ -443,11 +442,11 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
                     disabledContainerColor = CardRaised,
                     disabledContentColor = Gray,
                 ),
-            ) { Text(if (savedToday) "Registrado" else "Ahorré hoy", fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+            ) { Text(if (savedToday) t("Registrado") else t("Ahorré hoy"), fontSize = 12.sp, fontWeight = FontWeight.Bold) }
         }
         if (!savedToday) {
             Spacer(Modifier.height(8.dp))
-            Text("Ahorra hoy y suma +1 a tu racha. Aunque sea S/ 1, cuenta.", color = Orange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            Text(t("Ahorra hoy y suma +1 a tu racha. Aunque sea S/ 1, cuenta."), color = Orange, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -465,7 +464,7 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
             }
         }
         Spacer(Modifier.height(12.dp))
-        Text("Camino de niveles", color = Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
+        Text(t("Camino de niveles"), color = Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
         Spacer(Modifier.height(8.dp))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             items(streakLevels) { item ->
@@ -510,9 +509,9 @@ internal fun DailyBudget(today: Double, limit: Float, onChange: (Float) -> Unit,
     val remaining = max(limit - today, 0.0)
     DinexCard(accent = if (warning) Red else Green) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Tu presupuesto", color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+            Text(t("Tu presupuesto"), color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
             if (onAdjustCategories != null) {
-                TextButton(onClick = onAdjustCategories) { Text("Ajustar categorías", color = GreenDark, fontSize = 11.sp) }
+                TextButton(onClick = onAdjustCategories) { Text(t("Ajustar categorías"), color = GreenDark, fontSize = 11.sp) }
             }
         }
         Spacer(Modifier.height(12.dp))
@@ -525,7 +524,7 @@ internal fun DailyBudget(today: Double, limit: Float, onChange: (Float) -> Unit,
         DinexProgress(ratio, if (warning) Red else Green, height = 8.dp)
         Spacer(Modifier.height(8.dp))
         Text(
-            if (warning) "Estás cerca del límite de hoy" else "Aún tienes ${money(remaining)} hoy",
+            if (warning) t("Estás cerca del límite de hoy") else t("Aún tienes {0} hoy", money(remaining)),
             color = if (warning) Red else Gray,
             fontSize = 11.sp,
         )
@@ -553,14 +552,14 @@ internal fun SpendingOverview(movements: List<Movement>) {
     DinexCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("¿A dónde se fue tu dinero?", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Night)
-                Text(if (selected == null) "Toca una porción para filtrar" else "Filtro activo", color = Gray, fontSize = 11.sp)
+                Text(t("¿A dónde se fue tu dinero?"), fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Night)
+                Text(if (selected == null) t("Toca una porción para filtrar") else t("Filtro activo"), color = Gray, fontSize = 11.sp)
             }
             Text(money(realTotal), fontWeight = FontWeight.Black, color = Night, fontSize = 14.sp)
         }
         Spacer(Modifier.height(14.dp))
         if (realTotal <= 0) {
-            Text("Todavía no hay gastos registrados este mes.", color = Gray, fontSize = 11.sp)
+            Text(t("Todavía no hay gastos registrados este mes."), color = Gray, fontSize = 11.sp)
         } else {
             val onCategory: (String) -> Unit = { name ->
                 val index = expenses.indexOfFirst { it.first.name == name }
@@ -602,7 +601,7 @@ private fun SpendingLegend(visible: List<Pair<CategoryInfo, Double>>, total: Dou
                 Text(if (selected == null) "${percent(value, total)}%" else money(value), color = Night, fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
         }
-        if (selected != null) TextButton(onClick = onClear) { Text("Ver todas", color = GreenDark) }
+        if (selected != null) TextButton(onClick = onClear) { Text(t("Ver todas"), color = GreenDark) }
     }
 }
 

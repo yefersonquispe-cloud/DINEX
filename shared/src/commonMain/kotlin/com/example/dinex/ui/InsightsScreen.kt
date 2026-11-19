@@ -64,9 +64,9 @@ internal fun InsightsPage(
         ) {
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterChip(!weekly, { weekly = false }, label = { Text("Mensual") })
-                    FilterChip(weekly, { weekly = true }, label = { Text("Últimos 7 días") })
-                    TextButton(onClick = onExport) { Text("Exportar") }
+                    FilterChip(!weekly, { weekly = false }, label = { Text(t("Mensual")) })
+                    FilterChip(weekly, { weekly = true }, label = { Text(t("Últimos 7 días")) })
+                    TextButton(onClick = onExport) { Text(t("Exportar")) }
                 }
             }
             if (!weekly) item {
@@ -75,7 +75,7 @@ internal fun InsightsPage(
             item {
                 var expanded by remember { mutableStateOf(false) }
                 Box {
-                    OutlinedButton(onClick = { expanded = true }) { Text("Mes: $selectedMonth") }
+                    OutlinedButton(onClick = { expanded = true }) { Text(t("Mes: {0}", selectedMonth)) }
                     DropdownMenu(expanded, onDismissRequest = { expanded = false }) {
                         (listOf(currentKey) + months).distinct().forEach { month ->
                             DropdownMenuItem(text = { Text(month) }, onClick = { selectedMonth = month; expanded = false })
@@ -135,21 +135,21 @@ private fun SpendingRhythm(expense: Double, previousExpense: Double, income: Dou
     val change = if (previousExpense > 0) ((expense - previousExpense) / previousExpense * 100).toInt() else null
     val rate = if (income > 0) (expense / income * 100).toInt() else 0
     DinexCard(accent = if (change != null && change > 0) Orange else GreenDark, vibrant = true) {
-        Text("TU RITMO", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+        Text(t("TU RITMO"), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
         Spacer(Modifier.height(6.dp))
         Text(when {
-            change == null -> "Comienza a descubrir tus patrones"
-            change > 0 -> "Gastaste $change% más que $comparisonLabel"
-            change < 0 -> "Gastaste ${-change}% menos que $comparisonLabel"
-            else -> "Tu gasto se mantuvo estable"
+            change == null -> t("Comienza a descubrir tus patrones")
+            change > 0 -> t("Gastaste {0}% más que {1}", change, t(comparisonLabel))
+            change < 0 -> t("Gastaste {0}% menos que {1}", -change, t(comparisonLabel))
+            else -> t("Tu gasto se mantuvo estable")
         }, color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(Modifier.height(7.dp))
-        Text("${money(expense)} en gastos · ${money(income)} en ingresos", color = Gray, fontSize = 13.sp)
+        Text(t("{0} en gastos · {1} en ingresos", money(expense), money(income)), color = Gray, fontSize = 13.sp)
         Spacer(Modifier.height(14.dp))
         DinexProgress((rate / 100f).coerceIn(0f, 1f), if (rate > 100) Red else GreenDark)
         Spacer(Modifier.height(7.dp))
-        Text("Usaste $rate% de tus ingresos registrados", color = if (rate > 100) Red else Gray, fontSize = 12.sp)
-        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Ocultar detalle" else "Ver detalle") }
+        Text(t("Usaste {0}% de tus ingresos registrados", rate), color = if (rate > 100) Red else Gray, fontSize = 12.sp)
+        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) t("Ocultar detalle") else t("Ver detalle")) }
         if (expanded) {
             HorizontalDivider(color = Border)
             Spacer(Modifier.height(10.dp))
@@ -167,9 +167,9 @@ internal fun ForecastCard(income: Double, expense: Double) {
     val forecast = max(income - expense / day.coerceAtLeast(1) * daysInMonth, 0.0)
     val monthProgress = (day / daysInMonth.toFloat()).coerceIn(0.05f, 1f)
     DinexCard(elevated = true, accent = Indigo, vibrant = true) {
-        Text("Proyección de fin de mes", color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        Text(t("Proyección de fin de mes"), color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         Text(money(forecast), color = Night, fontWeight = FontWeight.Black, fontSize = 30.sp)
-        Text("Estimación según los ingresos registrados y tu gasto diario promedio", color = Gray, fontSize = 11.sp)
+        Text(t("Estimación según los ingresos registrados y tu gasto diario promedio"), color = Gray, fontSize = 11.sp)
         Spacer(Modifier.height(12.dp))
         DinexProgress(monthProgress, Indigo)
         Spacer(Modifier.height(6.dp))
@@ -186,9 +186,9 @@ internal fun InsightBox(code: String, title: String, body: String, tint: Color) 
             }
             Spacer(Modifier.width(10.dp))
             Column {
-                Text(title, fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Night)
+                Text(t(title), fontWeight = FontWeight.Bold, fontSize = 14.sp, color = Night)
                 Spacer(Modifier.height(3.dp))
-                Text(body, color = Gray, fontSize = 12.sp)
+                Text(t(body), color = Gray, fontSize = 12.sp)
             }
         }
     }

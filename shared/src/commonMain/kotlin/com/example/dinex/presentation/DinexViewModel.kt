@@ -62,7 +62,10 @@ internal class DinexViewModel(
     /** null en pruebas: la app funciona solo con los datos del equipo. */
     private val cloud: DinexCloud? = null,
 ) : ViewModel(), AiQuota {
-    init { DinexThemeState.dark = repository.darkMode() }
+    init {
+        DinexThemeState.dark = repository.darkMode()
+        DinexI18n.language = DinexI18n.fromCode(repository.language())
+    }
     private val initialEmail = repository.session()
     private val mutableState = MutableStateFlow(DinexUiState(
         accounts = repository.accounts(),
@@ -191,6 +194,12 @@ internal class DinexViewModel(
         repository.setLargeText(enabled)
         mutableState.value = value.copy(largeText = enabled)
     }
+    /** Cambia el idioma de toda la app y lo guarda en este equipo. */
+    fun setLanguage(language: DinexLanguage) {
+        repository.setLanguage(language.code)
+        DinexI18n.language = language
+    }
+
     fun setDarkMode(enabled: Boolean) {
         repository.setDarkMode(enabled)
         DinexThemeState.dark = enabled

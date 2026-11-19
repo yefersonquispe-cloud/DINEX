@@ -53,7 +53,7 @@ import org.jetbrains.compose.resources.painterResource
 @Composable
 internal fun ValidationHint(label: String, valid: Boolean) {
     Text(
-        "${if (valid) "Cumple:" else "Requisito:"} $label",
+        "${if (valid) t("Cumple:") else t("Requisito:")} ${t(label)}",
         color = if (valid) Lime else Gray,
         fontSize = 12.sp,
         modifier = Modifier.padding(top = 4.dp),
@@ -159,8 +159,8 @@ internal fun DinexSidebar(
                 }
                 Spacer(Modifier.width(11.dp))
                 Column {
-                    Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp, letterSpacing = 1.6.sp)
-                    Text("Tu dinero, con propósito.", color = Gray, fontSize = 11.sp)
+                    Text(t("DINEX"), color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp, letterSpacing = 1.6.sp)
+                    Text(t("Tu dinero, con propósito."), color = Gray, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.height(22.dp))
@@ -173,7 +173,7 @@ internal fun DinexSidebar(
             ) {
                 Icon(DinexNavigationIcons.Add, null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Registrar movimiento", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                Text(t("Registrar movimiento"), fontWeight = FontWeight.Bold, fontSize = 13.sp)
             }
             Spacer(Modifier.height(24.dp))
             SidebarSection("Menú")
@@ -249,7 +249,7 @@ internal fun SidebarItem(label: String, code: String, selected: Boolean, onClick
         } else {
             Text(code, color = if (selected) GreenDark else Gray, fontWeight = FontWeight.Black, fontSize = 9.sp, modifier = Modifier.width(33.dp))
         }
-        Text(label, color = if (selected) Night else NightSoft, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, fontSize = 14.sp)
+        Text(t(label), color = if (selected) Night else NightSoft, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium, fontSize = 14.sp)
     }
 }
 
@@ -265,7 +265,7 @@ internal fun DinexDesktopTopBar(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Hola, ${name.substringBefore(' ')}", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(t("Hola, {0}", name.substringBefore(' ')), color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                 Text(currentDateLabel(), color = Gray, fontSize = 12.sp)
             }
             Surface(
@@ -344,7 +344,7 @@ internal fun DinexTopBar(
             )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
-                Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.2.sp)
+                Text(t("DINEX"), color = Night, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.2.sp)
                 Text(currentDateLabel(), color = Gray, fontSize = 10.sp)
             }
             Surface(
@@ -441,6 +441,7 @@ internal fun ProfileDialog(
     onOpenGuide: () -> Unit,
     onOpenLegal: (Int) -> Unit,
     onDeleteAccount: (onDone: (String?) -> Unit) -> Unit,
+    onLanguage: (DinexLanguage) -> Unit = {},
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
@@ -470,10 +471,10 @@ internal fun ProfileDialog(
                             TextButton(onClick = onDismiss) {
                                 Icon(DinexNavigationIcons.Back, null, tint = Color.White, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(4.dp))
-                                Text("Volver", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text(t("Volver"), color = Color.White, fontWeight = FontWeight.Bold)
                             }
                             Spacer(Modifier.weight(1f))
-                            Text("MI PERFIL", color = Color.White.copy(alpha = .75f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
+                            Text(t("MI PERFIL"), color = Color.White.copy(alpha = .75f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.5.sp,
                                 modifier = Modifier.padding(end = 12.dp))
                         }
                         Box {
@@ -488,7 +489,7 @@ internal fun ProfileDialog(
                         Text(name, fontWeight = FontWeight.Black, fontSize = 24.sp, color = Color.White, textAlign = TextAlign.Center)
                         Text(email, color = Color.White.copy(alpha = .8f), fontSize = 13.sp)
                         if (profilePhoto.isNotBlank()) TextButton(onClick = { photoError = if (onProfilePhoto(null)) "" else "No se pudo quitar la foto." }) {
-                            Text("Quitar foto", color = Color.White.copy(alpha = .85f), fontSize = 12.sp)
+                            Text(t("Quitar foto"), color = Color.White.copy(alpha = .85f), fontSize = 12.sp)
                         }
                         if (photoError.isNotBlank()) Text(photoError, color = Color(0xFFFFC2C8), fontSize = 12.sp)
                         Spacer(Modifier.height(12.dp))
@@ -497,8 +498,8 @@ internal fun ProfileDialog(
                                 StreakBadge(level, 30.dp, locked = streak == 0)
                                 Spacer(Modifier.width(8.dp))
                                 Column {
-                                    Text("Nivel ${level.name} · $streak ${if (streak == 1) "día" else "días"} de racha", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Text(if (next == null) "Completaste los 365 días" else "${countLabel(next.startsAt - streak, "día", "días")} para ${next.name}", color = Color.White.copy(alpha = .75f), fontSize = 10.sp)
+                                    Text(t("Nivel {0} · {1} de racha", t(level.name), "$streak ${if (streak == 1) t("día") else t("días")}"), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(if (next == null) t("Completaste los 365 días") else t("{0} para {1}", "${next.startsAt - streak} ${if (next.startsAt - streak == 1) t("día") else t("días")}", t(next.name)), color = Color.White.copy(alpha = .75f), fontSize = 10.sp)
                                 }
                             }
                         }
@@ -526,11 +527,13 @@ internal fun ProfileDialog(
                             Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                                 Icon(DinexNavigationIcons.Check, null, tint = GreenDark, modifier = Modifier.size(13.dp))
                                 Spacer(Modifier.width(5.dp))
-                                Text("${countLabel(movements.size, "movimiento sincronizado", "movimientos sincronizados")} con tu cuenta", color = Gray, fontSize = 11.sp)
+                                Text(t("{0} sincronizados con tu cuenta", "${movements.size} ${if (movements.size == 1) t("movimiento") else t("movimientos")}"), color = Gray, fontSize = 11.sp)
                             }
                         }
                     }
                     ProfileSection("Preferencias") {
+                        LanguagePicker(DinexI18n.language, onLanguage)
+                        ProfileRowDivider()
                         ProfileSwitchRow(if (darkMode) DinexNavigationIcons.Moon else DinexNavigationIcons.Sun, "Modo oscuro", if (darkMode) "Verde bosque" else "Verde y blanco", darkMode, onDarkMode)
                         ProfileRowDivider()
                         ProfileSwitchRow(DinexNavigationIcons.Sparkle, "Reducir movimiento", "Menos animaciones", reduceMotion, onReduceMotion)
@@ -554,10 +557,10 @@ internal fun ProfileDialog(
                             }
                         }
                         if (!notificationsEnabled) Column(Modifier.padding(start = 62.dp, end = 14.dp, bottom = 10.dp)) {
-                            Text("Las notificaciones están bloqueadas en Android. Actívalas para que Dinex pueda avisarte.", color = Orange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            Text(t("Las notificaciones están bloqueadas en Android. Actívalas para que Dinex pueda avisarte."), color = Orange, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                TextButton(onClick = onRequestNotifications) { Text("Permitir", color = GreenDark, fontWeight = FontWeight.Bold) }
-                                TextButton(onClick = onOpenNotificationSettings) { Text("Abrir ajustes", color = Gray, fontWeight = FontWeight.Bold) }
+                                TextButton(onClick = onRequestNotifications) { Text(t("Permitir"), color = GreenDark, fontWeight = FontWeight.Bold) }
+                                TextButton(onClick = onOpenNotificationSettings) { Text(t("Abrir ajustes"), color = Gray, fontWeight = FontWeight.Bold) }
                             }
                         }
                         ProfileRowDivider()
@@ -578,7 +581,7 @@ internal fun ProfileDialog(
                         ProfileRowDivider()
                         ProfileLinkRow(DinexNavigationIcons.Close, "Eliminar mi cuenta", "Borra tu cuenta y todos tus datos", { deleteError = null; confirmDelete = true }, danger = true)
                     }
-                    Text("DINEX · Tu dinero, con propósito.", color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                    Text(t("DINEX · Tu dinero, con propósito."), color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(18.dp))
                 }
             }
@@ -586,11 +589,11 @@ internal fun ProfileDialog(
     }
     if (confirmDelete) AlertDialog(
         onDismissRequest = { if (!deleting) confirmDelete = false },
-        title = { Text("¿Eliminar tu cuenta?", fontWeight = FontWeight.Black) },
+        title = { Text(t("¿Eliminar tu cuenta?"), fontWeight = FontWeight.Black) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Se borrarán tu cuenta, tus movimientos, metas y recordatorios de la nube y de este equipo. No se puede deshacer.")
-                Text("Si quieres guardar una copia, primero exporta tu reporte desde Movimientos.", color = Gray, fontSize = 12.sp)
+                Text(t("Se borrarán tu cuenta, tus movimientos, metas y recordatorios de la nube y de este equipo. No se puede deshacer."))
+                Text(t("Si quieres guardar una copia, primero exporta tu reporte desde Movimientos."), color = Gray, fontSize = 12.sp)
                 deleteError?.let { Text(it, color = Red, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
             }
         },
@@ -602,16 +605,16 @@ internal fun ProfileDialog(
                     onDeleteAccount { error -> deleting = false; deleteError = error; if (error == null) confirmDelete = false }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = Red, contentColor = Color.White),
-            ) { Text(if (deleting) "Eliminando…" else "Eliminar para siempre") }
+            ) { Text(if (deleting) t("Eliminando…") else t("Eliminar para siempre")) }
         },
-        dismissButton = { TextButton(enabled = !deleting, onClick = { confirmDelete = false }) { Text("Cancelar") } },
+        dismissButton = { TextButton(enabled = !deleting, onClick = { confirmDelete = false }) { Text(t("Cancelar")) } },
     )
 }
 
 @Composable
 private fun ProfileSection(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title.uppercase(), color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, modifier = Modifier.padding(start = 6.dp))
+        Text(t(title).uppercase(), color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, modifier = Modifier.padding(start = 6.dp))
         Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
             Column(Modifier.fillMaxWidth().padding(vertical = 4.dp), content = content)
         }
@@ -638,8 +641,8 @@ private fun ProfileLinkRow(icon: androidx.compose.ui.graphics.vector.ImageVector
         ProfileRowIcon(icon, danger)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(label, color = if (danger) Red else Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(detail, color = Gray, fontSize = 11.sp)
+            Text(t(label), color = if (danger) Red else Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(t(detail), color = Gray, fontSize = 11.sp)
         }
         Icon(DinexNavigationIcons.Chevron, null, tint = Gray, modifier = Modifier.size(16.dp))
     }
@@ -651,8 +654,8 @@ private fun ProfileSwitchRow(icon: androidx.compose.ui.graphics.vector.ImageVect
         ProfileRowIcon(icon)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            Text(label, color = Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
-            Text(detail, color = Gray, fontSize = 11.sp)
+            Text(t(label), color = Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+            Text(t(detail), color = Gray, fontSize = 11.sp)
         }
         Switch(value, onChange, modifier = Modifier.semantics { contentDescription = label })
     }
@@ -664,7 +667,7 @@ private fun ProfileFigure(label: String, value: String, tint: Color, icon: andro
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, tint = Gray, modifier = Modifier.size(13.dp))
             Spacer(Modifier.width(5.dp))
-            Text(label, color = Gray, fontSize = 11.sp)
+            Text(t(label), color = Gray, fontSize = 11.sp)
         }
         Spacer(Modifier.height(4.dp))
         Text(value, color = tint, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, textAlign = TextAlign.Center)
@@ -722,7 +725,7 @@ internal fun BottomItem(icon: ImageVector, label: String, selected: Boolean, mod
         Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(25.dp).graphicsLayer { scaleX = bounce; scaleY = bounce })
         Spacer(Modifier.height(5.dp))
         Text(
-            label,
+            t(label),
             color = if (selected) Night else NavigationMuted,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
             fontSize = 11.sp,
@@ -734,3 +737,32 @@ internal fun BottomItem(icon: ImageVector, label: String, selected: Boolean, mod
 
 private val NavigationAqua get() = if (DinexThemeState.dark) GreenDark else Green
 private val NavigationMuted get() = Gray
+
+/** Selector de idioma del perfil: Español, English y Runasimi en un control segmentado. */
+@Composable
+private fun LanguagePicker(current: DinexLanguage, onChange: (DinexLanguage) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Mint), contentAlignment = Alignment.Center) {
+                Text("Aa", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(t("Idioma"), color = Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(t("Elige el idioma de toda la app"), color = Gray, fontSize = 12.sp)
+            }
+        }
+        Row(Modifier.fillMaxWidth().clip(CircleShape).background(CardRaised).border(1.dp, Border, CircleShape).padding(4.dp)) {
+            DinexLanguage.entries.forEach { language ->
+                val chosen = language == current
+                Box(
+                    Modifier.weight(1f).height(36.dp).clip(CircleShape).background(if (chosen) Green else androidx.compose.ui.graphics.Color.Transparent)
+                        .clickable(onClickLabel = language.label) { onChange(language) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(language.label, color = if (chosen) androidx.compose.ui.graphics.Color.White else NightSoft, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+                }
+            }
+        }
+    }
+}
