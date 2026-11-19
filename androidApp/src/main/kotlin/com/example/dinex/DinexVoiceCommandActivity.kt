@@ -13,7 +13,10 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -130,11 +133,15 @@ class DinexVoiceCommandActivity : ComponentActivity() {
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 CircularProgressIndicator(
-                                    modifier = Modifier.size(58.dp),
+                                    modifier = Modifier.size(76.dp),
                                     color = accent,
-                                    strokeWidth = 5.dp,
+                                    strokeWidth = 4.dp,
                                 )
-                                Text("D", color = accent, fontWeight = FontWeight.Black, fontSize = 24.sp)
+                                // Mascota oficial de Dinex en lugar de la letra D.
+                                Image(
+                                    painterResource(R.drawable.dinex_mascot), "Mascota de Dinex",
+                                    Modifier.size(60.dp), contentScale = ContentScale.Fit,
+                                )
                             }
                         }
                         Spacer(Modifier.height(20.dp))
@@ -146,6 +153,7 @@ class DinexVoiceCommandActivity : ComponentActivity() {
                             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Text("Puedes decir:", color = colors.onSurfaceVariant, fontSize = 11.sp)
                                 Text("“Registra 20 soles en comida”", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                Text("“¿Cuánto gasté esta semana?”", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 Text("“Recibí 150 soles por un trabajo”", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                 Text("“Agenda pagar internet mañana por 50 soles”", fontSize = 13.sp, fontWeight = FontWeight.Bold)
                             }

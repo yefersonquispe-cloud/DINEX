@@ -21,6 +21,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -147,6 +149,31 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         }
     }
 
+    // Oye Dinex: preguntas que no son comandos se envían a Dinex IA (con su límite diario).
+    LaunchedEffect(state.pendingAiQuestion) {
+        model.consumePendingAiQuestion()?.let { question ->
+            assistantOpen = true
+            assistantModel.send(question, assistant, state.data)
+        }
+    }
+    // Oye Dinex: confirmación antes de guardar un movimiento dictado con dudas.
+    state.voiceConfirmation?.let { draft ->
+        val item = draft.movement
+        AlertDialog(
+            onDismissRequest = { model.confirmVoice(false) },
+            title = { Text(if (item.income) "¿Guardo este ingreso?" else "¿Guardo este gasto?", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(money(item.amount), color = if (item.income) Green else Red, fontSize = 28.sp, fontWeight = FontWeight.Black)
+                    Text("${item.title} · ${item.category} · ${item.day}/${item.month}/${item.year}", color = Night)
+                    draft.doubts.forEach { Text("• $it", color = Gray, fontSize = 13.sp) }
+                }
+            },
+            confirmButton = { Button(onClick = { model.confirmVoice(true, automation.currentLocationLabel()) }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Guardar") } },
+            dismissButton = { TextButton(onClick = { model.confirmVoice(false) }) { Text("Cancelar") } },
+        )
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
       // En la web, con pantalla ancha, se usa el diseño de escritorio (WebWorkspace.kt).
       if (LocalWebLayout.current && maxWidth >= WebDesktopMinWidth) {
@@ -209,6 +236,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                             onExport = { exportDialog = true },
                             locationAvailable = locationAvailable,
                             onRequestLocation = { automation.requestLocationPermission() },
+                            dailyLimit = dailyLimit.toDouble(),
                         )
                         else -> HomePage(movements, dailyLimit, streak, savings, countLabel(goals.size, "meta", "metas"), goals.sumOf { it.target },
                             onDailyLimitChange = model::setDailyLimit,
@@ -301,7 +329,13 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         }, confirmButton = { Button(onClick = model::confirmPendingExpense) { Text("Sí, registrar gasto") } }, dismissButton = { TextButton(onClick = model::cancelPendingExpense) { Text("Cancelar gasto") } })
     }
     state.budgetWarning?.let { warning ->
-        AlertDialog(onDismissRequest = model::dismissBudgetWarning, title = { Text("Superaste tu presupuesto diario") }, text = { Text(warning) }, confirmButton = { TextButton(onClick = model::dismissBudgetWarning) { Text("Entendido") } })
+        BudgetWarningDialog(
+            warning = warning,
+            spentToday = state.data.movements.filter { !it.income && it.isToday() }.sumOf { it.amount },
+            limit = state.data.dailyLimit.toDouble(),
+            onDismiss = model::dismissBudgetWarning,
+            onOpenPlan = { model.dismissBudgetWarning(); model.selectPage(2) },
+        )
     }
     if (state.goalCelebration) GoalCelebrationDialog(state.celebrationGoal?.name ?: "tu meta", state.celebrationGoal?.saved ?: savings, onDismiss = model::dismissCelebrations)
     state.levelCelebration?.let { StreakLevelDialog(it, streak, onDismiss = model::dismissCelebrations) }

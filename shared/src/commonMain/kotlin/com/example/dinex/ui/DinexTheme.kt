@@ -42,6 +42,9 @@ import androidx.compose.ui.unit.sp
 // sus propios colores para que las categorías sigan siendo distinguibles.
 internal object DinexThemeState { var dark by mutableStateOf(false) }
 fun isDinexDarkModeEnabled(): Boolean = DinexRepository().darkMode()
+
+/** Opción "Reducir movimiento" de Dinex, para las vistas nativas de Android (burbuja de voz). */
+fun isDinexReducedMotionEnabled(): Boolean = DinexRepository().reduceMotion()
 internal val AppBg get() = if (DinexThemeState.dark) Color(0xFF101A15) else Color(0xFFF7FAF7)
 internal val Night get() = if (DinexThemeState.dark) Color(0xFFF3F8F3) else Color(0xFF183326)
 internal val NightSoft get() = if (DinexThemeState.dark) Color(0xFFC0D6C5) else Color(0xFF365442)

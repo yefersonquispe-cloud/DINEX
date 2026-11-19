@@ -43,6 +43,7 @@ class MainActivity : ComponentActivity() {
         configureDinexStorage(this)
         DinexAlerts.sink = AndroidDinexAlerts(this)
         if (savedInstanceState == null) handleWidgetAction(intent)
+        if (savedInstanceState == null) handleDebugVoice(intent)
 
         setContent {
             App(onThemeChanged = { dark ->
@@ -58,6 +59,27 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleWidgetAction(intent)
+        handleDebugVoice(intent)
+    }
+
+    /**
+     * Solo en la versión de desarrollo (nunca en la publicada): permite probar Oye Dinex
+     * en el emulador sin micrófono, con adb y el extra "dinex_debug_phrase".
+     */
+    private fun handleDebugVoice(intent: Intent?) {
+        if ((applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) return
+        val phrase = intent?.getStringExtra("dinex_debug_phrase") ?: return
+        intent.removeExtra("dinex_debug_phrase")
+        // Se (re)inicia Oye Dinex mientras la app está a la vista, como lo haría la persona.
+        runCatching { androidx.core.content.ContextCompat.startForegroundService(this, Intent(this, DinexHotwordService::class.java).setAction(DinexHotwordService.ACTION_START)) }
+        if (phrase.isBlank()) return
+        val app = applicationContext
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        // Primero se pasa la app a segundo plano y luego se "dicta" la frase a la burbuja.
+        handler.postDelayed({ moveTaskToBack(true) }, 600)
+        handler.postDelayed({
+            runCatching { app.startService(Intent(app, DinexHotwordService::class.java).setAction(DinexHotwordService.ACTION_DEBUG_PHRASE).putExtra(DinexHotwordService.EXTRA_PHRASE, phrase)) }
+        }, 1_800)
     }
 
     /** Un botón del widget se atiende una sola vez, aunque la app se reabra desde recientes. */

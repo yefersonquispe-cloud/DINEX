@@ -35,6 +35,10 @@ internal data class DinexUiState(
     val authNotice: String? = null,
     /** Cuenta nueva creada con Google: falta aceptar los Términos antes de entrar. */
     val googleTermsRequired: Boolean = false,
+    /** Movimiento dictado que espera confirmación (monto alto, sin moneda, etc.). */
+    val voiceConfirmation: VoiceDraft? = null,
+    /** Pregunta dictada que Oye Dinex no resolvió solo: se envía a Dinex IA. */
+    val pendingAiQuestion: String? = null,
 ) {
     val activeAccount get() = accounts.firstOrNull { it.email == email }
     val initialBalanceRequired get() = email != null && !data.onboardingCompleted && data.movements.isEmpty()
@@ -86,6 +90,8 @@ internal class DinexViewModel(
     private var resumeJob: Job? = null
 
     init {
+        // El servidor seguro de Dinex IA necesita el token de la sesión activa (nunca la contraseña).
+        if (cloud != null) DinexAiAuth.idToken = { runCatching { validSession()?.idToken }.getOrNull() }
         val email = initialEmail
         if (cloud != null && email != null) {
             if (cloudSession?.email != email) {
@@ -141,6 +147,25 @@ internal class DinexViewModel(
             }
         }
         return aiQueriesLeft()
+    }
+
+    override fun acceptServerAiQuota(remaining: Int) {
+        val email = value.email ?: return
+        repository.mergeAiUsage(email, AiUsage(currentDayIndex(), (DAILY_AI_QUERIES - remaining).coerceIn(0, DAILY_AI_QUERIES)))
+    }
+
+    override suspend fun submitAiReport(report: AiReport): String? {
+        val cloud = cloud ?: return "Los reportes necesitan una cuenta en la nube."
+        val session = try { validSession() } catch (cancel: CancellationException) { throw cancel } catch (_: Throwable) { null }
+            ?: return "Inicia sesión para enviar el reporte."
+        return try {
+            cloud.reportAiAnswer(session, report)
+            null
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Throwable) {
+            "No pude enviar el reporte. Revisa tu internet e inténtalo otra vez."
+        }
     }
 
     private suspend fun pushAiUsage(email: String) {
@@ -619,12 +644,43 @@ internal class DinexViewModel(
         return true
     }
     fun dismissCelebrations() { mutableState.value = value.copy(goalCelebration = false, levelCelebration = null) }
+    private val voice = VoiceConversation()
+
+    /** Comando de voz dentro de la app: registra, responde con datos reales o pide confirmación. */
     fun handleVoice(text: String, location: String?) {
-        val reminder = parseVoiceReminder(text, nextReminderId())
-        if (reminder != null) { saveReminder(reminder); selectPage(2); return }
-        val movement = parseVoiceCommand(text, nextMovementId(), location)
-        if (movement == null) showMessage("No pude identificar el monto. Prueba: registra 20 soles en comida.")
-        else { saveMovement(movement); selectPage(1) }
+        if (value.email == null) return
+        // La burbuja de Oye Dinex envía aquí las preguntas que deben ir a Dinex IA.
+        if (text.startsWith(VOICE_AI_PREFIX)) {
+            mutableState.value = value.copy(pendingAiQuestion = text.removePrefix(VOICE_AI_PREFIX).trim().take(500).ifBlank { null })
+            return
+        }
+        when (val outcome = voice.interpret(text, value.data)) {
+            is VoiceOutcome.SaveReminder -> { saveReminder(outcome.reminder); selectPage(2) }
+            is VoiceOutcome.Save -> saveVoiceDraft(outcome.draft, location)
+            is VoiceOutcome.Confirm -> mutableState.value = value.copy(voiceConfirmation = outcome.draft)
+            is VoiceOutcome.Answer -> showMessage(outcome.text)
+            is VoiceOutcome.Cancelled -> showMessage(outcome.text)
+            is VoiceOutcome.Help -> showMessage(outcome.text)
+            is VoiceOutcome.AskAi -> mutableState.value = value.copy(pendingAiQuestion = outcome.question)
+        }
+    }
+
+    /** Respuesta del cuadro "¿Guardo…?" de un movimiento dictado. */
+    fun confirmVoice(save: Boolean, location: String? = null) {
+        val draft = value.voiceConfirmation ?: return
+        voice.reset()
+        mutableState.value = value.copy(voiceConfirmation = null)
+        if (save) saveVoiceDraft(draft, location) else showMessage("Listo, no guardé nada.")
+    }
+
+    fun consumePendingAiQuestion(): String? = value.pendingAiQuestion?.also {
+        mutableState.value = value.copy(pendingAiQuestion = null)
+    }
+
+    private fun saveVoiceDraft(draft: VoiceDraft, location: String?) {
+        val movement = draft.movement.copy(id = nextMovementId(), location = location.orEmpty())
+        saveMovement(movement)
+        selectPage(1)
     }
 
     private fun persist(data: FinancialData) {
