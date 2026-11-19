@@ -102,7 +102,7 @@ internal fun InsightsPage(
                     InsightBox(
                         "AH",
                         "Gastos hormiga",
-                        "Llevas ${money(antTotal)} en ${smallSpends.size} compras menores a S/ 15.",
+                        "Llevas ${money(antTotal)} en ${countLabel(smallSpends.size, "compra menor", "compras menores")} a S/ 15.",
                         Orange,
                     )
                 }

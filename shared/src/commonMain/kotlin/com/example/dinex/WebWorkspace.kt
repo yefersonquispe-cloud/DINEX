@@ -272,6 +272,10 @@ internal fun WebWorkspace(
             }
         }
         state.message?.let { message ->
+            LaunchedEffect(message) {
+                kotlinx.coroutines.delay(4_000)
+                model.showMessage(null)
+            }
             Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.BottomCenter) {
                 Row(
                     Modifier.clip(RoundedCornerShape(12.dp)).background(W.forest).padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
@@ -1042,7 +1046,7 @@ private fun GoalsCompactCard(goals: List<SavingsGoal>, actions: WebActions, onAl
 @Composable
 private fun RemindersCard(reminders: List<PaymentReminder>, actions: WebActions, modifier: Modifier = Modifier) {
     WCard(modifier.fillMaxWidth()) {
-        CardTitle("Próximos pagos", if (reminders.isEmpty()) "Sin pagos pendientes" else "${reminders.size} pendientes") {
+        CardTitle("Próximos pagos", if (reminders.isEmpty()) "Sin pagos pendientes" else countLabel(reminders.size, "pendiente", "pendientes")) {
             IconSquare(DinexNavigationIcons.Add, "Agregar recordatorio", actions.onAddReminder)
         }
         if (reminders.isEmpty()) {
@@ -1266,7 +1270,7 @@ private fun BudgetWebPage(model: DinexViewModel, data: FinancialData, actions: W
                 Spacer(Modifier.height(14.dp))
                 categories.forEach { info ->
                     val limit = data.categoryBudgets[info.name] ?: suggestions[info.name] ?: 0.0
-                    val spent = month.filter { !it.income && it.category == info.name }.sumOf { it.amount }
+                    val spent = month.filter { !it.income && it.budgetCategory() == info.name }.sumOf { it.amount }
                     val over = limit > 0 && spent > limit
                     Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {

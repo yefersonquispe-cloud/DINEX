@@ -106,7 +106,7 @@ internal fun personalTips(data: FinancialData, today: Int = currentDayIndex()): 
     }
 
     if (month.expenses > 0) {
-        val byCategory = month.expenseItems.groupBy { it.category }.mapValues { (_, items) -> items.sumOf { it.amount } }
+        val byCategory = month.expenseItems.groupBy { it.budgetCategory() }.mapValues { (_, items) -> items.sumOf { it.amount } }
         val (topName, topAmount) = byCategory.maxBy { it.value }
         val share = topAmount / month.expenses
         if (share >= .4 && byCategory.size > 1 || share >= .6) {

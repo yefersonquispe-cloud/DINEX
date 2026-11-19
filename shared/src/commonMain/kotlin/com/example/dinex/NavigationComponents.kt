@@ -498,7 +498,7 @@ internal fun ProfileDialog(
                                 Spacer(Modifier.width(8.dp))
                                 Column {
                                     Text("Nivel ${level.name} · $streak ${if (streak == 1) "día" else "días"} de racha", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Text(if (next == null) "Completaste los 365 días" else "${next.startsAt - streak} días para ${next.name}", color = Color.White.copy(alpha = .75f), fontSize = 10.sp)
+                                    Text(if (next == null) "Completaste los 365 días" else "${countLabel(next.startsAt - streak, "día", "días")} para ${next.name}", color = Color.White.copy(alpha = .75f), fontSize = 10.sp)
                                 }
                             }
                         }
@@ -526,7 +526,7 @@ internal fun ProfileDialog(
                             Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                                 Icon(DinexNavigationIcons.Check, null, tint = GreenDark, modifier = Modifier.size(13.dp))
                                 Spacer(Modifier.width(5.dp))
-                                Text("${movements.size} movimientos sincronizados con tu cuenta", color = Gray, fontSize = 11.sp)
+                                Text("${countLabel(movements.size, "movimiento sincronizado", "movimientos sincronizados")} con tu cuenta", color = Gray, fontSize = 11.sp)
                             }
                         }
                     }

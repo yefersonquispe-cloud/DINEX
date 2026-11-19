@@ -59,7 +59,7 @@ internal fun ImportMovementsDialog(existing: List<Movement>, onDismiss: () -> Un
             }
             if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Preparando la vista previa…", color = Gray) }
             review?.let { result ->
-                Text("${candidates.size} movimientos para importar", color = Green, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text("${countLabel(candidates.size, "movimiento", "movimientos")} para importar", color = Green, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text("Ingresos ${money(candidates.filter { it.income }.sumOf { it.amount })}\nEgresos ${money(candidates.filterNot { it.income }.sumOf { it.amount })}", color = Night)
                 Row { Checkbox(skipDuplicates, { skipDuplicates = it }); Text("Omitir movimientos repetidos", modifier = Modifier.padding(top = 12.dp), color = Night) }
                 if (duplicates > 0) Text("$duplicates movimientos repetidos se omitirán.", color = Gray)

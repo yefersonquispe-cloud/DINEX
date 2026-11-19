@@ -203,7 +203,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                             locationAvailable = locationAvailable,
                             onRequestLocation = { automation.requestLocationPermission() },
                         )
-                        else -> HomePage(movements, dailyLimit, streak, savings, "${data.savingGoals().size} metas", data.savingGoals().sumOf { it.target },
+                        else -> HomePage(movements, dailyLimit, streak, savings, countLabel(data.savingGoals().size, "meta", "metas"), data.savingGoals().sumOf { it.target },
                             onDailyLimitChange = model::setDailyLimit,
                             onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
                             goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true },

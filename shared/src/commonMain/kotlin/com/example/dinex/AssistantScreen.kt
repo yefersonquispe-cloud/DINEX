@@ -124,7 +124,7 @@ internal fun AssistantPage(
                     val expense = movements.filterNot { it.income }.sumOf { it.amount }
                     AssistantContextLine("Saldo registrado", money(income - expense), Night)
                     AssistantContextLine("Ahorros", money(savings), Lime)
-                    AssistantContextLine("Racha", "$streak días", Orange)
+                    AssistantContextLine("Racha", countLabel(streak, "día", "días"), Orange)
                     Spacer(Modifier.height(12.dp))
                     Text("Usa tu resumen de Dinex. No accede a tus bancos ni solicita claves.", color = Gray, fontSize = 12.sp, lineHeight = 18.sp)
                 }
@@ -363,7 +363,7 @@ internal fun buildFinancialContext(movements: List<Movement>, dailyLimit: Float,
     val expenses = movements.asSequence().filterNot { it.income }.sumOf { it.amount }
     val today = movements.asSequence().filter { !it.income && it.isToday() }.sumOf { it.amount }
     val categoryLines = categories.joinToString("\n") { category ->
-        val spent = movements.filter { !it.income && it.isInCurrentMonth() && it.category == category.name }.sumOf { it.amount }
+        val spent = movements.filter { !it.income && it.isInCurrentMonth() && it.budgetCategory() == category.name }.sumOf { it.amount }
         val limit = categoryBudgets[category.name] ?: 0.0
         "- ${category.name}: ${money(spent)} este mes; " + if (limit > 0) "límite mensual ${money(limit)}" else "sin límite configurado"
     }
@@ -376,7 +376,7 @@ internal fun buildFinancialContext(movements: List<Movement>, dailyLimit: Float,
         Gastos: ${money(expenses)}.
         Saldo disponible: ${money(income - expenses - savings)}.
         Gasto de hoy: ${money(today)}; límite diario: ${money(dailyLimit.toDouble())}.
-        Racha de ahorro: $streak días.
+        Racha de ahorro: ${countLabel(streak, "día", "días")}.
         Ahorro acumulado: ${money(savings)}.
         Gasto por categoría:
         $categoryLines

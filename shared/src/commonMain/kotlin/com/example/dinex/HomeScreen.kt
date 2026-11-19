@@ -389,7 +389,7 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text("Racha actual", color = Gray, fontSize = 10.sp)
-                Text("$streak días", color = Night, fontWeight = FontWeight.Black, fontSize = 22.sp)
+                Text(countLabel(streak, "día", "días"), color = Night, fontWeight = FontWeight.Black, fontSize = 22.sp)
                 Text("Nivel ${level.name.uppercase()}", color = readableAccent(level.color), fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 if (next != null) Text("Progreso hacia ${next.name}", color = Gray, fontSize = 10.sp)
             }
