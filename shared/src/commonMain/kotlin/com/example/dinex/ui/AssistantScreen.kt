@@ -89,7 +89,7 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
         AlertDialog(
             onDismissRequest = model::clearReportNotice,
             text = { Text(notice, color = Night) },
-            confirmButton = { TextButton(onClick = model::clearReportNotice) { Text("Entendido") } },
+            confirmButton = { TextButton(onClick = model::clearReportNotice) { Text(t("Entendido")) } },
         )
     }
 
@@ -100,12 +100,12 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
                 DinexCard(accent = Indigo, vibrant = true) {
                     Image(painterResource(Res.drawable.dinex_mascot_ai), null, Modifier.size(108.dp).align(Alignment.CenterHorizontally), contentScale = ContentScale.Fit)
                     Spacer(Modifier.height(14.dp))
-                    Text("Un aliado para tus decisiones.", color = Night, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 30.sp)
+                    Text(t("Un aliado para tus decisiones."), color = Night, fontWeight = FontWeight.Bold, fontSize = 24.sp, lineHeight = 30.sp)
                     Spacer(Modifier.height(8.dp))
-                    Text("Convierte tus movimientos en una conversación más clara sobre tu dinero.", color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
+                    Text(t("Convierte tus movimientos en una conversación más clara sobre tu dinero."), color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
                 }
                 DinexCard(accent = ElectricBlue) {
-                    Text("TU CONTEXTO", color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
+                    Text(t("TU CONTEXTO"), color = ElectricBlue, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp)
                     Spacer(Modifier.height(14.dp))
                     val income = movements.filter { it.income }.sumOf { it.amount }
                     val expense = movements.filterNot { it.income }.sumOf { it.amount }
@@ -113,7 +113,7 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
                     AssistantContextLine("Ahorros", money(savings), Lime)
                     AssistantContextLine("Racha", countLabel(streak, "día", "días"), Orange)
                     Spacer(Modifier.height(12.dp))
-                    Text("Usa tu resumen de Dinex. No accede a tus bancos ni solicita claves.", color = Gray, fontSize = 12.sp, lineHeight = 18.sp)
+                    Text(t("Usa tu resumen de Dinex. No accede a tus bancos ni solicita claves."), color = Gray, fontSize = 12.sp, lineHeight = 18.sp)
                 }
             }
             Column(Modifier.weight(1f).fillMaxHeight()) {
@@ -123,7 +123,7 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("Dinex IA", color = Night, fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.5).sp)
+                        Text(t("Dinex IA"), color = Night, fontSize = 24.sp, fontWeight = FontWeight.Bold, letterSpacing = (-.5).sp)
                         val subtitle = when (nanoStatus) {
                             NanoStatus.AVAILABLE -> "Gemini Nano · funciona sin internet"
                             NanoStatus.DOWNLOADING -> "Descargando Gemini Nano…"
@@ -164,11 +164,11 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
                 ) {
                     if (messages.size <= 1) item {
                         DinexCard(accent = Indigo, vibrant = true) {
-                            Text("MENOS DUDAS. MÁS CLARIDAD.", color = Indigo, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
+                            Text(t("MENOS DUDAS. MÁS CLARIDAD."), color = Indigo, fontSize = 10.sp, letterSpacing = 1.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(10.dp))
-                            Text("¿Qué quieres descubrir hoy?", color = Night, fontSize = 25.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
+                            Text(t("¿Qué quieres descubrir hoy?"), color = Night, fontSize = 25.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold)
                             Spacer(Modifier.height(9.dp))
-                            Text("Revisa tus gastos, piensa en tu próxima compra o empieza un plan de ahorro.", color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
+                            Text(t("Revisa tus gastos, piensa en tu próxima compra o empieza un plan de ahorro."), color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
                         }
                     }
                     items(messages) { item ->
@@ -188,7 +188,7 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
                 Surface(shape = RoundedCornerShape(24.dp), color = CardRaised.copy(alpha = .9f), border = androidx.compose.foundation.BorderStroke(1.dp, Indigo.copy(alpha = .35f))) {
                     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.Bottom) {
                         TextField(draft, { if (it.length <= 500) draft = it }, Modifier.weight(1f),
-                            placeholder = { Text(if (remaining > 0) "Escribe tu pregunta…" else "Vuelve mañana para preguntar", fontSize = 14.sp) }, maxLines = 4,
+                            placeholder = { Text(if (remaining > 0) t("Escribe tu pregunta…") else t("Vuelve mañana para preguntar"), fontSize = 14.sp) }, maxLines = 4,
                             enabled = remaining > 0,
                             colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, disabledContainerColor = Color.Transparent, focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent),
                             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { send(draft) }))
@@ -200,7 +200,7 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
                         }
                     }
                 }
-                Text("Puede equivocarse. Revisa cualquier decisión financiera.", color = Gray, fontSize = 10.sp, modifier = Modifier.fillMaxWidth().padding(top = 7.dp), textAlign = TextAlign.Center)
+                Text(t("Puede equivocarse. Revisa cualquier decisión financiera."), color = Gray, fontSize = 10.sp, modifier = Modifier.fillMaxWidth().padding(top = 7.dp), textAlign = TextAlign.Center)
             }
         }
     }
@@ -231,7 +231,7 @@ private fun AiQuotaNotice(remaining: Int) {
 @Composable
 private fun AssistantContextLine(label: String, value: String, tint: Color) {
     Column(Modifier.padding(vertical = 6.dp)) {
-        Text(label, color = Gray, fontSize = 12.sp)
+        Text(t(label), color = Gray, fontSize = 12.sp)
         Text(value, color = tint, fontSize = 20.sp, fontWeight = FontWeight.Bold)
     }
 }
@@ -248,7 +248,7 @@ private fun NanoDownloadCard(downloading: Boolean, progress: Float?, error: Stri
                 Icon(DinexNavigationIcons.Sparkle, null, tint = ElectricBlue, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("Gemini Nano en tu teléfono", color = Night, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(t("Gemini Nano en tu teléfono"), color = Night, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     Text(
                         if (downloading) "Descargando el modelo para responder sin internet…"
                         else "Responde sin internet y sin enviar tus datos a la nube.",
@@ -256,7 +256,7 @@ private fun NanoDownloadCard(downloading: Boolean, progress: Float?, error: Stri
                     )
                 }
                 if (!downloading) TextButton(onClick = onDownload) {
-                    Text("Descargar", color = ElectricBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    Text(t("Descargar"), color = ElectricBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 }
             }
             if (downloading) {
@@ -265,7 +265,7 @@ private fun NanoDownloadCard(downloading: Boolean, progress: Float?, error: Stri
                     DinexProgress(progress, ElectricBlue, height = 6.dp)
                     Text("${(progress * 100).toInt()}% descargado", color = Gray, fontSize = 10.sp)
                 } else {
-                    Text("Preparando la descarga…", color = Gray, fontSize = 10.sp)
+                    Text(t("Preparando la descarga…"), color = Gray, fontSize = 10.sp)
                 }
             }
             error?.let {
@@ -288,7 +288,7 @@ private fun AssistantThinking() {
             }.clip(CircleShape).background(Indigo))
         }
         Spacer(Modifier.width(7.dp))
-        Text("Analizando tus movimientos…", color = Gray, fontSize = 13.sp)
+        Text(t("Analizando tus movimientos…"), color = Gray, fontSize = 13.sp)
     }
 }
 
@@ -335,7 +335,7 @@ internal fun ChatBubble(message: ChatMessage, onReport: ((ChatMessage) -> Unit)?
                 // Política de Google Play: cada respuesta de la IA se puede reportar.
                 if (onReport != null) {
                     Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
-                        if (message.reported) Text("Reportada · gracias", color = Gray, fontSize = 11.sp, modifier = Modifier.padding(vertical = 6.dp))
+                        if (message.reported) Text(t("Reportada · gracias"), color = Gray, fontSize = 11.sp, modifier = Modifier.padding(vertical = 6.dp))
                         else TextButton(
                             onClick = { onReport(message) },
                             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
@@ -343,7 +343,7 @@ internal fun ChatBubble(message: ChatMessage, onReport: ((ChatMessage) -> Unit)?
                         ) {
                             Icon(DinexNavigationIcons.Shield, null, tint = Gray, modifier = Modifier.size(13.dp))
                             Spacer(Modifier.width(4.dp))
-                            Text("Reportar", color = Gray, fontSize = 11.sp)
+                            Text(t("Reportar"), color = Gray, fontSize = 11.sp)
                         }
                     }
                 }
@@ -359,35 +359,35 @@ private fun AiReportDialog(message: ChatMessage, onDismiss: () -> Unit, onSend: 
     var comment by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Reportar respuesta", fontWeight = FontWeight.Bold) },
+        title = { Text(t("Reportar respuesta"), fontWeight = FontWeight.Bold) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Surface(shape = RoundedCornerShape(12.dp), color = CardRaised) {
                     Text(message.text, color = Gray, fontSize = 12.sp, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(10.dp))
                 }
-                Text("¿Qué problema tiene?", color = Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                Text(t("¿Qué problema tiene?"), color = Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
                 AiReportReason.entries.forEach { option ->
                     Row(
                         Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickableRow { reason = option }.padding(vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         RadioButton(selected = reason == option, onClick = { reason = option })
-                        Text(option.label, color = Night, fontSize = 14.sp)
+                        Text(t(option.label), color = Night, fontSize = 14.sp)
                     }
                 }
                 OutlinedTextField(
                     comment, { if (it.length <= 500) comment = it },
-                    label = { Text("Comentario (opcional)") }, maxLines = 3, modifier = Modifier.fillMaxWidth(),
+                    label = { Text(t("Comentario (opcional)")) }, maxLines = 3, modifier = Modifier.fillMaxWidth(),
                 )
-                Text("Se enviará el texto de esta respuesta para revisarla. No se envían tus movimientos.", color = Gray, fontSize = 11.sp)
+                Text(t("Se enviará el texto de esta respuesta para revisarla. No se envían tus movimientos."), color = Gray, fontSize = 11.sp)
             }
         },
         confirmButton = {
             Button(onClick = { reason?.let { onSend(it, comment) } }, enabled = reason != null, colors = ButtonDefaults.buttonColors(containerColor = Green)) {
-                Text("Enviar reporte")
+                Text(t("Enviar reporte"))
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancelar")) } },
     )
 }
 

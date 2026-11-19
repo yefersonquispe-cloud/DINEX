@@ -161,7 +161,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         val item = draft.movement
         AlertDialog(
             onDismissRequest = { model.confirmVoice(false) },
-            title = { Text(if (item.income) "¿Guardo este ingreso?" else "¿Guardo este gasto?", fontWeight = FontWeight.Bold) },
+            title = { Text(if (item.income) t("¿Guardo este ingreso?") else t("¿Guardo este gasto?"), fontWeight = FontWeight.Bold) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(money(item.amount), color = if (item.income) Green else Red, fontSize = 28.sp, fontWeight = FontWeight.Black)
@@ -169,8 +169,8 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                     draft.doubts.forEach { Text("• $it", color = Gray, fontSize = 13.sp) }
                 }
             },
-            confirmButton = { Button(onClick = { model.confirmVoice(true, automation.currentLocationLabel()) }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Guardar") } },
-            dismissButton = { TextButton(onClick = { model.confirmVoice(false) }) { Text("Cancelar") } },
+            confirmButton = { Button(onClick = { model.confirmVoice(true, automation.currentLocationLabel()) }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(t("Guardar")) } },
+            dismissButton = { TextButton(onClick = { model.confirmVoice(false) }) { Text(t("Cancelar")) } },
         )
     }
 
@@ -321,12 +321,12 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     }
     goalToDelete?.let { goal -> AlertDialog(onDismissRequest = { goalToDelete = null }, title = { Text("¿Eliminar ${goal.name}?") },
         text = { Text("Se eliminará esta meta. ${money(goal.saved)} volverán al saldo disponible. Las demás metas y tu historial no cambiarán.") },
-        confirmButton = { TextButton(onClick = { model.deleteSavingsGoal(goal.id); goalToDelete = null; selectedGoalId = null }) { Text("Eliminar meta", color = Red) } },
-        dismissButton = { TextButton(onClick = { goalToDelete = null }) { Text("Conservar meta") } }) }
+        confirmButton = { TextButton(onClick = { model.deleteSavingsGoal(goal.id); goalToDelete = null; selectedGoalId = null }) { Text(t("Eliminar meta"), color = Red) } },
+        dismissButton = { TextButton(onClick = { goalToDelete = null }) { Text(t("Conservar meta")) } }) }
     state.pendingExpense?.let { pending ->
-        AlertDialog(onDismissRequest = model::cancelPendingExpense, title = { Text("¿Deseas continuar?") }, text = {
+        AlertDialog(onDismissRequest = model::cancelPendingExpense, title = { Text(t("¿Deseas continuar?")) }, text = {
             Text("Ya alcanzaste tu límite diario de ${money(dailyLimit.toDouble())}. Registrar ${pending.title} por ${money(pending.amount)} aumentará tu gasto de hoy. No se guardará hasta que confirmes.")
-        }, confirmButton = { Button(onClick = model::confirmPendingExpense) { Text("Sí, registrar gasto") } }, dismissButton = { TextButton(onClick = model::cancelPendingExpense) { Text("Cancelar gasto") } })
+        }, confirmButton = { Button(onClick = model::confirmPendingExpense) { Text(t("Sí, registrar gasto")) } }, dismissButton = { TextButton(onClick = model::cancelPendingExpense) { Text(t("Cancelar gasto")) } })
     }
     state.budgetWarning?.let { warning ->
         BudgetWarningDialog(
@@ -359,8 +359,8 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 shape = RoundedCornerShape(28.dp), color = Card, shadowElevation = 20.dp) {
                 Column {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Dinex IA · tu guía de dinero", color = Night, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { assistantOpen = false }) { Text("Cerrar") }
+                        Text(t("Dinex IA · tu guía de dinero"), color = Night, style = MaterialTheme.typography.titleLarge, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { assistantOpen = false }) { Text(t("Cerrar")) }
                     }
                     HorizontalDivider(color = Border)
                     Box(Modifier.weight(1f)) { AssistantPage(assistant, assistantModel, data) }
@@ -398,10 +398,10 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     movementToDelete?.let { movement ->
         AlertDialog(
             onDismissRequest = { movementToDelete = null },
-            title = { Text("¿Eliminar movimiento?") },
+            title = { Text(t("¿Eliminar movimiento?")) },
             text = { Text(movement.title + " · " + money(movement.amount) + " se quitará del historial.") },
-            confirmButton = { TextButton(onClick = { model.deleteMovement(movement); movementToDelete = null }) { Text("Eliminar", color = Red) } },
-            dismissButton = { TextButton(onClick = { movementToDelete = null }) { Text("Cancelar") } },
+            confirmButton = { TextButton(onClick = { model.deleteMovement(movement); movementToDelete = null }) { Text(t("Eliminar"), color = Red) } },
+            dismissButton = { TextButton(onClick = { movementToDelete = null }) { Text(t("Cancelar")) } },
         )
     }
     reminderToResolve?.let { reminder ->

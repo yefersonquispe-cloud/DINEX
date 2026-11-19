@@ -47,8 +47,8 @@ internal fun QuickAddDialog(onDismiss: () -> Unit, onExpense: () -> Unit, onInco
         containerColor = Card,
         title = {
             Column {
-                Text("¿Qué quieres registrar?", fontWeight = FontWeight.Black, color = Night)
-                Text("Elige cómo añadir tu próximo movimiento", color = Gray, fontSize = 13.sp, fontWeight = FontWeight.Normal)
+                Text(t("¿Qué quieres registrar?"), fontWeight = FontWeight.Black, color = Night)
+                Text(t("Elige cómo añadir tu próximo movimiento"), color = Gray, fontSize = 13.sp, fontWeight = FontWeight.Normal)
             }
         },
         text = {
@@ -58,7 +58,7 @@ internal fun QuickAddDialog(onDismiss: () -> Unit, onExpense: () -> Unit, onInco
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cerrar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cerrar")) } },
     )
 }
 
@@ -71,8 +71,8 @@ internal fun DialogAction(code: String, title: String, subtitle: String, bg: Col
             }
             Spacer(Modifier.width(11.dp))
             Column(Modifier.weight(1f)) {
-                Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                Text(subtitle, color = Gray, fontSize = 12.sp, lineHeight = 17.sp)
+                Text(t(title), color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Text(t(subtitle), color = Gray, fontSize = 12.sp, lineHeight = 17.sp)
             }
             Icon(DinexNavigationIcons.Chevron, null, tint = tint, modifier = Modifier.size(18.dp))
         }
@@ -113,8 +113,8 @@ internal fun AutomationDialog(
         containerColor = Card,
         icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex voz", Modifier.size(64.dp), contentScale = ContentScale.Fit) },
         title = { Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("Registro automático", color = Night, fontWeight = FontWeight.Black)
-            Text("Registra sin escribir: con tu voz o con las alertas de tu banco", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, lineHeight = 16.sp)
+            Text(t("Registro automático"), color = Night, fontWeight = FontWeight.Black)
+            Text(t("Registra sin escribir: con tu voz o con las alertas de tu banco"), color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, lineHeight = 16.sp)
         } },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -124,7 +124,7 @@ internal fun AutomationDialog(
                     status = if (automation.voiceAvailable) "Listo" to true else "No disponible" to false,
                 ) {
                     Surface(shape = RoundedCornerShape(12.dp), color = ElectricBlue.copy(alpha = .08f)) {
-                        Text("“Dinex, registra 20 soles en comida”", color = NightSoft, fontSize = 13.sp,
+                        Text(t("“Dinex, registra 20 soles en comida”"), color = NightSoft, fontSize = 13.sp,
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp))
                     }
                     Button(
@@ -136,7 +136,7 @@ internal fun AutomationDialog(
                     ) {
                         Icon(DinexNavigationIcons.Microphone, null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text(if (listening) "Escuchando..." else "Hablar con Dinex", fontWeight = FontWeight.Bold)
+                        Text(if (listening) t("Escuchando...") else t("Hablar con Dinex"), fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -149,8 +149,7 @@ internal fun AutomationDialog(
                         else -> "Conectando" to false
                     },
                 ) {
-                    Text(
-                        "Detecta ingresos (“te yapearon”, “recibiste”) y gastos (“yapeaste”, “pagaste”) cuando la alerta trae un monto en soles.",
+                    Text(t("Detecta ingresos (“te yapearon”, “recibiste”) y gastos (“yapeaste”, “pagaste”) cuando la alerta trae un monto en soles."),
                         color = Gray, fontSize = 13.sp, lineHeight = 18.sp,
                     )
                     if (!notificationAccess) {
@@ -168,12 +167,12 @@ internal fun AutomationDialog(
                             onAction = { automation.openNotificationSettings() },
                         )
                         TextButton(onClick = { accessRefresh++ }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Ya lo activé, comprobar", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(t("Ya lo activé, comprobar"), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     } else {
                         if (!listenerConnected) {
                             TextButton(onClick = { automation.reconnectNotifications(); accessRefresh++ }) {
-                                Text("Reconectar lector", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                Text(t("Reconectar lector"), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                             }
                         }
                         Button(
@@ -181,7 +180,7 @@ internal fun AutomationDialog(
                             modifier = Modifier.fillMaxWidth().height(46.dp),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Green),
-                        ) { Text("Revisar alertas detectadas", fontWeight = FontWeight.Bold) }
+                        ) { Text(t("Revisar alertas detectadas"), fontWeight = FontWeight.Bold) }
                     }
                     if (captured.isNotEmpty()) {
                         captured.take(4).forEach { item ->
@@ -198,7 +197,7 @@ internal fun AutomationDialog(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Green),
-                        ) { Text("Registrar ${captured.size} ${if (captured.size == 1) "alerta" else "alertas"}", fontWeight = FontWeight.Bold) }
+                        ) { Text("Registrar ${captured.size} ${if (captured.size == 1) t("alerta") else t("alertas")}", fontWeight = FontWeight.Bold) }
                     }
                 }
 
@@ -207,8 +206,7 @@ internal fun AutomationDialog(
                     subtitle = "Sin abrir la app",
                     status = if (hotwordActive) "Activo" to true else "Apagado" to false,
                 ) {
-                    Text(
-                        "Di “Oye Dinex” o toca la burbuja con la mascota para registrar gastos, ingresos o preguntar cuánto gastaste. Android muestra una notificación mientras escucha.",
+                    Text(t("Di “Oye Dinex” o toca la burbuja con la mascota para registrar gastos, ingresos o preguntar cuánto gastaste. Android muestra una notificación mientras escucha."),
                         color = Gray, fontSize = 13.sp, lineHeight = 18.sp,
                     )
                     // Lista de permisos: se marca sola al volver de cada pantalla.
@@ -256,13 +254,12 @@ internal fun AutomationDialog(
                             fontWeight = FontWeight.Bold,
                         )
                     }
-                    if (hotwordActive) Text(
-                        "Listo. Sal de Dinex y verás la burbuja con la mascota. Tócala para hablar.",
+                    if (hotwordActive) Text(t("Listo. Sal de Dinex y verás la burbuja con la mascota. Tócala para hablar."),
                         color = GreenDark, fontSize = 12.sp, lineHeight = 16.sp,
                     )
                     if (hotwordActive && !automation.xiaomiDevice) {
                         TextButton(onClick = { automation.openBatterySettings() }, modifier = Modifier.fillMaxWidth()) {
-                            Text("Revisar batería e inicio automático", color = Orange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(t("Revisar batería e inicio automático"), color = Orange, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
@@ -275,9 +272,9 @@ internal fun AutomationDialog(
                     if (automation.locationAvailable) {
                         Text("Estás en: ${automation.currentLocationLabel() ?: "se guardará al registrar"}", color = NightSoft, fontSize = 13.sp)
                     } else {
-                        Text("Solo se pide con tu permiso y se guarda en tu teléfono.", color = Gray, fontSize = 13.sp)
+                        Text(t("Solo se pide con tu permiso y se guarda en tu teléfono."), color = Gray, fontSize = 13.sp)
                         OutlinedButton(onClick = { automation.requestLocationPermission() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
-                            Text("Activar ubicación", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text(t("Activar ubicación"), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
                 }
@@ -287,14 +284,13 @@ internal fun AutomationDialog(
                         Text(it, color = Red, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(10.dp))
                     }
                 }
-                Text(
-                    "Dinex solo lee alertas con tu autorización. “Oye Dinex” usa el micrófono únicamente mientras está activo.",
+                Text(t("Dinex solo lee alertas con tu autorización. “Oye Dinex” usa el micrófono únicamente mientras está activo."),
                     color = Gray, fontSize = 11.sp, lineHeight = 15.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
                 )
             }
         },
         confirmButton = {},
-        dismissButton = { TextButton(onClick = { automation.stopVoice(); onDismiss() }) { Text("Cerrar", color = GreenDark, fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = { automation.stopVoice(); onDismiss() }) { Text(t("Cerrar"), color = GreenDark, fontWeight = FontWeight.Bold) } },
     )
 }
 
@@ -316,12 +312,12 @@ private fun AutomationSection(
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                    Text(subtitle, color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(t(title), color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(t(subtitle), color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 val (label, good) = status
                 Surface(shape = RoundedCornerShape(50), color = (if (good) Lime else Orange).copy(alpha = .14f)) {
-                    Text(label, color = if (good) Lime else Orange, fontWeight = FontWeight.Bold, fontSize = 11.sp,
+                    Text(t(label), color = if (good) Lime else Orange, fontWeight = FontWeight.Bold, fontSize = 11.sp,
                         modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp))
                 }
             }
@@ -337,7 +333,7 @@ private fun AutomationStep(number: String, text: String) {
             Text(number, color = Orange, fontWeight = FontWeight.Black, fontSize = 11.sp)
         }
         Spacer(Modifier.width(8.dp))
-        Text(text, color = NightSoft, fontSize = 13.sp, lineHeight = 18.sp)
+        Text(t(text), color = NightSoft, fontSize = 13.sp, lineHeight = 18.sp)
     }
 }
 
@@ -399,8 +395,8 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                         error = false
                     },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Monto") },
-                    prefix = { Text("S/ ", color = tint) },
+                    label = { Text(t("Monto")) },
+                    prefix = { Text(t("S/ "), color = tint) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     isError = error,
@@ -416,7 +412,7 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                     value = title,
                     onValueChange = { title = it.take(60) },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("¿En qué fue?") },
+                    label = { Text(t("¿En qué fue?")) },
                     placeholder = {
                         Text(
                             if (isIncome) "Ej. Pago freelance" else "Ej. Almuerzo en el centro",
@@ -430,7 +426,7 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                 // Categoría (solo gasto) con iconos
                 if (!isIncome) {
                     Column {
-                        Text("Categoría", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Gray)
+                        Text(t("Categoría"), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Gray)
                         val categoryRow = rememberLazyListState()
                         LazyRow(
                             state = categoryRow,
@@ -479,7 +475,7 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
 
                 if (showDetails) {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("Método de pago", fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Gray)
+                        Text(t("Método de pago"), fontWeight = FontWeight.Bold, fontSize = 11.sp, color = Gray)
                         FlowRow(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
@@ -498,7 +494,7 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                             value = day,
                             onValueChange = { day = it.filter(Char::isDigit).take(2) },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Día del mes") },
+                            label = { Text(t("Día del mes")) },
                             singleLine = true,
                             shape = RoundedCornerShape(16.dp),
                         )
@@ -507,8 +503,8 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                             value = note,
                             onValueChange = { note = it.take(80) },
                             modifier = Modifier.fillMaxWidth(),
-                            label = { Text("Nota (opcional)") },
-                            placeholder = { Text("Ej. con tarjeta de crédito", color = Gray) },
+                            label = { Text(t("Nota (opcional)")) },
+                            placeholder = { Text(t("Ej. con tarjeta de crédito"), color = Gray) },
                             singleLine = true,
                             shape = RoundedCornerShape(16.dp),
                         )
@@ -519,14 +515,14 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(16.dp),
                             ) {
-                                Text("Escanear comprobante", fontWeight = FontWeight.Bold)
+                                Text(t("Escanear comprobante"), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
 
                 if (error) {
-                    Text("Ingresa un monto válido", color = Red, fontSize = 12.sp)
+                    Text(t("Ingresa un monto válido"), color = Red, fontSize = 12.sp)
                 }
             }
         },
@@ -557,10 +553,10 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = tint),
             ) {
-                Text("Guardar", fontWeight = FontWeight.Bold)
+                Text(t("Guardar"), fontWeight = FontWeight.Bold)
             }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancelar")) } },
     )
 }
 
@@ -686,7 +682,7 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
         icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Mascota de ahorro", Modifier.size(76.dp), contentScale = ContentScale.Fit) },
-        title = { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("¿Cuánto ahorraste?", fontWeight = FontWeight.Black); Text("Este monto irá a tu tarjeta de ahorro", color = Gray, fontSize = 10.sp) } },
+        title = { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(t("¿Cuánto ahorraste?"), fontWeight = FontWeight.Black); Text(t("Este monto irá a tu tarjeta de ahorro"), color = Gray, fontSize = 10.sp) } },
         text = {
             Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Box {
@@ -707,7 +703,7 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
                         }
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }, modifier = Modifier.widthIn(min = 260.dp)) {
-                        Text("TUS METAS", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+                        Text(t("TUS METAS"), color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
                         goals.forEach { goal ->
                             val p = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
                             DropdownMenuItem(
@@ -731,7 +727,7 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
                         HorizontalDivider(color = Border)
                         DropdownMenuItem(
                             leadingIcon = { NewGoalBadge() },
-                            text = { Text("Nueva meta de ahorro", color = GreenDark, fontWeight = FontWeight.Black) },
+                            text = { Text(t("Nueva meta de ahorro"), color = GreenDark, fontWeight = FontWeight.Black) },
                             onClick = { selectedId = null; purpose = ""; target = ""; menuOpen = false },
                         )
                     }
@@ -741,23 +737,23 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
                     value = amount,
                     onValueChange = { amount = it.filter { char -> char.isDigit() || char == '.' || char == ',' }; error = false },
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Monto ahorrado") },
-                    prefix = { Text("S/ ") },
+                    label = { Text(t("Monto ahorrado")) },
+                    prefix = { Text(t("S/ ")) },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     isError = error,
                     shape = RoundedCornerShape(16.dp),
                 )
-                OutlinedTextField(purpose, { purpose = it.take(60) }, Modifier.fillMaxWidth(), label = { Text("¿Para qué estás ahorrando?") }, placeholder = { Text("Ej. PlayStation, celular, emergencia") }, readOnly = selectedId != null, singleLine = true, shape = RoundedCornerShape(16.dp))
-                OutlinedTextField(target, { target = it.filter { char -> char.isDigit() || char == '.' || char == ',' } }, Modifier.fillMaxWidth(), label = { Text("Meta total (opcional)") }, placeholder = { Text("¿Cuánto necesitas reunir?") }, prefix = { Text("S/ ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(purpose, { purpose = it.take(60) }, Modifier.fillMaxWidth(), label = { Text(t("¿Para qué estás ahorrando?")) }, placeholder = { Text(t("Ej. PlayStation, celular, emergencia")) }, readOnly = selectedId != null, singleLine = true, shape = RoundedCornerShape(16.dp))
+                OutlinedTextField(target, { target = it.filter { char -> char.isDigit() || char == '.' || char == ',' } }, Modifier.fillMaxWidth(), label = { Text(t("Meta total (opcional)")) }, placeholder = { Text(t("¿Cuánto necesitas reunir?")) }, prefix = { Text(t("S/ ")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, shape = RoundedCornerShape(16.dp))
                 Surface(shape = RoundedCornerShape(14.dp), color = Lime.copy(alpha = .10f), border = androidx.compose.foundation.BorderStroke(1.dp, Lime.copy(alpha = .22f))) {
-                    Text("Registrar un ahorro activa el día de tu racha. Solo cuenta una vez por día, aunque puedes agregar varios montos.", color = Lime, fontSize = 9.sp, modifier = Modifier.padding(11.dp))
+                    Text(t("Registrar un ahorro activa el día de tu racha. Solo cuenta una vez por día, aunque puedes agregar varios montos."), color = Lime, fontSize = 9.sp, modifier = Modifier.padding(11.dp))
                 }
-                if (error) Text("Ingresa un monto válido que no supere tu saldo disponible.", color = Red, fontSize = 12.sp)
+                if (error) Text(t("Ingresa un monto válido que no supere tu saldo disponible."), color = Red, fontSize = 12.sp)
             }
         },
-        confirmButton = { Button(onClick = { val value = parseMoneyInput(amount); val targetValue = parseMoneyInput(target) ?: 0.0; if (value == null || !value.isFinite() || value <= 0 || value > available) error = true else onSave(SavingEntry(value, purpose.trim(), targetValue, selectedId)) }) { Text("Guardar ahorro", fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        confirmButton = { Button(onClick = { val value = parseMoneyInput(amount); val targetValue = parseMoneyInput(target) ?: 0.0; if (value == null || !value.isFinite() || value <= 0 || value > available) error = true else onSave(SavingEntry(value, purpose.trim(), targetValue, selectedId)) }) { Text(t("Guardar ahorro"), fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancelar")) } },
     )
 }
 
@@ -779,15 +775,15 @@ internal fun InitialBalanceDialog(onSave: (Double) -> Unit) {
         onDismissRequest = {},
         shape = RoundedCornerShape(30.dp),
         icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Mascota Dinex sin fondo", Modifier.size(92.dp), contentScale = ContentScale.Fit) },
-        title = { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text("Comencemos con tu saldo", fontWeight = FontWeight.Black); Text("Así tus reportes empiezan desde cero y reflejan tu realidad.", color = Gray, fontSize = 10.sp, textAlign = TextAlign.Center) } },
+        title = { Column(horizontalAlignment = Alignment.CenterHorizontally) { Text(t("Comencemos con tu saldo"), fontWeight = FontWeight.Black); Text(t("Así tus reportes empiezan desde cero y reflejan tu realidad."), color = Gray, fontSize = 10.sp, textAlign = TextAlign.Center) } },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' } }, Modifier.fillMaxWidth(), label = { Text("Saldo disponible este mes") }, prefix = { Text("S/ ") }, placeholder = { Text("0.00") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, shape = RoundedCornerShape(16.dp))
-                Text("Puedes empezar sin saldo y registrar tus ingresos después desde el botón +.", color = Gray, fontSize = 10.sp)
+                OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' } }, Modifier.fillMaxWidth(), label = { Text(t("Saldo disponible este mes")) }, prefix = { Text(t("S/ ")) }, placeholder = { Text("0.00") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, shape = RoundedCornerShape(16.dp))
+                Text(t("Puedes empezar sin saldo y registrar tus ingresos después desde el botón +."), color = Gray, fontSize = 10.sp)
             }
         },
-        confirmButton = { Button(onClick = { onSave(parseMoneyInput(amount) ?: 0.0) }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text("Guardar y entrar", fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = { onSave(0.0) }) { Text("Empezar con S/ 0", color = Gray) } },
+        confirmButton = { Button(onClick = { onSave(parseMoneyInput(amount) ?: 0.0) }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text(t("Guardar y entrar"), fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = { onSave(0.0) }) { Text(t("Empezar con S/ 0"), color = Gray) } },
     )
 }
 
@@ -799,7 +795,7 @@ internal fun GoalCelebrationDialog(goalName: String, amount: Double, onDismiss: 
                 Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(DinexNavigationIcons.Sparkle, null, tint = Orange, modifier = Modifier.size(14.dp))
-                        Text("META CUMPLIDA", color = Orange, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.5.sp)
+                        Text(t("META CUMPLIDA"), color = Orange, fontWeight = FontWeight.Black, fontSize = 11.sp, letterSpacing = 1.5.sp)
                         Icon(DinexNavigationIcons.Sparkle, null, tint = Orange, modifier = Modifier.size(14.dp))
                     }
                     Spacer(Modifier.height(5.dp))
@@ -809,14 +805,14 @@ internal fun GoalCelebrationDialog(goalName: String, amount: Double, onDismiss: 
                         }
                     }
                     Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex celebra tu meta", Modifier.size(142.dp), contentScale = ContentScale.Fit)
-                    Text("¡Enhorabuena!", color = Night, fontWeight = FontWeight.Black, fontSize = 27.sp)
+                    Text(t("¡Enhorabuena!"), color = Night, fontWeight = FontWeight.Black, fontSize = 27.sp)
                     Spacer(Modifier.height(5.dp))
                     Text("Ya reuniste ${money(amount)} para $goalName.", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(7.dp))
-                    Text("Disfruta tu logro y sigue construyendo tus próximas metas financieras.", color = Gray, fontSize = 10.sp, textAlign = TextAlign.Center)
+                    Text(t("Disfruta tu logro y sigue construyendo tus próximas metas financieras."), color = Gray, fontSize = 10.sp, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(18.dp))
                     Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth(), colors = ButtonDefaults.buttonColors(containerColor = Orange), shape = RoundedCornerShape(16.dp)) {
-                        Text("Celebrar y continuar", color = Color(0xFF1A1610), fontWeight = FontWeight.Black)
+                        Text(t("Celebrar y continuar"), color = Color(0xFF1A1610), fontWeight = FontWeight.Black)
                     }
                 }
             }
@@ -832,7 +828,7 @@ internal fun PremiumLoadingDialog(message: String) {
                 Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex trabajando", Modifier.size(120.dp), contentScale = ContentScale.Fit)
                 CircularProgressIndicator(color = Lime, strokeWidth = 3.dp, modifier = Modifier.size(30.dp))
                 Spacer(Modifier.height(14.dp)); Text(message, color = Night, fontWeight = FontWeight.Black, fontSize = 15.sp, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(5.dp)); Text("Estamos afinando los datos para darte una mejor alternativa.", color = Gray, fontSize = 10.sp, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(5.dp)); Text(t("Estamos afinando los datos para darte una mejor alternativa."), color = Gray, fontSize = 10.sp, textAlign = TextAlign.Center)
             }
         }
     }
@@ -847,13 +843,13 @@ internal fun ReminderDialog(nextId: Int, onDismiss: () -> Unit, onSave: (Payment
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
-        title = { Column { Text("Nuevo recordatorio", fontWeight = FontWeight.Black); Text("No olvides tus próximos pagos", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Normal) } },
+        title = { Column { Text(t("Nuevo recordatorio"), fontWeight = FontWeight.Black); Text(t("No olvides tus próximos pagos"), color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Normal) } },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                OutlinedTextField(title, { title = it; error = false }, Modifier.fillMaxWidth(), label = { Text("Nombre del pago") }, placeholder = { Text("Ej. Internet") }, singleLine = true)
-                OutlinedTextField(date, { date = it.uppercase().take(12); error = false }, Modifier.fillMaxWidth(), label = { Text("Fecha") }, placeholder = { Text("Ej. 25 SEP") }, singleLine = true)
-                OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false }, Modifier.fillMaxWidth(), label = { Text("Monto") }, prefix = { Text("S/ ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, isError = error)
-                if (error) Text("Completa el nombre, la fecha y un monto válido.", color = Red, fontSize = 9.sp)
+                OutlinedTextField(title, { title = it; error = false }, Modifier.fillMaxWidth(), label = { Text(t("Nombre del pago")) }, placeholder = { Text(t("Ej. Internet")) }, singleLine = true)
+                OutlinedTextField(date, { date = it.uppercase().take(12); error = false }, Modifier.fillMaxWidth(), label = { Text(t("Fecha")) }, placeholder = { Text(t("Ej. 25 SEP")) }, singleLine = true)
+                OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false }, Modifier.fillMaxWidth(), label = { Text(t("Monto")) }, prefix = { Text(t("S/ ")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, isError = error)
+                if (error) Text(t("Completa el nombre, la fecha y un monto válido."), color = Red, fontSize = 9.sp)
             }
         },
         confirmButton = {
@@ -861,9 +857,9 @@ internal fun ReminderDialog(nextId: Int, onDismiss: () -> Unit, onSave: (Payment
                 val value = parseMoneyInput(amount)
                 if (title.isBlank() || date.isBlank() || value == null || value <= 0) error = true
                 else onSave(PaymentReminder(nextId, title.trim(), date.trim(), value))
-            }) { Text("Guardar recordatorio") }
+            }) { Text(t("Guardar recordatorio")) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancelar")) } },
     )
 }
 
@@ -881,9 +877,9 @@ internal fun ScanReviewDialog(result: ScannedPurchase, movementId: Int?, nextId:
         }
     }
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(28.dp),
-        title = { Column { Text("Compra detectada", fontWeight = FontWeight.Black); Text("Revísala antes de registrarla. Nada se guarda sin tu confirmación.", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Normal) } },
+        title = { Column { Text(t("Compra detectada"), fontWeight = FontWeight.Black); Text(t("Revísala antes de registrarla. Nada se guarda sin tu confirmación."), color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Normal) } },
         text = { Column(Modifier.verticalScroll(rememberScrollState())) {
-            Surface(shape = RoundedCornerShape(16.dp), color = Indigo.copy(alpha = .14f)) { Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex IA", Modifier.size(46.dp), contentScale = ContentScale.Fit); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(if (result.analyzedWithGemini) "Analizado con Dinex IA" else "Análisis local completado", color = GreenDark, fontWeight = FontWeight.Black, fontSize = 12.sp); Text("Confianza ${result.confidence}%${if (result.priceEstimated) " · precio estimado" else ""}", color = Gray, fontSize = 9.sp) }; Text("REVISAR", color = GreenDark, fontWeight = FontWeight.Black, fontSize = 8.sp) } }
+            Surface(shape = RoundedCornerShape(16.dp), color = Indigo.copy(alpha = .14f)) { Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex IA", Modifier.size(46.dp), contentScale = ContentScale.Fit); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(if (result.analyzedWithGemini) t("Analizado con Dinex IA") else t("Análisis local completado"), color = GreenDark, fontWeight = FontWeight.Black, fontSize = 12.sp); Text("Confianza ${result.confidence}%${if (result.priceEstimated) t(" · precio estimado") else ""}", color = Gray, fontSize = 9.sp) }; Text(t("REVISAR"), color = GreenDark, fontWeight = FontWeight.Black, fontSize = 8.sp) } }
             val details = listOfNotNull(result.kind.takeIf { it.isNotBlank() }, receiptDate?.let { "${it.day.toString().padStart(2, '0')}/${it.month.toString().padStart(2, '0')}/${it.year}" }, result.method)
             if (details.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
@@ -891,15 +887,15 @@ internal fun ScanReviewDialog(result: ScannedPurchase, movementId: Int?, nextId:
                     details.forEach { Surface(shape = RoundedCornerShape(50), color = Mint) { Text(it, color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)) } }
                 }
             }
-            Spacer(Modifier.height(12.dp)); OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), label = { Text("Producto o comercio") }, singleLine = true)
-            Spacer(Modifier.height(9.dp)); OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false }, Modifier.fillMaxWidth(), label = { Text(if (result.priceEstimated) "Precio estimado" else "Precio detectado") }, prefix = { Text("S/ ") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, isError = error)
-            Spacer(Modifier.height(10.dp)); Text("Categoría sugerida", fontWeight = FontWeight.Bold, fontSize = 10.sp); LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(categories) { item -> FilterChip(category == item.name, { category = item.name }, label = { Text(item.name) }) } }
-            Spacer(Modifier.height(10.dp)); Text(if (result.analyzedWithGemini) "Gemini procesa la foto para extraer los datos; Dinex no conserva la imagen." else "El reconocimiento de respaldo ocurrió en el dispositivo.", color = Gray, fontSize = 9.sp)
+            Spacer(Modifier.height(12.dp)); OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(), label = { Text(t("Producto o comercio")) }, singleLine = true)
+            Spacer(Modifier.height(9.dp)); OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false }, Modifier.fillMaxWidth(), label = { Text(if (result.priceEstimated) t("Precio estimado") else t("Precio detectado")) }, prefix = { Text(t("S/ ")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, isError = error)
+            Spacer(Modifier.height(10.dp)); Text(t("Categoría sugerida"), fontWeight = FontWeight.Bold, fontSize = 10.sp); LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(categories) { item -> FilterChip(category == item.name, { category = item.name }, label = { Text(item.name) }) } }
+            Spacer(Modifier.height(10.dp)); Text(if (result.analyzedWithGemini) t("Gemini procesa la foto para extraer los datos; Dinex no conserva la imagen.") else t("El reconocimiento de respaldo ocurrió en el dispositivo."), color = Gray, fontSize = 9.sp)
         } },
         confirmButton = { Button(onClick = { val value = parseMoneyInput(amount); if (value == null || value <= 0) error = true else onSave(Movement(movementId ?: nextId, title.ifBlank { "Compra escaneada" }, category, value, false, receiptDate?.day ?: currentDayOfMonth(),
                 result.method ?: if (result.analyzedWithGemini) "Foto + Gemini" else "Escáner local",
-                month = receiptDate?.month ?: civilDateFromEpochDays().month, year = receiptDate?.year ?: civilDateFromEpochDays().year)) }) { Text("Registrar gasto") } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Descartar foto", color = Red, fontWeight = FontWeight.Bold) } })
+                month = receiptDate?.month ?: civilDateFromEpochDays().month, year = receiptDate?.year ?: civilDateFromEpochDays().year)) }) { Text(t("Registrar gasto")) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(t("Descartar foto"), color = Red, fontWeight = FontWeight.Bold) } })
 }
 
 @Composable
@@ -949,19 +945,19 @@ internal fun BudgetWarningDialog(
                     }
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text("PRESUPUESTO DE HOY", color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                        Text("Superaste tu límite diario", color = Night, fontSize = 20.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
+                        Text(t("PRESUPUESTO DE HOY"), color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text(t("Superaste tu límite diario"), color = Night, fontSize = 20.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
                     }
                 }
                 Spacer(Modifier.height(18.dp))
                 if (limit > 0 && spentToday > 0) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
                         Column(Modifier.weight(1f)) {
-                            Text("Gastaste hoy", color = Gray, fontSize = 12.sp)
+                            Text(t("Gastaste hoy"), color = Gray, fontSize = 12.sp)
                             Text(money(spentToday), color = Night, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-.5).sp)
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            Text("Tu límite", color = Gray, fontSize = 12.sp)
+                            Text(t("Tu límite"), color = Gray, fontSize = 12.sp)
                             Text(money(limit), color = Night, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -984,8 +980,7 @@ internal fun BudgetWarningDialog(
                     Text(warning, color = NightSoft, fontSize = 15.sp, lineHeight = 22.sp)
                 }
                 Spacer(Modifier.height(14.dp))
-                Text(
-                    "No pasa nada: mañana tu límite empieza de cero. Si este gasto era necesario, puedes ajustar tu presupuesto en el Plan.",
+                Text(t("No pasa nada: mañana tu límite empieza de cero. Si este gasto era necesario, puedes ajustar tu presupuesto en el Plan."),
                     color = Gray, fontSize = 13.sp, lineHeight = 19.sp,
                 )
                 Spacer(Modifier.height(20.dp))
@@ -993,11 +988,11 @@ internal fun BudgetWarningDialog(
                     OutlinedButton(
                         onClick = onOpenPlan, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape,
                         border = BorderStroke(1.dp, Border),
-                    ) { Text("Ver mi plan", color = Night, fontWeight = FontWeight.SemiBold) }
+                    ) { Text(t("Ver mi plan"), color = Night, fontWeight = FontWeight.SemiBold) }
                     Button(
                         onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape,
                         colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
-                    ) { Text("Entendido", fontWeight = FontWeight.SemiBold) }
+                    ) { Text(t("Entendido"), fontWeight = FontWeight.SemiBold) }
                 }
             }
         }
@@ -1027,8 +1022,8 @@ private fun PermissionStep(number: Int, title: String, detail: String, done: Boo
                 }
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(title, color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                    Text(if (ready) "Listo" else detail, color = if (ready) GreenDark else Gray, fontSize = 12.sp, lineHeight = 16.sp)
+                    Text(t(title), color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                    Text(if (ready) t("Listo") else detail, color = if (ready) GreenDark else Gray, fontSize = 12.sp, lineHeight = 16.sp)
                 }
             }
             if (!ready) {

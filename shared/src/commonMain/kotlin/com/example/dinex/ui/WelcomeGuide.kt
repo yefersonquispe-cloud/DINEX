@@ -88,8 +88,8 @@ internal fun WelcomeGuideDialog(name: String, onDismiss: () -> Unit, onAction: (
             ) {
                 Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
                     Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 8.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("${page + 1} de ${cards.size}", color = Gray, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                        if (!last) TextButton(onClick = onDismiss) { Text("Saltar", color = Gray, fontWeight = FontWeight.SemiBold) }
+                        Text(t("{0} de {1}", page + 1, cards.size), color = Gray, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        if (!last) TextButton(onClick = onDismiss) { Text(t("Saltar"), color = Gray, fontWeight = FontWeight.SemiBold) }
                         else Spacer(Modifier.height(48.dp))
                     }
                     // Progreso continuo: avanza junto con el dedo al deslizar.
@@ -124,7 +124,7 @@ internal fun WelcomeGuideDialog(name: String, onDismiss: () -> Unit, onAction: (
                             shape = CircleShape,
                             colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
                         ) {
-                            Text(if (last) "Empezar a usar Dinex" else if (page == 0) "Comenzar" else "Siguiente", fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+                            Text(if (last) t("Empezar a usar Dinex") else if (page == 0) t("Comenzar") else t("Siguiente"), fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                         }
                     }
                 }
@@ -228,11 +228,11 @@ private fun GuideText(card: GuideCard, onAction: (GuideAction) -> Unit, modifier
         Surface(shape = CircleShape, color = card.accent.copy(alpha = .12f), modifier = Modifier.entrance(step[0])) {
             Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(card.icon, null, tint = tone, modifier = Modifier.size(14.dp))
-                Text(card.tag.uppercase(), color = tone, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
+                Text(t(card.tag).uppercase(), color = tone, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
             }
         }
-        Text(card.title, color = Night, fontWeight = FontWeight.Bold, fontSize = 26.sp, lineHeight = 31.sp, letterSpacing = (-.5).sp, modifier = Modifier.entrance(step[1]))
-        Text(card.body, color = NightSoft, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.entrance(step[2]))
+        Text(t(card.title), color = Night, fontWeight = FontWeight.Bold, fontSize = 26.sp, lineHeight = 31.sp, letterSpacing = (-.5).sp, modifier = Modifier.entrance(step[1]))
+        Text(t(card.body), color = NightSoft, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.entrance(step[2]))
         // Datos extra y ubicación de la función, agrupados en una tarjeta.
         if (card.points.isNotEmpty() || card.where.isNotBlank()) {
             Surface(shape = RoundedCornerShape(18.dp), color = Card, border = BorderStroke(1.dp, Border), modifier = Modifier.fillMaxWidth().padding(top = 4.dp).entrance(step[3])) {
@@ -243,7 +243,7 @@ private fun GuideText(card: GuideCard, onAction: (GuideAction) -> Unit, modifier
                                 Icon(DinexNavigationIcons.Check, null, tint = tone, modifier = Modifier.size(12.dp))
                             }
                             Spacer(Modifier.width(10.dp))
-                            Text(point, color = Night, fontSize = 14.sp, lineHeight = 20.sp)
+                            Text(t(point), color = Night, fontSize = 14.sp, lineHeight = 20.sp)
                         }
                     }
                     if (card.where.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
@@ -251,7 +251,7 @@ private fun GuideText(card: GuideCard, onAction: (GuideAction) -> Unit, modifier
                             Icon(DinexNavigationIcons.MapPin, null, tint = Gray, modifier = Modifier.size(12.dp))
                         }
                         Spacer(Modifier.width(10.dp))
-                        Text(card.where, color = Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                        Text(t(card.where), color = Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
                     }
                 }
             }
@@ -262,14 +262,14 @@ private fun GuideText(card: GuideCard, onAction: (GuideAction) -> Unit, modifier
                 shape = CircleShape,
                 border = BorderStroke(1.dp, card.accent.copy(alpha = .6f)),
                 modifier = Modifier.fillMaxWidth().height(46.dp).entrance(step[4]),
-            ) { Text(label, color = tone, fontWeight = FontWeight.SemiBold) }
+            ) { Text(t(label), color = tone, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
 
 private fun guideCards(firstName: String, web: Boolean, openLegal: (Int) -> Unit): List<GuideCard> = listOf(
     GuideCard(
-        "Bienvenida", if (firstName.isBlank()) "Te damos la bienvenida a Dinex" else "Hola, $firstName. Bienvenido a Dinex",
+        "Bienvenida", if (firstName.isBlank()) "Te damos la bienvenida a Dinex" else t("Hola, {0}. Bienvenido a Dinex", firstName),
         "En menos de un minuto verás cómo ordenar tu dinero, ahorrar para tus metas y entender tus gastos.",
         DinexNavigationIcons.Sparkle, Color(0xFF2B8456), "",
         emptyList(),
@@ -382,7 +382,7 @@ private fun RegisterDemo() {
                 Box(
                     Modifier.clip(CircleShape).background(if (selected) Green else Color.Transparent)
                         .clickable { touched = true; income = value }.padding(horizontal = 20.dp, vertical = 8.dp),
-                ) { Text(label, color = if (selected) Color.White else Gray, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }
+                ) { Text(t(label), color = if (selected) Color.White else Gray, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }
             }
         }
         Surface(shape = RoundedCornerShape(20.dp), color = Card, border = BorderStroke(1.dp, Border), shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
@@ -392,8 +392,8 @@ private fun RegisterDemo() {
                 }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text(if (income) "Pago de clases" else "Almuerzo", color = Night, fontWeight = FontWeight.Bold)
-                    Text("${if (income) "Ingreso" else "Comida"} · $method", color = Gray, fontSize = 12.sp)
+                    Text(if (income) t("Pago de clases") else t("Almuerzo"), color = Night, fontWeight = FontWeight.Bold)
+                    Text("${if (income) t("Ingreso") else t("Comida")} · $method", color = Gray, fontSize = 12.sp)
                 }
                 Text((if (income) "+ " else "- ") + "S/ ${if (income) "120.00" else "18.50"}", color = tone, fontWeight = FontWeight.Black)
             }
@@ -448,7 +448,7 @@ private fun VoiceDemo() {
         )
         AnimatedVisibility(shown == phrase.length && !listening, enter = fadeIn() + slideInVertically { it / 2 }) {
             Surface(shape = RoundedCornerShape(14.dp), color = Mint) {
-                Text("Gasto guardado: Comida · S/ 20.00", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+                Text(t("Gasto guardado: Comida · S/ 20.00"), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
             }
         }
     }
@@ -472,7 +472,7 @@ private fun GoalDemo() {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Viaje a Cusco", color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp)
+                Text(t("Viaje a Cusco"), color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp)
                 Text("S/ ${saved.toInt()} de S/ ${target.toInt()}", color = Gray, fontSize = 12.sp)
             }
             Surface(shape = RoundedCornerShape(12.dp), color = Orange.copy(alpha = .18f)) {
@@ -483,7 +483,7 @@ private fun GoalDemo() {
             Box(Modifier.fillMaxHeight().fillMaxWidth(progress).clip(CircleShape).background(Brush.horizontalGradient(listOf(Orange, Green))))
         }
         Slider(saved, { saved = it }, valueRange = 0f..target, steps = 9, colors = guideSliderColors())
-        Text(if (saved >= target) "¡Meta cumplida!" else "Mueve la barra para ahorrar", color = GreenDark, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text(if (saved >= target) t("¡Meta cumplida!") else t("Mueve la barra para ahorrar"), color = GreenDark, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
     }
 }
 
@@ -565,14 +565,14 @@ private fun ChatDemo() {
         Surface(
             shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp), color = Green,
             modifier = Modifier.align(Alignment.End).clickable(onClickLabel = "Preguntar") { asked = true },
-        ) { Text("¿En qué gasté más esta semana?", color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(12.dp)) }
-        if (!asked) Text("Toca la pregunta", color = Gray, fontSize = 11.sp, modifier = Modifier.align(Alignment.End))
+        ) { Text(t("¿En qué gasté más esta semana?"), color = Color.White, fontSize = 13.sp, modifier = Modifier.padding(12.dp)) }
+        if (!asked) Text(t("Toca la pregunta"), color = Gray, fontSize = 11.sp, modifier = Modifier.align(Alignment.End))
         AnimatedVisibility(asked, enter = fadeIn() + slideInVertically { it / 2 }) {
             Row(verticalAlignment = Alignment.Bottom) {
                 Image(painterResource(Res.drawable.dinex_mascot_ai), null, Modifier.size(40.dp), contentScale = ContentScale.Fit)
                 Spacer(Modifier.width(6.dp))
                 Surface(shape = RoundedCornerShape(18.dp, 18.dp, 18.dp, 4.dp), color = Card) {
-                    Text("En Comida: S/ 96. Si llevas almuerzo 2 días, ahorras unos S/ 30", color = Night, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
+                    Text(t("En Comida: S/ 96. Si llevas almuerzo 2 días, ahorras unos S/ 30"), color = Night, fontSize = 13.sp, modifier = Modifier.padding(12.dp))
                 }
             }
         }

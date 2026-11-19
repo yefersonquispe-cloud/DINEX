@@ -355,9 +355,9 @@ internal fun StreakLevelDialog(level: StreakLevel, streak: Int, onDismiss: () ->
         ) {
             Box(Modifier.fillMaxWidth().background(Brush.radialGradient(listOf(accent.copy(alpha = .30f), Color.Transparent), radius = 900f))) {
                 Column(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("¡SUBISTE DE NIVEL!", color = accent, fontWeight = FontWeight.Black, fontSize = 13.sp, letterSpacing = 2.5.sp)
+                    Text(t("¡SUBISTE DE NIVEL!"), color = accent, fontWeight = FontWeight.Black, fontSize = 13.sp, letterSpacing = 2.5.sp)
                     Spacer(Modifier.height(4.dp))
-                    Text("Ganaste una nueva medalla de ahorro", color = Color.White.copy(alpha = .72f), fontSize = 12.sp, textAlign = TextAlign.Center)
+                    Text(t("Ganaste una nueva medalla de ahorro"), color = Color.White.copy(alpha = .72f), fontSize = 12.sp, textAlign = TextAlign.Center)
 
                     // Insignia flotante con rayos giratorios, halo y destellos alrededor.
                     Box(Modifier.size(250.dp), contentAlignment = Alignment.Center) {
@@ -394,7 +394,7 @@ internal fun StreakLevelDialog(level: StreakLevel, streak: Int, onDismiss: () ->
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(level.name.uppercase(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 34.sp, letterSpacing = 1.sp)
-                    Text("$streak ${if (streak == 1) "día" else "días"} ahorrando seguido", color = Color.White.copy(alpha = .82f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text("$streak ${if (streak == 1) t("día") else t("días")} ahorrando seguido", color = Color.White.copy(alpha = .82f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(14.dp))
 
                     // Camino: nivel anterior, actual y siguiente.
@@ -418,7 +418,7 @@ internal fun StreakLevelDialog(level: StreakLevel, streak: Int, onDismiss: () ->
                         modifier = Modifier.fillMaxWidth().height(50.dp).clip(RoundedCornerShape(16.dp)),
                         colors = ButtonDefaults.buttonColors(containerColor = accent),
                         shape = RoundedCornerShape(16.dp),
-                    ) { Text("Seguir mi racha", color = Color(0xFF0A0C10), fontWeight = FontWeight.Black, fontSize = 15.sp) }
+                    ) { Text(t("Seguir mi racha"), color = Color(0xFF0A0C10), fontWeight = FontWeight.Black, fontSize = 15.sp) }
                     Spacer(Modifier.width(1.dp))
                 }
             }

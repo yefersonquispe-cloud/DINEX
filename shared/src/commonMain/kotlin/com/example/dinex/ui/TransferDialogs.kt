@@ -55,35 +55,35 @@ internal fun ImportMovementsDialog(existing: List<Movement>, onDismiss: () -> Un
     )
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() }, containerColor = Card, shape = RoundedCornerShape(RadiusLg),
-        title = { Text("Importar movimientos", fontWeight = FontWeight.Bold, color = Night) },
+        title = { Text(t("Importar movimientos"), fontWeight = FontWeight.Bold, color = Night) },
         text = { Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Abre tu Excel o CSV de Yape, Plin o tu banco. Revisa la vista previa y confirma qué vas a registrar.", color = Gray, fontSize = 14.sp)
-            Button(onClick = { busy = true; error = ""; files.chooseImport() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("Seleccionar Excel o CSV") }
+            Text(t("Abre tu Excel o CSV de Yape, Plin o tu banco. Revisa la vista previa y confirma qué vas a registrar."), color = Gray, fontSize = 14.sp)
+            Button(onClick = { busy = true; error = ""; files.chooseImport() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(t("Seleccionar Excel o CSV")) }
             if (fileName.isNotBlank()) Text(fileName, color = Night, fontWeight = FontWeight.SemiBold)
-            TextButton(onClick = { pasteOpen = !pasteOpen }, enabled = !busy) { Text(if (pasteOpen) "Ocultar texto CSV" else "O pegar texto CSV") }
+            TextButton(onClick = { pasteOpen = !pasteOpen }, enabled = !busy) { Text(if (pasteOpen) t("Ocultar texto CSV") else t("O pegar texto CSV")) }
             if (pasteOpen) {
-                OutlinedTextField(pasted, { pasted = it }, label = { Text("Contenido CSV") }, modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp), enabled = !busy)
-                OutlinedButton(onClick = { inspect(TransferFile("movimientos.csv", pasted.encodeToByteArray())) }, enabled = !busy && pasted.isNotBlank()) { Text("Revisar texto") }
+                OutlinedTextField(pasted, { pasted = it }, label = { Text(t("Contenido CSV")) }, modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp), enabled = !busy)
+                OutlinedButton(onClick = { inspect(TransferFile("movimientos.csv", pasted.encodeToByteArray())) }, enabled = !busy && pasted.isNotBlank()) { Text(t("Revisar texto")) }
             }
-            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Preparando la vista previa…", color = Gray) }
+            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(t("Preparando la vista previa…"), color = Gray) }
             review?.let { result ->
                 Text("${countLabel(candidates.size, "movimiento", "movimientos")} para importar", color = Green, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text("Ingresos ${money(candidates.filter { it.income }.sumOf { it.amount })}\nEgresos ${money(candidates.filterNot { it.income }.sumOf { it.amount })}", color = Night)
-                Row { Checkbox(skipDuplicates, { skipDuplicates = it }); Text("Omitir movimientos repetidos", modifier = Modifier.padding(top = 12.dp), color = Night) }
+                Row { Checkbox(skipDuplicates, { skipDuplicates = it }); Text(t("Omitir movimientos repetidos"), modifier = Modifier.padding(top = 12.dp), color = Night) }
                 if (duplicates > 0) Text("$duplicates movimientos repetidos se omitirán.", color = Gray)
                 result.warnings.forEach { Text(it, color = Orange, fontSize = 13.sp) }
                 candidates.take(6).forEach { item ->
                     HorizontalDivider(color = Border)
                     Text(item.title, color = Night, fontWeight = FontWeight.SemiBold)
-                    Text("${item.dateLabel()} · ${if (item.income) "Ingreso" else "Egreso"} ${money(item.amount)}\n${item.category} · ${item.method}", color = Gray, fontSize = 13.sp)
+                    Text("${item.dateLabel()} · ${if (item.income) t("Ingreso") else t("Egreso")} ${money(item.amount)}\n${item.category} · ${item.method}", color = Gray, fontSize = 13.sp)
                 }
                 if (candidates.size > 6) Text("Y ${candidates.size - 6} movimientos más. Se conservarán sus fechas.", color = Gray, fontSize = 13.sp)
             }
             if (error.isNotBlank()) Text(error, color = Red)
-            Text("Nada se guarda sin tu confirmación. Formatos: .xlsx, .csv y .tsv; hasta 20 MB.", color = Gray, fontSize = 12.sp)
+            Text(t("Nada se guarda sin tu confirmación. Formatos: .xlsx, .csv y .tsv; hasta 20 MB."), color = Gray, fontSize = 12.sp)
         } },
         confirmButton = { Button(onClick = { onImport(candidates) }, enabled = !busy && candidates.isNotEmpty()) { Text("Importar ${candidates.size}") } },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cancelar") } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(t("Cancelar")) } },
     )
 }
 
@@ -107,8 +107,8 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
         onDismissRequest = { if (!busy) onDismiss() }, containerColor = Card, shape = RoundedCornerShape(RadiusLg),
         title = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Exportar reporte", fontWeight = FontWeight.Bold, color = Night, textAlign = TextAlign.Center)
-                Text(if (format == ReportFormat.CSV) "Datos simples para abrir en otras apps" else "Incluye tu plan de ahorro personalizado", color = Gray, fontSize = 13.sp, textAlign = TextAlign.Center)
+                Text(t("Exportar reporte"), fontWeight = FontWeight.Bold, color = Night, textAlign = TextAlign.Center)
+                Text(if (format == ReportFormat.CSV) t("Datos simples para abrir en otras apps") else t("Incluye tu plan de ahorro personalizado"), color = Gray, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
         },
         text = { Column(Modifier.heightIn(max = 540.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -143,7 +143,7 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
                                     .clickable(enabled = !busy) { period = item; error = ""; message = "" },
                                 contentAlignment = Alignment.Center,
                             ) {
-                                Text(item.label, color = if (chosen) GreenDark else NightSoft, fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium,
+                                Text(t(item.label), color = if (chosen) GreenDark else NightSoft, fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium,
                                     fontSize = 13.sp, textAlign = TextAlign.Center, maxLines = 1)
                             }
                         }
@@ -153,17 +153,17 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
             }
             if (period == ReportPeriod.CUSTOM) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(from, { from = it; error = "" }, label = { Text("Desde") }, placeholder = { Text("AAAA-MM-DD") }, singleLine = true, enabled = !busy, modifier = Modifier.weight(1f))
-                    OutlinedTextField(to, { to = it; error = "" }, label = { Text("Hasta") }, placeholder = { Text("AAAA-MM-DD") }, singleLine = true, enabled = !busy, modifier = Modifier.weight(1f))
+                    OutlinedTextField(from, { from = it; error = "" }, label = { Text(t("Desde")) }, placeholder = { Text(t("AAAA-MM-DD")) }, singleLine = true, enabled = !busy, modifier = Modifier.weight(1f))
+                    OutlinedTextField(to, { to = it; error = "" }, label = { Text(t("Hasta")) }, placeholder = { Text(t("AAAA-MM-DD")) }, singleLine = true, enabled = !busy, modifier = Modifier.weight(1f))
                 }
-                if (!validRange) Text("Ingresa fechas válidas y coloca la fecha inicial antes de la final.", color = Red, fontSize = 12.sp)
+                if (!validRange) Text(t("Ingresa fechas válidas y coloca la fecha inicial antes de la final."), color = Red, fontSize = 12.sp)
             }
             // Resumen de lo que se exportará, en tres cifras centradas.
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Mint).padding(vertical = 12.dp)) {
                 listOf(
-                    Triple("Movimientos", "${selected.size}", Night),
-                    Triple("Ingresos", money(selected.filter { it.income }.sumOf { it.amount }), GreenDark),
-                    Triple("Egresos", money(selected.filterNot { it.income }.sumOf { it.amount }), Red),
+                    Triple(t("Movimientos"), "${selected.size}", Night),
+                    Triple(t("Ingresos"), money(selected.filter { it.income }.sumOf { it.amount }), GreenDark),
+                    Triple(t("Egresos"), money(selected.filterNot { it.income }.sumOf { it.amount }), Red),
                 ).forEach { (label, value, tint) ->
                     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(label, color = Gray, fontSize = 11.sp)
@@ -171,8 +171,8 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
                     }
                 }
             }
-            if (selected.isEmpty()) Text("No hay movimientos en este periodo. Elige otro o registra uno primero.", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green); Text("Preparando y guardando tu reporte…", color = Gray, fontSize = 12.sp) }
+            if (selected.isEmpty()) Text(t("No hay movimientos en este periodo. Elige otro o registra uno primero."), color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green); Text(t("Preparando y guardando tu reporte…"), color = Gray, fontSize = 12.sp) }
             if (message.isNotBlank()) Text(message, color = Green, fontSize = 13.sp)
             if (error.isNotBlank()) Text(error, color = Red, fontSize = 13.sp)
         } },
@@ -183,13 +183,13 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
                 runCatching { withContext(Dispatchers.Default) { createMovementReport(selected, format, label, owner, context) } }
                     .onSuccess(files::save).onFailure { busy = false; error = it.message ?: "No pudimos preparar el reporte." }
             }
-        }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Guardar ${format.extension.uppercase()}", fontWeight = FontWeight.Bold) } },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cerrar", color = GreenDark) } },
+        }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text(t("Guardar {0}", format.extension.uppercase()), fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(t("Cerrar"), color = GreenDark) } },
     )
 }
 
 @Composable
 private fun ExportLabel(text: String) {
-    Text(text.uppercase(), color = Gray, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp,
+    Text(t(text).uppercase(), color = Gray, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp,
         textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
 }
