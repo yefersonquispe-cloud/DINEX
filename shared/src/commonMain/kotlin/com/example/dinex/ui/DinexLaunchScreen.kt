@@ -128,7 +128,7 @@ internal fun DinexLaunchScreen(
         val rise = easeInOut(t.between(RiseStart, RiseEnd)) * (1f - easeInOut(t.between(HoldEnd, ZoomStart)))
         val liftDp = 62.dp
         Canvas(
-            Modifier.fillMaxSize().semantics { contentDescription = "Dinex. Decide mejor. Ahorra más."; heading() },
+            Modifier.fillMaxSize().semantics { contentDescription = "Dinex. Tu dinero, con propósito."; heading() },
         ) { drawLaunchScene(shape, t, rise, logo.toPx(), liftDp.toPx()) }
 
         // Nombre y lema, debajo del logo.
@@ -158,7 +158,7 @@ internal fun DinexLaunchScreen(
             )
             val tagline = easeOut(t.between(RiseStart + 480f, RiseStart + 900f))
             Text(
-                "Decide mejor. Ahorra más.", color = Color.White.copy(alpha = .68f), fontSize = 15.sp, textAlign = TextAlign.Center,
+                "Tu dinero, con propósito.", color = Color.White.copy(alpha = .68f), fontSize = 15.sp, textAlign = TextAlign.Center,
                 modifier = Modifier.padding(top = 8.dp).graphicsLayer { alpha = tagline * textOut; translationY = (1f - tagline) * 10.dp.toPx() },
             )
         }

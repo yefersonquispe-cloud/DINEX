@@ -390,7 +390,10 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         })
     }
     if (importDialog) ImportMovementsDialog(movements, onDismiss = { importDialog = false }, onImport = { model.importMovements(it); importDialog = false })
-    if (exportDialog) ExportReportDialog(movements, name, onDismiss = { exportDialog = false })
+    if (exportDialog) ExportReportDialog(
+        movements, name, onDismiss = { exportDialog = false },
+        context = ReportContext(goals = state.goals, savings = state.data.savings, dailyLimit = state.data.dailyLimit.toDouble()),
+    )
     if (reminderDialog) ReminderDialog(model.nextReminderId(), onDismiss = { reminderDialog = false }, onSave = { model.saveReminder(it); reminderDialog = false })
     movementToDelete?.let { movement ->
         AlertDialog(

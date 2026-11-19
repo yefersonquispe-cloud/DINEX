@@ -80,7 +80,7 @@ internal fun ImportMovementsDialog(existing: List<Movement>, onDismiss: () -> Un
 }
 
 @Composable
-internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDismiss: () -> Unit) {
+internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDismiss: () -> Unit, context: ReportContext = ReportContext()) {
     var format by remember { mutableStateOf(ReportFormat.XLSX) }
     var period by remember { mutableStateOf(ReportPeriod.ALL) }
     var from by remember { mutableStateOf(movements.minOfOrNull { it.dateIso() }.orEmpty()) }
@@ -124,7 +124,7 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
             busy = true; error = ""; message = ""
             scope.launch {
                 val label = if (period == ReportPeriod.CUSTOM) "$from al $to" else period.label
-                runCatching { withContext(Dispatchers.Default) { createMovementReport(selected, format, label, owner) } }
+                runCatching { withContext(Dispatchers.Default) { createMovementReport(selected, format, label, owner, context) } }
                     .onSuccess(files::save).onFailure { busy = false; error = it.message ?: "No pudimos preparar el reporte." }
             }
         }) { Text("Guardar ${format.extension.uppercase()}") } },

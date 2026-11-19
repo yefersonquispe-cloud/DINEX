@@ -38,6 +38,10 @@ private val PdfLine = Rgb(0xD9E6DC)
 private val PdfGrid = Rgb(0xE6EEE8)
 private val PdfTrack = Rgb(0xEEF4EF)
 private val PdfZebra = Rgb(0xF6FAF7)
+private val PdfAmber = Rgb(0xD89945)
+private val PdfAmberSoft = Rgb(0xFBF0DF)
+private val PdfExpenseSoft = Rgb(0xFBE7E9)
+private val PdfGood = Rgb(0x4F9D69)
 private val PdfCategoryPalette = listOf(0x176B43, 0xE66678, 0x8A76D4, 0xD89945, 0x3E8EB8, 0xC2577F, 0x4F9D69, 0x71827A).map(::Rgb)
 
 // Anchos de Helvetica y Helvetica-Bold (AFM de Adobe) para los caracteres 32..126, en milésimas de em.
@@ -217,8 +221,9 @@ private fun compactMoney(value: Double): String {
 
 private fun pdfPlural(count: Int, one: String, many: String) = "$count ${if (count == 1) one else many}"
 
-internal fun exportPdfReport(items: List<Movement>, period: String, owner: String): ByteArray {
+internal fun exportPdfReport(items: List<Movement>, period: String, owner: String, context: ReportContext = ReportContext()): ByteArray {
     val stats = ReportStats(items)
+    val advice = reportAdvice(stats, owner, context)
     val today = civilDateFromEpochDays()
     val generated = "${today.day} ${reportMonthShort(today.month)} ${today.year}"
     val pages = mutableListOf<PdfPage>()
@@ -232,14 +237,22 @@ internal fun exportPdfReport(items: List<Movement>, period: String, owner: Strin
     page.circle(560.0, 830.0, 120.0, PdfBrandGlow1)
     page.circle(455.0, 675.0, 70.0, PdfBrandGlow2)
     page.out.append("Q\n")
-    page.text(PDF_MARGIN, 804.0, "DINEX · REPORTE FINANCIERO", 8.0, true, PdfBrandSoft, 1.6)
+    page.text(PDF_MARGIN, 804.0, "DINEX · TU DINERO, CON PROPÓSITO", 8.0, true, PdfBrandSoft, 1.6)
     page.text(PDF_MARGIN, 770.0, "Reporte de movimientos", 26.0, true, PdfWhite)
-    page.text(PDF_MARGIN, 748.0, ellipsize(owner.ifBlank { "Mi cuenta DINEX" }, 360.0, 11.5), 11.5, false, PdfWhite)
-    page.text(PDF_MARGIN, 728.0, ellipsize("Periodo: $period  ·  Generado el $generated", 380.0, 9.0), 9.0, false, PdfBrandSoft)
+    page.text(PDF_MARGIN, 748.0, ellipsize(owner.ifBlank { "Mi cuenta DINEX" }, 330.0, 11.5), 11.5, false, PdfWhite)
+    page.text(PDF_MARGIN, 728.0, ellipsize("Periodo: $period  ·  Generado el $generated", 330.0, 9.0), 9.0, false, PdfBrandSoft)
     val chipLabel = pdfPlural(items.size, "movimiento", "movimientos")
     val chipW = textWidth(chipLabel, 8.5, true) + 24
     page.roundRect(PDF_RIGHT - chipW, 795.0, chipW, 20.0, 10.0, PdfChip)
     page.text(PDF_RIGHT - chipW + 12, 801.5, chipLabel, 8.5, true, PdfWhite)
+    // Adelanto del plan: salud financiera del periodo.
+    val healthW = 132.0
+    page.roundRect(PDF_RIGHT - healthW, 716.0, healthW, 54.0, 10.0, PdfWhite)
+    page.text(PDF_RIGHT - healthW + 12, 755.0, "SALUD FINANCIERA", 6.5, true, PdfMuted, 0.6)
+    page.text(PDF_RIGHT - healthW + 12, 731.0, "${advice.score}", 20.0, true, scoreColor(advice.score))
+    page.text(PDF_RIGHT - healthW + 14 + textWidth("${advice.score}", 20.0, true), 731.0, "/100", 9.0, false, PdfMuted)
+    page.textRight(PDF_RIGHT - 12, 733.0, advice.level, 8.5, true, scoreColor(advice.score))
+    page.text(PDF_RIGHT - healthW + 12, 722.0, "Tu plan está al final", 6.8, false, PdfMuted)
 
     // ---------- Tarjetas con las cifras principales ----------
     data class Kpi(val label: String, val value: String, val note: String, val color: Rgb)
@@ -415,14 +428,143 @@ internal fun exportPdfReport(items: List<Movement>, period: String, owner: Strin
         y -= 52
     }
 
+    // ---------- Tu plan para ahorrar más ----------
+    page = PdfPage().also(pages::add)
+    val planBand = PDF_PAGE_H - 118
+    page.rect(0.0, planBand, PDF_PAGE_W, 118.0, PdfBrandDeep)
+    page.out.append("q 0 ${pn(planBand)} ${pn(PDF_PAGE_W)} 118 re W n\n")
+    page.circle(565.0, 835.0, 95.0, PdfBrandGlow1)
+    page.circle(470.0, 735.0, 48.0, PdfBrandGlow2)
+    page.out.append("Q\n")
+    page.text(PDF_MARGIN, 802.0, "TU PLAN DINEX", 8.0, true, PdfBrandSoft, 1.6)
+    page.text(PDF_MARGIN, 772.0, "Tu plan para ahorrar más", 24.0, true, PdfWhite)
+    page.text(PDF_MARGIN, 752.0, ellipsize("Recomendaciones hechas con tus propios movimientos · $period", 470.0, 9.5), 9.5, false, PdfBrandSoft)
+    y = planBand - 20
+
+    // Tarjeta de salud financiera: puntaje, nivel, diagnóstico y barra por zonas.
+    val healthH = 112.0
+    page.roundRect(PDF_MARGIN, y - healthH, PDF_CONTENT_W, healthH, 12.0, PdfWhite, PdfLine)
+    val tone = scoreColor(advice.score)
+    page.text(PDF_MARGIN + 18, y - 24, "SALUD FINANCIERA", 7.0, true, PdfMuted, 0.6)
+    page.text(PDF_MARGIN + 18, y - 62, "${advice.score}", 38.0, true, tone)
+    page.text(PDF_MARGIN + 20 + textWidth("${advice.score}", 38.0, true), y - 62, "/100", 11.0, false, PdfMuted)
+    val levelW = textWidth(advice.level, 8.0, true) + 18
+    page.roundRect(PDF_MARGIN + 18, y - 88, levelW, 17.0, 8.5, scoreSoft(advice.score))
+    page.text(PDF_MARGIN + 27, y - 82.5, advice.level, 8.0, true, tone)
+    val textX = PDF_MARGIN + 150
+    val textW = PDF_RIGHT - textX - 18
+    val head = wrapText(advice.headline, textW, 12.5, true, 2)
+    head.forEachIndexed { i, line -> page.text(textX, y - 26 - i * 15, line, 12.5, true, PdfNight) }
+    val sumLines = wrapText(advice.summary, textW, 9.0, false, 3)
+    sumLines.forEachIndexed { i, line -> page.text(textX, y - 30 - head.size * 15 - i * 12, line, 9.0, false, PdfMuted) }
+    // Barra por zonas (atención, mejorar, bien, excelente) con el marcador del puntaje.
+    val barY = y - healthH + 16; val barX = textX; val barW = textW
+    listOf(0.0 to 40.0 to PdfExpense, 40.0 to 60.0 to PdfAmber, 60.0 to 80.0 to PdfGood, 80.0 to 100.0 to PdfBrand).forEach { (range, color) ->
+        val (from, to) = range
+        page.roundRect(barX + barW * from / 100 + 1, barY, barW * (to - from) / 100 - 2, 6.0, 3.0, color)
+    }
+    val markerX = barX + barW * advice.score / 100.0
+    page.circle(markerX, barY + 3, 6.5, PdfWhite)
+    page.circle(markerX, barY + 3, 4.0, tone)
+    y -= healthH + 14
+
+    // Potencial de ahorro.
+    if (advice.potentialMonthly > 0) {
+        page.roundRect(PDF_MARGIN, y - 40, PDF_CONTENT_W, 40.0, 10.0, PdfMint)
+        page.text(PDF_MARGIN + 16, y - 17, "SI SIGUES ESTE PLAN PODRÍAS AHORRAR", 7.0, true, PdfMintDeep, 0.5)
+        page.text(PDF_MARGIN + 16, y - 31, "Sumando las recomendaciones con monto", 7.5, false, PdfMuted)
+        val yearly = "${moneyGrouped(advice.potentialMonthly * 12)} al año"
+        page.textRight(PDF_RIGHT - 16, y - 18, "${moneyGrouped(advice.potentialMonthly)} al mes", 14.0, true, PdfBrand)
+        page.textRight(PDF_RIGHT - 16, y - 31, yearly, 8.0, true, PdfMintDeep)
+        y -= 54
+    }
+
+    // Recomendaciones numeradas.
+    page.text(PDF_MARGIN, y - 4, "Qué puedes hacer", 13.0, true, PdfNight)
+    page.line(PDF_MARGIN, y - 13, PDF_RIGHT, y - 13, PdfLine, 0.75)
+    y -= 24
+    advice.items.forEachIndexed { index, item ->
+        val impactText = item.impact?.takeIf { it > 0.004 }?.let { "+${moneyGrouped(it)} ${item.impactLabel}" }
+        val impactW = impactText?.let { textWidth(it, 8.0, true) + 18 } ?: 0.0
+        val bodyW = PDF_CONTENT_W - 62 - (if (impactText != null) impactW + 8 else 0.0)
+        val body = wrapText(item.body, bodyW, 8.8, false, 4)
+        val cardH = 30.0 + body.size * 11.5
+        if (y - cardH < PDF_BOTTOM_LIMIT + 4) {
+            page = PdfPage().also(pages::add)
+            page.text(PDF_MARGIN, 806.0, "DINEX", 10.5, true, PdfBrand)
+            page.text(PDF_MARGIN + textWidth("DINEX", 10.5, true) + 6, 806.0, "Tu plan para ahorrar más", 10.5, false, PdfNight)
+            page.line(PDF_MARGIN, 795.0, PDF_RIGHT, 795.0, PdfLine, 0.75)
+            y = 772.0
+        }
+        page.roundRect(PDF_MARGIN, y - cardH, PDF_CONTENT_W, cardH, 10.0, if (index % 2 == 0) PdfZebra else PdfWhite, PdfLine, 0.6)
+        page.circle(PDF_MARGIN + 22, y - 18, 10.0, PdfBrand)
+        page.textCenter(PDF_MARGIN + 22, y - 21.5, "${index + 1}", 10.0, true, PdfWhite)
+        page.text(PDF_MARGIN + 42, y - 21, ellipsize(item.title, bodyW, 10.5, true), 10.5, true, PdfNight)
+        body.forEachIndexed { i, line -> page.text(PDF_MARGIN + 42, y - 35 - i * 11.5, line, 8.8, false, PdfMuted) }
+        if (impactText != null) {
+            page.roundRect(PDF_RIGHT - 12 - impactW, y - 27, impactW, 17.0, 8.5, PdfMint)
+            page.text(PDF_RIGHT - 12 - impactW + 9, y - 21.5, impactText, 8.0, true, PdfMintDeep)
+        }
+        y -= cardH + 8
+    }
+    y -= 6
+
+    // Reto de la semana y educación financiera, lado a lado.
+    val boxH = 104.0
+    if (y - boxH < PDF_BOTTOM_LIMIT + 4) {
+        page = PdfPage().also(pages::add)
+        page.text(PDF_MARGIN, 806.0, "DINEX", 10.5, true, PdfBrand)
+        page.text(PDF_MARGIN + textWidth("DINEX", 10.5, true) + 6, 806.0, "Tu plan para ahorrar más", 10.5, false, PdfNight)
+        page.line(PDF_MARGIN, 795.0, PDF_RIGHT, 795.0, PdfLine, 0.75)
+        y = 772.0
+    }
+    val half = (PDF_CONTENT_W - 12) / 2
+    page.roundRect(PDF_MARGIN, y - boxH, half, boxH, 12.0, PdfAmberSoft)
+    page.text(PDF_MARGIN + 14, y - 20, advice.challengeTitle.uppercase(), 7.0, true, PdfAmber, 0.6)
+    wrapText(advice.challenge, half - 28, 9.0, false, 5).forEachIndexed { i, line ->
+        page.text(PDF_MARGIN + 14, y - 36 - i * 12, line, 9.0, i == 0, PdfNight)
+    }
+    val lx = PDF_MARGIN + half + 12
+    page.roundRect(lx, y - boxH, half, boxH, 12.0, PdfMint)
+    page.text(lx + 14, y - 20, "EDUCACIÓN FINANCIERA · ${advice.lessonTitle.uppercase()}", 7.0, true, PdfMintDeep, 0.6)
+    // Barra 50/30/20.
+    val splitW = half - 28
+    listOf(0.5 to PdfBrandDeep, 0.3 to PdfGood, 0.2 to PdfAmber).fold(lx + 14) { x, (share, color) ->
+        page.roundRect(x, y - 38, splitW * share - 2, 8.0, 4.0, color); x + splitW * share
+    }
+    page.text(lx + 14, y - 50, "Necesidades 50 %", 7.0, false, PdfMuted)
+    page.textCenter(lx + 14 + splitW * 0.65, y - 50, "Gustos 30 %", 7.0, false, PdfMuted)
+    page.textRight(lx + 14 + splitW, y - 50, "Ahorro 20 %", 7.0, true, PdfMintDeep)
+    wrapText(advice.lesson, half - 28, 8.5, false, 3).forEachIndexed { i, line ->
+        page.text(lx + 14, y - 66 - i * 11, line, 8.5, false, PdfNight)
+    }
+    y -= boxH + 18
+    if (y > PDF_BOTTOM_LIMIT + 20) {
+        page.textCenter(PDF_PAGE_W / 2, y, "Pequeños cambios, grandes metas.", 11.0, true, PdfBrand)
+        page.textCenter(PDF_PAGE_W / 2, y - 14, "Estas recomendaciones son orientativas y se basan solo en lo que registraste en Dinex.", 7.5, false, PdfMuted)
+    }
+
     // ---------- Pie de página con numeración ----------
     pages.forEachIndexed { i, sheet ->
         sheet.line(PDF_MARGIN, 46.0, PDF_RIGHT, 46.0, PdfLine, 0.5)
-        sheet.text(PDF_MARGIN, 31.0, "DINEX · Decide mejor. Ahorra más.", 7.5, true, PdfBrand)
+        sheet.text(PDF_MARGIN, 31.0, "DINEX · Tu dinero, con propósito.", 7.5, true, PdfBrand)
         sheet.textCenter(PDF_PAGE_W / 2, 31.0, "Los montos corresponden a tus registros en la app", 7.0, false, PdfMuted)
         sheet.textRight(PDF_RIGHT, 31.0, "Página ${i + 1} de ${pages.size}", 7.5, false, PdfMuted)
     }
     return assemblePdf(pages.map { it.out.toString() }, owner)
+}
+
+private fun scoreColor(score: Int) = when {
+    score >= 80 -> PdfBrand
+    score >= 60 -> PdfGood
+    score >= 40 -> PdfAmber
+    else -> PdfExpense
+}
+
+private fun scoreSoft(score: Int) = when {
+    score >= 60 -> PdfMint
+    score >= 40 -> PdfAmberSoft
+    else -> PdfExpenseSoft
 }
 
 private fun pdfBytes(value: String): ByteArray = ByteArray(value.length) { (value[it].code and 255).toByte() }

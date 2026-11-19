@@ -349,7 +349,7 @@ private fun MascotDemo() {
         Spacer(Modifier.height(10.dp))
         Surface(shape = CircleShape, color = Card, border = BorderStroke(1.dp, Border)) {
             Text(
-                when (waves % 3) { 0 -> "¡Tócame!"; 1 -> "¡Hola! Vamos a ahorrar juntos."; else -> "Decide mejor. Ahorra más." },
+                when (waves % 3) { 0 -> "¡Tócame!"; 1 -> "¡Hola! Vamos a ahorrar juntos."; else -> "Tu dinero, con propósito." },
                 color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp,
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
             )

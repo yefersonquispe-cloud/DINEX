@@ -2,8 +2,9 @@ package com.example.dinex
 
 import androidx.compose.ui.graphics.toArgb
 
-// Libro Excel con dos hojas:
+// Libro Excel con tres hojas:
 //  - "Resumen": cifras con fórmulas reales (SUMIFS, COUNTIFS…) y tres gráficos nativos de Excel.
+//  - "Mi plan de ahorro": salud financiera y recomendaciones personalizadas (las mismas del PDF).
 //  - "Movimientos": la tabla con filtros, fechas reales y montos con formato de soles.
 // Las fórmulas viven solo en "Resumen"; los textos del usuario siempre se guardan como texto,
 // así nadie puede colar una fórmula en la hoja de movimientos.
@@ -42,6 +43,20 @@ private const val XS_TOTAL_PERCENT = 23
 private const val XS_TOTAL_COUNT = 24
 private const val XS_NOTE = 25
 private const val XS_TOTAL_BALANCE = 26
+private const val XS_BAND_TITLE = 27
+private const val XS_BAND_SUB = 28
+private const val XS_PLAN_NUM = 29
+private const val XS_PLAN_TITLE = 30
+private const val XS_PLAN_BODY = 31
+private const val XS_PLAN_IMPACT = 32
+private const val XS_SCORE = 33
+private const val XS_HEADLINE = 34
+private const val XS_SUMMARY = 35
+private const val XS_CHALLENGE = 36
+private const val XS_LESSON = 37
+private const val XS_LEVEL = 38
+private const val XS_SPLIT_LABEL = 39
+private const val XS_SPLIT_MONEY = 40
 
 private val ChartPalette = listOf("176B43", "E66678", "8A76D4", "D89945", "3E8EB8", "C2577F", "4F9D69", "71827A", "2F5D8A", "B5893B")
 
@@ -61,8 +76,9 @@ private fun excelSerial(year: Int, month: Int, day: Int) = epochDaysOf(year, mon
 
 private data class ChartSpec(val xml: String, val fromRow: Int, val toRow: Int)
 
-internal fun exportWorkbook(items: List<Movement>, period: String, owner: String): ByteArray {
+internal fun exportWorkbook(items: List<Movement>, period: String, owner: String, context: ReportContext = ReportContext()): ByteArray {
     val stats = ReportStats(items)
+    val planSheet = planSheet(stats, reportAdvice(stats, owner, context), period)
     val last = items.size + 1
     val movementsSheet = movementsSheet(items, last)
     val charts = mutableListOf<ChartSpec>()
@@ -79,6 +95,7 @@ internal fun exportWorkbook(items: List<Movement>, period: String, owner: String
             append("<Override PartName=\"/xl/styles.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml\"/>")
             append("<Override PartName=\"/xl/worksheets/sheet1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>")
             append("<Override PartName=\"/xl/worksheets/sheet2.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>")
+            append("<Override PartName=\"/xl/worksheets/sheet3.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml\"/>")
             if (charts.isNotEmpty()) append("<Override PartName=\"/xl/drawings/drawing1.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.drawing+xml\"/>")
             chartFiles.forEach { (name, _) -> append("<Override PartName=\"/$name\" ContentType=\"application/vnd.openxmlformats-officedocument.drawingml.chart+xml\"/>") }
             append("<Override PartName=\"/docProps/core.xml\" ContentType=\"application/vnd.openxmlformats-package.core-properties+xml\"/>")
@@ -96,17 +113,20 @@ internal fun exportWorkbook(items: List<Movement>, period: String, owner: String
         // La hoja "Resumen" aparece primero, pero el archivo sheet1 sigue siendo "Movimientos" para que reimportar funcione igual.
         "xl/workbook.xml" to "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><workbook xmlns=\"$SHEET_NS\" xmlns:r=\"$OFFICE_REL\">" +
             "<bookViews><workbookView activeTab=\"0\"/></bookViews><sheets><sheet name=\"Resumen\" sheetId=\"2\" r:id=\"rId2\"/>" +
+            "<sheet name=\"Mi plan de ahorro\" sheetId=\"3\" r:id=\"rId4\"/>" +
             "<sheet name=\"Movimientos\" sheetId=\"1\" r:id=\"rId1\"/></sheets><definedNames>" +
-            "<definedName name=\"_xlnm._FilterDatabase\" localSheetId=\"1\" hidden=\"1\">Movimientos!\$A\$1:\$G\$$last</definedName>" +
-            "<definedName name=\"_xlnm.Print_Titles\" localSheetId=\"1\">Movimientos!\$1:\$1</definedName></definedNames>" +
+            "<definedName name=\"_xlnm._FilterDatabase\" localSheetId=\"2\" hidden=\"1\">Movimientos!\$A\$1:\$G\$$last</definedName>" +
+            "<definedName name=\"_xlnm.Print_Titles\" localSheetId=\"2\">Movimientos!\$1:\$1</definedName></definedNames>" +
             "<calcPr calcId=\"191029\" fullCalcOnLoad=\"1\"/></workbook>",
         "xl/_rels/workbook.xml.rels" to "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"$PACKAGE_REL\">" +
             "<Relationship Id=\"rId1\" Type=\"$OFFICE_REL/worksheet\" Target=\"worksheets/sheet1.xml\"/>" +
             "<Relationship Id=\"rId2\" Type=\"$OFFICE_REL/worksheet\" Target=\"worksheets/sheet2.xml\"/>" +
-            "<Relationship Id=\"rId3\" Type=\"$OFFICE_REL/styles\" Target=\"styles.xml\"/></Relationships>",
+            "<Relationship Id=\"rId3\" Type=\"$OFFICE_REL/styles\" Target=\"styles.xml\"/>" +
+            "<Relationship Id=\"rId4\" Type=\"$OFFICE_REL/worksheet\" Target=\"worksheets/sheet3.xml\"/></Relationships>",
         "xl/styles.xml" to workbookStyles(),
         "xl/worksheets/sheet1.xml" to movementsSheet,
         "xl/worksheets/sheet2.xml" to summarySheet,
+        "xl/worksheets/sheet3.xml" to planSheet,
     )
     if (charts.isNotEmpty()) {
         files["xl/worksheets/_rels/sheet2.xml.rels"] = "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><Relationships xmlns=\"$PACKAGE_REL\">" +
@@ -166,8 +186,9 @@ private fun summarySheet(stats: ReportStats, period: String, owner: String, char
     val dataBars = mutableListOf<String>()
     var r = 1
     val generated = "${today.day.toString().padStart(2, '0')}/${today.month.toString().padStart(2, '0')}/${today.year}"
-    rows.append(row(1, cellText("A1", "Reporte de movimientos DINEX", XS_TITLE), 34.0))
-    rows.append(row(2, cellText("A2", "${owner.ifBlank { "Mi cuenta" }}  ·  $period  ·  Generado el $generated", XS_SUBTITLE), 18.0))
+    // Franja verde de marca: título y datos del reporte.
+    rows.append(row(1, (listOf(cellText("A1", "DINEX · Reporte de movimientos", XS_BAND_TITLE)) + ('B'..'E').map { cellText("${it}1", "", XS_BAND_TITLE) }).joinToString(""), 40.0))
+    rows.append(row(2, (listOf(cellText("A2", "Tu dinero, con propósito  ·  ${owner.ifBlank { "Mi cuenta" }}  ·  $period  ·  Generado el $generated", XS_BAND_SUB)) + ('B'..'E').map { cellText("${it}2", "", XS_BAND_SUB) }).joinToString(""), 22.0))
 
     // Indicadores principales (fila 4 títulos, fila 5 valores).
     rows.append(row(4, listOf("INGRESOS", "EGRESOS", "BALANCE", "TASA DE AHORRO", "MOVIMIENTOS")
@@ -245,6 +266,8 @@ private fun summarySheet(stats: ReportStats, period: String, owner: String, char
     val methodRows = expenseTable(stats.methods, 'F', "Sin gastos en este periodo.")
     r++
     rows.append(row(r, cellText("A$r", "Los totales usan fórmulas sobre la hoja Movimientos: si corriges un monto allí, el resumen y los gráficos se actualizan solos.", XS_NOTE)))
+    r++
+    rows.append(row(r, cellText("A$r", "Mira tus recomendaciones personalizadas en la hoja \"Mi plan de ahorro\".", XS_NOTE)))
     val lastRow = r
 
     // Gráficos nativos de Excel a la derecha de las tablas (columnas G a O).
@@ -279,6 +302,77 @@ private fun summarySheet(stats: ReportStats, period: String, owner: String, char
         append("<pageSetup paperSize=\"9\" orientation=\"landscape\" fitToWidth=\"1\" fitToHeight=\"0\"/>")
         if (charts.isNotEmpty()) append("<drawing r:id=\"rId1\"/>")
         append("</worksheet>")
+    }
+}
+
+// ---------------------------------------------------------------- Hoja "Mi plan de ahorro"
+
+/** Recomendaciones personalizadas: mismas cifras y textos que la última página del PDF. */
+private fun planSheet(stats: ReportStats, advice: ReportAdvice, period: String): String {
+    val rows = StringBuilder()
+    val merges = mutableListOf("A1:D1", "A2:D2", "A4:B4", "A5:B6", "C4:D4", "C5:D5", "C6:D6")
+    fun band(r: Int, text: String, style: Int, height: Double) =
+        row(r, (listOf(cellText("A$r", text, style)) + ('B'..'D').map { cellText("$it$r", "", style) }).joinToString(""), height)
+    rows.append(band(1, "Mi plan de ahorro", XS_BAND_TITLE, 40.0))
+    rows.append(band(2, "DINEX · Tu dinero, con propósito  ·  $period", XS_BAND_SUB, 22.0))
+    rows.append(row(4, cellText("A4", "SALUD FINANCIERA", XS_KPI_LABEL) + cellText("B4", "", XS_KPI_LABEL) +
+        cellText("C4", advice.headline, XS_HEADLINE) + cellText("D4", "", XS_HEADLINE), 30.0))
+    rows.append(row(5, cellText("A5", "${advice.score} / 100", XS_SCORE) + cellText("B5", "", XS_SCORE) +
+        cellText("C5", advice.summary, XS_SUMMARY) + cellText("D5", "", XS_SUMMARY), 36.0))
+    rows.append(row(6, cellText("A6", "", XS_SCORE) + cellText("B6", "", XS_SCORE) +
+        cellText("C6", "Nivel: ${advice.level}", XS_LEVEL) + cellText("D6", "", XS_LEVEL), 22.0))
+    var r = 8
+    rows.append(row(r, cellText("A$r", "Qué puedes hacer", XS_SECTION), 26.0)); r++
+    rows.append(row(r, listOf("#", "Recomendación", "Cómo hacerlo", "Ahorro posible").mapIndexed { i, h -> cellText("${'A' + i}$r", h, XS_HEADER) }.joinToString(""), 22.0)); r++
+    advice.items.forEachIndexed { i, item ->
+        val impact = item.impact?.takeIf { it > 0.004 }?.let { "+${moneyGrouped(it)} ${item.impactLabel}" } ?: "Hábito"
+        val height = (18.0 * (1 + item.body.length / 70)).coerceIn(36.0, 72.0)
+        rows.append(row(r, cellText("A$r", "${i + 1}", XS_PLAN_NUM) + cellText("B$r", item.title, XS_PLAN_TITLE) +
+            cellText("C$r", item.body, XS_PLAN_BODY) + cellText("D$r", impact, XS_PLAN_IMPACT), height))
+        r++
+    }
+    if (advice.potentialMonthly > 0) {
+        merges += "A$r:C$r"
+        rows.append(row(r, cellText("A$r", "Si sigues este plan podrías ahorrar (al mes)", XS_TOTAL_LABEL) + cellText("B$r", "", XS_TOTAL_LABEL) +
+            cellText("C$r", "", XS_TOTAL_LABEL) + cellNumber("D$r", advice.potentialMonthly, XS_TOTAL_MONEY), 24.0)); r++
+        merges += "A$r:C$r"
+        rows.append(row(r, cellText("A$r", "En un año", XS_TOTAL_LABEL) + cellText("B$r", "", XS_TOTAL_LABEL) +
+            cellText("C$r", "", XS_TOTAL_LABEL) + cellFormula("D$r", "D${r - 1}*12", advice.potentialMonthly * 12, XS_TOTAL_MONEY), 24.0)); r++
+    }
+    r++
+    merges += "A$r:D$r"
+    rows.append(row(r, cellText("A$r", "${advice.challengeTitle}: ${advice.challenge}", XS_CHALLENGE) +
+        ('B'..'D').joinToString("") { cellText("$it$r", "", XS_CHALLENGE) }, 46.0)); r += 2
+    rows.append(row(r, cellText("A$r", "Educación financiera · ${advice.lessonTitle}", XS_SECTION), 26.0)); r++
+    merges += "A$r:D$r"
+    rows.append(row(r, cellText("A$r", advice.lesson, XS_LESSON) + ('B'..'D').joinToString("") { cellText("$it$r", "", XS_LESSON) }, 40.0)); r++
+    // Reparto 50/30/20 calculado con el ingreso mensual promedio del periodo.
+    val monthly = stats.income / stats.months.size.coerceAtLeast(1)
+    rows.append(row(r, listOf("", "Destino", "Para qué", "Monto al mes").mapIndexed { i, h -> cellText("${'A' + i}$r", h, XS_HEADER) }.joinToString(""), 22.0)); r++
+    val incomeRow = r
+    rows.append(row(r, cellText("A$r", "", XS_SPLIT_LABEL) + cellText("B$r", "Ingreso mensual promedio", XS_SPLIT_LABEL) +
+        cellText("C$r", "Base para repartir tu dinero", XS_PLAN_BODY) + cellNumber("D$r", monthly, XS_SPLIT_MONEY), 22.0)); r++
+    listOf(Triple("50 %", "Necesidades", "Alimentación, transporte, estudios y servicios") to 0.5,
+        Triple("30 %", "Gustos", "Salidas, suscripciones y compras personales") to 0.3,
+        Triple("20 %", "Ahorro", "Tus metas y tu fondo de emergencia") to 0.2).forEach { (texts, share) ->
+        rows.append(row(r, cellText("A$r", texts.first, XS_PLAN_NUM) + cellText("B$r", texts.second, XS_SPLIT_LABEL) +
+            cellText("C$r", texts.third, XS_PLAN_BODY) + cellFormula("D$r", "D$incomeRow*${fixed(share, 2)}", monthly * share, XS_SPLIT_MONEY), 22.0)); r++
+    }
+    r++
+    rows.append(row(r, cellText("A$r", "Recomendaciones orientativas, calculadas solo con lo que registraste en Dinex. Pequeños cambios, grandes metas.", XS_NOTE)))
+    val lastRow = r
+    return buildString {
+        append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><worksheet xmlns=\"$SHEET_NS\" xmlns:r=\"$OFFICE_REL\">")
+        append("<sheetPr><tabColor rgb=\"FFD89945\"/><pageSetUpPr fitToPage=\"1\"/></sheetPr><dimension ref=\"A1:D$lastRow\"/>")
+        append("<sheetViews><sheetView showGridLines=\"0\" workbookViewId=\"0\"><selection activeCell=\"A1\" sqref=\"A1\"/></sheetView></sheetViews>")
+        append("<sheetFormatPr defaultRowHeight=\"18\"/>")
+        append("<cols><col min=\"1\" max=\"1\" width=\"8\" customWidth=\"1\"/><col min=\"2\" max=\"2\" width=\"34\" customWidth=\"1\"/>")
+        append("<col min=\"3\" max=\"3\" width=\"70\" customWidth=\"1\"/><col min=\"4\" max=\"4\" width=\"24\" customWidth=\"1\"/></cols>")
+        append("<sheetData>").append(rows).append("</sheetData>")
+        append("<mergeCells count=\"${merges.size}\">").append(merges.joinToString("") { "<mergeCell ref=\"$it\"/>" }).append("</mergeCells>")
+        append("<pageMargins left=\"0.4\" right=\"0.4\" top=\"0.6\" bottom=\"0.6\" header=\"0.3\" footer=\"0.3\"/>")
+        append("<pageSetup paperSize=\"9\" orientation=\"portrait\" fitToWidth=\"1\" fitToHeight=\"0\"/>")
+        append("<headerFooter><oddFooter>&amp;LDINEX · Tu dinero, con propósito&amp;RPágina &amp;P de &amp;N</oddFooter></headerFooter></worksheet>")
     }
 }
 
@@ -366,17 +460,19 @@ private fun workbookStyles(): String {
     fun font(size: Int, color: String, bold: Boolean = false, italic: Boolean = false) =
         "<font>${if (bold) "<b/>" else ""}${if (italic) "<i/>" else ""}<sz val=\"$size\"/><color rgb=\"FF$color\"/><name val=\"Calibri\"/><family val=\"2\"/></font>"
     fun fill(color: String) = "<fill><patternFill patternType=\"solid\"><fgColor rgb=\"FF$color\"/><bgColor indexed=\"64\"/></patternFill></fill>"
-    fun xf(numFmt: Int, font: Int, fill: Int, border: Int, horizontal: String? = null, indent: Int = 0) =
+    fun xf(numFmt: Int, font: Int, fill: Int, border: Int, horizontal: String? = null, indent: Int = 0, wrap: Boolean = false) =
         "<xf numFmtId=\"$numFmt\" fontId=\"$font\" fillId=\"$fill\" borderId=\"$border\" xfId=\"0\" applyNumberFormat=\"1\" applyFont=\"1\" applyFill=\"1\" applyBorder=\"1\" applyAlignment=\"1\">" +
-            "<alignment vertical=\"center\"${horizontal?.let { " horizontal=\"$it\"" } ?: ""}${if (indent > 0) " indent=\"$indent\"" else ""}/></xf>"
+            "<alignment vertical=\"center\"${horizontal?.let { " horizontal=\"$it\"" } ?: ""}${if (indent > 0) " indent=\"$indent\"" else ""}${if (wrap) " wrapText=\"1\"" else ""}/></xf>"
     val fonts = listOf(
         font(11, "183326"), font(11, "FFFFFF", bold = true), font(11, "176B43", bold = true), font(11, "B84754", bold = true),
         font(18, "115B38", bold = true), font(10, "536A5A"), font(9, "536A5A", bold = true), font(15, "176B43", bold = true),
         font(15, "B84754", bold = true), font(15, "183326", bold = true), font(12, "115B38", bold = true), font(11, "183326", bold = true),
         font(9, "536A5A", italic = true), font(11, "B84754"),
+        font(20, "FFFFFF", bold = true), font(10, "D8EFE0"), font(28, "176B43", bold = true), font(13, "183326", bold = true),
+        font(10, "365442"), font(11, "8A5A12", bold = true), font(11, "176B43", bold = true), font(11, "183326"),
     )
     val fills = listOf("<fill><patternFill patternType=\"none\"/></fill>", "<fill><patternFill patternType=\"gray125\"/></fill>",
-        fill("176B43"), fill("E5F3E9"), fill("FBE7E9"), fill("E2F2E7"))
+        fill("176B43"), fill("E5F3E9"), fill("FBE7E9"), fill("E2F2E7"), fill("115B38"), fill("FBF0DF"), fill("F6FAF7"))
     val borders = listOf(
         "<border><left/><right/><top/><bottom/><diagonal/></border>",
         "<border><left/><right/><top/><bottom style=\"thin\"><color rgb=\"FFD4E4D8\"/></bottom><diagonal/></border>",
@@ -412,6 +508,20 @@ private fun workbookStyles(): String {
         xf(1, 11, 3, 2, "center"),           // XS_TOTAL_COUNT
         xf(0, 12, 0, 0),                     // XS_NOTE
         xf(167, 11, 3, 2),                   // XS_TOTAL_BALANCE
+        xf(0, 14, 6, 0, indent = 1),         // XS_BAND_TITLE
+        xf(0, 15, 6, 0, indent = 1),         // XS_BAND_SUB
+        xf(0, 1, 2, 3, "center"),            // XS_PLAN_NUM
+        xf(0, 11, 0, 1, wrap = true),        // XS_PLAN_TITLE
+        xf(0, 18, 0, 1, wrap = true),        // XS_PLAN_BODY
+        xf(0, 20, 3, 1, "center", wrap = true), // XS_PLAN_IMPACT
+        xf(0, 16, 3, 3, "center"),           // XS_SCORE
+        xf(0, 17, 0, 0, wrap = true),        // XS_HEADLINE
+        xf(0, 18, 0, 0, wrap = true),        // XS_SUMMARY
+        xf(0, 19, 7, 3, indent = 1, wrap = true), // XS_CHALLENGE
+        xf(0, 21, 3, 3, indent = 1, wrap = true), // XS_LESSON
+        xf(0, 20, 0, 0),                     // XS_LEVEL
+        xf(0, 11, 8, 1),                     // XS_SPLIT_LABEL
+        xf(164, 20, 8, 1),                   // XS_SPLIT_MONEY
     )
     return "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><styleSheet xmlns=\"$SHEET_NS\">" +
         "<numFmts count=\"4\"><numFmt numFmtId=\"164\" formatCode=\"&quot;S/ &quot;#,##0.00\"/><numFmt numFmtId=\"165\" formatCode=\"dd/mm/yyyy\"/>" +

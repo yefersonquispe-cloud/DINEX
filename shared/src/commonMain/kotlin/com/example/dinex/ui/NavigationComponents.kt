@@ -160,7 +160,7 @@ internal fun DinexSidebar(
                 Spacer(Modifier.width(11.dp))
                 Column {
                     Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp, letterSpacing = 1.6.sp)
-                    Text("Decide mejor. Ahorra más.", color = Gray, fontSize = 11.sp)
+                    Text("Tu dinero, con propósito.", color = Gray, fontSize = 11.sp)
                 }
             }
             Spacer(Modifier.height(22.dp))

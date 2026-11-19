@@ -9,12 +9,12 @@ internal enum class ReportFormat(val label: String, val extension: String, val m
     PDF("PDF", "pdf", "application/pdf")
 }
 
-internal fun createMovementReport(items: List<Movement>, format: ReportFormat, period: String, owner: String): TransferDocument {
+internal fun createMovementReport(items: List<Movement>, format: ReportFormat, period: String, owner: String, context: ReportContext = ReportContext()): TransferDocument {
     require(items.size <= MAX_IMPORT_ROWS) { "Exporta como máximo $MAX_IMPORT_ROWS movimientos por reporte." }
     val bytes = when (format) {
         ReportFormat.CSV -> ("﻿" + exportMovementsCsv(items)).encodeToByteArray()
-        ReportFormat.XLSX -> exportWorkbook(items, period, owner)
-        ReportFormat.PDF -> exportPdfReport(items, period, owner)
+        ReportFormat.XLSX -> exportWorkbook(items, period, owner, context)
+        ReportFormat.PDF -> exportPdfReport(items, period, owner, context)
     }
     val today = civilDateFromEpochDays()
     val date = "${today.year}-${today.month.toString().padStart(2, '0')}-${today.day.toString().padStart(2, '0')}"
