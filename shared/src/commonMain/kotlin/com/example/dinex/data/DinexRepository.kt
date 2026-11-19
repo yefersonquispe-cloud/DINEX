@@ -163,12 +163,19 @@ internal fun packProfile(data: FinancialData): String = packFields(listOf(
 
 internal fun unpackProfile(raw: String?): FinancialData = unpackProfileOrNull(raw) ?: FinancialData()
 
+/** Un id repetido en datos antiguos cerraría la lista de movimientos: el repetido recibe uno libre. */
+private fun List<Movement>.withUniqueIds(): List<Movement> {
+    val used = mutableSetOf<Int>()
+    var next = (maxOfOrNull { it.id } ?: 0) + 1
+    return map { item -> if (used.add(item.id)) item else item.copy(id = next++) }
+}
+
 /** null cuando el texto no es un perfil válido (por ejemplo, datos dañados en la nube). */
 internal fun unpackProfileOrNull(raw: String?): FinancialData? {
     val fields = unpackFields(raw) ?: return null
     if (!(fields.size == 10 && fields[0] == "2") && !(fields.size == 12 && fields[0] == "3") && !(fields.size == 14 && fields[0] == "4")) return null
     return FinancialData(
-        movements = decodeMovements(fields[1]),
+        movements = decodeMovements(fields[1]).withUniqueIds(),
         reminders = decodeReminders(fields[2]),
         savings = fields[3].toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 } ?: 0.0,
         streak = fields[4].toIntOrNull()?.coerceAtLeast(0) ?: 0,

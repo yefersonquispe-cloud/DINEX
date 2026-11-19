@@ -105,11 +105,12 @@ internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Doubl
         Text("Ingresos del mes: ${money(income)}", color = Gray, fontSize = 12.sp)
         Spacer(Modifier.height(12.dp))
         categories.forEach { category ->
-            val spent = movements.filter { !it.income && it.category == category.name }.sumOf { it.amount }
+            val spent = movements.filter { !it.income && it.budgetCategory() == category.name }.sumOf { it.amount }
             val custom = budgets.containsKey(category.name)
             val limit = budgets[category.name] ?: suggestions[category.name] ?: 0.0
             val ratio = if (limit > 0) (spent / limit).toFloat().coerceIn(0f, 1f) else 0f
             val warning = ratio >= .8f
+            val exceeded = limit > 0 && spent > limit
             Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     CategoryMark(category.code, category.color)
@@ -123,12 +124,15 @@ internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Doubl
                         DinexProgress(ratio, if (warning) Orange else category.color)
                     }
                     Spacer(Modifier.width(8.dp))
-                    Text("${(ratio * 100).toInt()}%", color = if (warning) Orange else Gray, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                    Text("${percent(spent, limit)}%", color = if (warning) Orange else Gray, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
                 Text(if (custom) "Personalizado" else "Sugerido automáticamente", color = Gray, fontSize = 10.sp, modifier = Modifier.padding(start = 44.dp, top = 3.dp))
                 if (warning) {
                     Spacer(Modifier.height(4.dp))
-                    Text("Cerca del límite en ${category.name.lowercase()}", color = Orange, fontSize = 10.sp)
+                    Text(
+                        if (exceeded) "Superaste el límite por ${money(spent - limit)}" else "Cerca del límite en ${category.name.lowercase()}",
+                        color = Orange, fontSize = 10.sp,
+                    )
                 }
             }
         }
@@ -145,7 +149,7 @@ internal fun CategoryBudgetEditorDialog(
 ) {
     val initial = remember { categories.associate { it.name to (overrides[it.name] ?: suggestions[it.name] ?: 0.0) } }
     val amounts = remember { mutableStateMapOf<String, String>().apply { initial.forEach { (name, value) -> put(name, format2(value)) } } }
-    val parsed = categories.associate { it.name to amounts[it.name].orEmpty().replace(',', '.').toDoubleOrNull() }
+    val parsed = categories.associate { it.name to parseMoneyInput(amounts[it.name].orEmpty()) }
     val valid = parsed.values.all { it != null && it.isFinite() && it >= 0 }
     val total = parsed.values.sumOf { it ?: 0.0 }
     val income = suggestions.values.sum()

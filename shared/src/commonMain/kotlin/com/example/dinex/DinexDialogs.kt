@@ -505,8 +505,8 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
         confirmButton = {
             Button(
                 onClick = {
-                    val value = amount.replace(',', '.').toDoubleOrNull()
-                    val parsedDay = day.toIntOrNull()?.coerceIn(1, 31) ?: currentDayOfMonth()
+                    val value = parseMoneyInput(amount)
+                    val parsedDay = movementDayOfMonth(day)
                     val savedTitle = buildString {
                         append(title.ifBlank { if (isIncome) "Ingreso" else category })
                         if (note.isNotBlank()) append(" · ").append(note)
@@ -728,7 +728,7 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
                 if (error) Text("Ingresa un monto válido que no supere tu saldo disponible.", color = Red, fontSize = 12.sp)
             }
         },
-        confirmButton = { Button(onClick = { val value = amount.replace(',', '.').toDoubleOrNull(); val targetValue = target.replace(',', '.').toDoubleOrNull() ?: 0.0; if (value == null || !value.isFinite() || value <= 0 || value > available) error = true else onSave(SavingEntry(value, purpose.trim(), targetValue, selectedId)) }) { Text("Guardar ahorro", fontWeight = FontWeight.Bold) } },
+        confirmButton = { Button(onClick = { val value = parseMoneyInput(amount); val targetValue = parseMoneyInput(target) ?: 0.0; if (value == null || !value.isFinite() || value <= 0 || value > available) error = true else onSave(SavingEntry(value, purpose.trim(), targetValue, selectedId)) }) { Text("Guardar ahorro", fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
     )
 }
@@ -758,7 +758,7 @@ internal fun InitialBalanceDialog(onSave: (Double) -> Unit) {
                 Text("Puedes empezar sin saldo y registrar tus ingresos después desde el botón +.", color = Gray, fontSize = 10.sp)
             }
         },
-        confirmButton = { Button(onClick = { onSave(amount.replace(',', '.').toDoubleOrNull() ?: 0.0) }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text("Guardar y entrar", fontWeight = FontWeight.Bold) } },
+        confirmButton = { Button(onClick = { onSave(parseMoneyInput(amount) ?: 0.0) }, colors = ButtonDefaults.buttonColors(containerColor = Green), shape = RoundedCornerShape(14.dp)) { Text("Guardar y entrar", fontWeight = FontWeight.Bold) } },
         dismissButton = { TextButton(onClick = { onSave(0.0) }) { Text("Empezar con S/ 0", color = Gray) } },
     )
 }
@@ -830,7 +830,7 @@ internal fun ReminderDialog(nextId: Int, onDismiss: () -> Unit, onSave: (Payment
         },
         confirmButton = {
             Button(onClick = {
-                val value = amount.replace(',', '.').toDoubleOrNull()
+                val value = parseMoneyInput(amount)
                 if (title.isBlank() || date.isBlank() || value == null || value <= 0) error = true
                 else onSave(PaymentReminder(nextId, title.trim(), date.trim(), value))
             }) { Text("Guardar recordatorio") }
@@ -868,7 +868,7 @@ internal fun ScanReviewDialog(result: ScannedPurchase, movementId: Int?, nextId:
             Spacer(Modifier.height(10.dp)); Text("Categoría sugerida", fontWeight = FontWeight.Bold, fontSize = 10.sp); LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) { items(categories) { item -> FilterChip(category == item.name, { category = item.name }, label = { Text(item.name) }) } }
             Spacer(Modifier.height(10.dp)); Text(if (result.analyzedWithGemini) "Gemini procesa la foto para extraer los datos; Dinex no conserva la imagen." else "El reconocimiento de respaldo ocurrió en el dispositivo.", color = Gray, fontSize = 9.sp)
         } },
-        confirmButton = { Button(onClick = { val value = amount.replace(',', '.').toDoubleOrNull(); if (value == null || value <= 0) error = true else onSave(Movement(movementId ?: nextId, title.ifBlank { "Compra escaneada" }, category, value, false, receiptDate?.day ?: currentDayOfMonth(),
+        confirmButton = { Button(onClick = { val value = parseMoneyInput(amount); if (value == null || value <= 0) error = true else onSave(Movement(movementId ?: nextId, title.ifBlank { "Compra escaneada" }, category, value, false, receiptDate?.day ?: currentDayOfMonth(),
                 result.method ?: if (result.analyzedWithGemini) "Foto + Gemini" else "Escáner local",
                 month = receiptDate?.month ?: civilDateFromEpochDays().month, year = receiptDate?.year ?: civilDateFromEpochDays().year)) }) { Text("Registrar gasto") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Descartar foto", color = Red, fontWeight = FontWeight.Bold) } })

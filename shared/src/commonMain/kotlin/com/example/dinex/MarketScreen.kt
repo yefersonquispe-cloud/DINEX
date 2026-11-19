@@ -363,7 +363,7 @@ private fun Converter(data: MarketSnapshot, code: String, onCode: (String) -> Un
     var amountText by remember { mutableStateOf("100") }
     var fromSoles by remember { mutableStateOf(false) }
     val quote = data.currencies.firstOrNull { it.id == code } ?: data.currencies.first()
-    val amount = amountText.replace(',', '.').toDoubleOrNull() ?: 0.0
+    val amount = parseMoneyInput(amountText) ?: 0.0
     val result = if (fromSoles) amount / quote.pricePen else amount * quote.pricePen
     val resultDecimals = if (result != 0.0 && abs(result) < 1) 4 else 2
     val resultText = if (fromSoles) "${formatAmount(result, resultDecimals)} ${quote.symbol}" else "S/ ${formatAmount(result, resultDecimals)}"

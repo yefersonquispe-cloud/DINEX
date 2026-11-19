@@ -75,9 +75,10 @@ internal fun parseImportDate(raw: String): DinexDate? {
     if (value.isBlank()) return civilDateFromEpochDays()
     val numeric = value.toDoubleOrNull()
     if (numeric != null && numeric in 1.0..109_574.0) return civilDateFromEpochDays(numeric.toInt() - 25_569)
-    val parts = Regex("^(\\d{1,4})[/.\\-](\\d{1,2})[/.\\-](\\d{2,4})").find(value)
+    val parts = Regex("^(\\d{1,4})[/.\\-](\\d{1,2})[/.\\-](\\d{1,4})").find(value)
     if (parts != null) {
         val (a, b, c) = parts.destructured
+        if (a.length != 4 && c.length == 1) return null // Un año de una sola cifra no es una fecha.
         val year = if (a.length == 4) a.toInt() else c.toInt().let { if (it < 100) it + 2000 else it }
         val month = b.toInt()
         val day = if (a.length == 4) c.toInt() else a.toInt()

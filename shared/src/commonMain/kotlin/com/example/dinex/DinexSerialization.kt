@@ -11,8 +11,38 @@ import androidx.compose.runtime.*
 // ═══════════════════════════════════════════════════════════════════════════
 internal fun money(value: Double): String = "S/ ${format2(value)}"
 
+/** "1 meta", "3 metas": cantidad con la palabra en singular o plural. */
+internal fun countLabel(count: Int, one: String, many: String): String = "$count ${if (count == 1) one else many}"
+
+/** Monto escrito a mano: "1,500" son mil quinientos y "12,50" son doce soles con cincuenta. */
+internal fun parseMoneyInput(text: String): Double? {
+    val clean = text.trim().trimEnd('.', ',')
+    return if (MoneyInputFormat.matches(clean)) parseImportAmount(clean)?.takeIf { it >= 0 } else null
+}
+
+private val MoneyInputFormat = Regex("^(\\d+|\\d{1,3}(?:[.,]\\d{3})+)?(?:[.,]\\d{1,2})?$")
+
+/** Quita los separadores de miles de lo dictado: "1,500 soles" pasa a "1500 soles". */
+private fun withoutThousands(text: String): String =
+    Regex("\\b\\d{1,3}(?:[.,]\\d{3})+\\b").replace(text) { match -> match.value.filter(Char::isDigit) }
+
+/** Busca una palabra completa o su plural: "pan" coincide con "panes", pero no con "pantalón". */
+private fun String.hasWord(word: String): Boolean {
+    var start = indexOf(word)
+    while (start >= 0) {
+        val startsClean = getOrNull(start - 1)?.isLetterOrDigit() != true
+        val endsClean = listOf("", "s", "es").any { ending ->
+            val end = start + word.length + ending.length
+            startsWith(ending, start + word.length) && getOrNull(end)?.isLetterOrDigit() != true
+        }
+        if (startsClean && endsClean) return true
+        start = indexOf(word, start + 1)
+    }
+    return false
+}
+
 internal fun parseVoiceCommand(text: String, nextId: Int, location: String?): Movement? {
-    val normalized = text.lowercase()
+    val normalized = withoutThousands(text.lowercase())
     val explicit = Regex("(?:s/\\.?|soles?|sol|pen)\\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\\s*(?:s/\\.?|soles?|sol|pen)", RegexOption.IGNORE_CASE).find(normalized)
     val amount = explicit?.let { match ->
         (match.groupValues[1].ifBlank { match.groupValues[2] }).replace(',', '.').toDoubleOrNull()
@@ -24,10 +54,10 @@ internal fun parseVoiceCommand(text: String, nextId: Int, location: String?): Mo
         income -> "Ingreso"
         // Se evalúa transporte antes que supermercados: "pasaje del metro"
         // debe ser transporte, mientras "compré en Metro" sigue siendo comida.
-        listOf("transporte", "taxi", "uber", "pasaje", "pasajes", "metropolitano", "tren", "línea 1", "linea 1", "gasolina", "combustible", "bus", "micro").any(normalized::contains) -> "Transporte"
-        listOf("comida", "almuerzo", "cena", "desayuno", "restaurante", "snack", "mercado", "super", "tottus", "metro", "plaza vea", "kfc", "bembos", "cafe", "café", "pan", "hamburguesa").any(normalized::contains) -> "Comida"
-        listOf("estudios", "libro", "curso", "pension", "pensión", "copias", "universidad", "instituto", "colegio", "matricula", "matrícula").any(normalized::contains) -> "Estudios"
-        listOf("entretenimiento", "cine", "juego", "salida", "bar", "fiesta", "netflix", "spotify", "steam").any(normalized::contains) -> "Entretenimiento"
+        listOf("transporte", "taxi", "uber", "pasaje", "metropolitano", "tren", "línea 1", "linea 1", "gasolina", "combustible", "bus", "micro").any(normalized::hasWord) -> "Transporte"
+        listOf("comida", "almuerzo", "cena", "desayuno", "restaurante", "snack", "mercado", "supermercado", "super", "tottus", "metro", "plaza vea", "kfc", "bembos", "cafe", "café", "pan", "hamburguesa").any(normalized::hasWord) -> "Comida"
+        listOf("estudio", "libro", "curso", "pension", "pensión", "copia", "universidad", "instituto", "colegio", "matricula", "matrícula").any(normalized::hasWord) -> "Estudios"
+        listOf("entretenimiento", "cine", "juego", "salida", "bar", "fiesta", "netflix", "spotify", "steam").any(normalized::hasWord) -> "Entretenimiento"
         else -> categories.firstOrNull { normalized.contains(it.name.lowercase()) }?.name ?: "Otros"
     }
     val title = Regex("(?:en|de|para|por)\\s+([a-záéíóúñ0-9\\s]+)$", RegexOption.IGNORE_CASE).find(text)?.groupValues?.getOrNull(1)?.trim()
@@ -39,7 +69,7 @@ internal fun parseVoiceCommand(text: String, nextId: Int, location: String?): Mo
 }
 
 internal fun parseVoiceReminder(text: String, nextId: Int): PaymentReminder? {
-    val normalized = text.lowercase()
+    val normalized = withoutThousands(text.lowercase())
     val reminderWords = listOf("agenda", "agendar", "recuérdame", "recuerdame", "recordatorio", "recordar")
     if (reminderWords.none(normalized::contains)) return null
     val amountMatch = Regex("(?:s/\\.?|pen|soles?)\\s*([0-9]+(?:[.,][0-9]{1,2})?)|([0-9]+(?:[.,][0-9]{1,2})?)\\s*(?:s/\\.?|pen|soles?)")
@@ -70,7 +100,7 @@ internal fun parseVoiceReminder(text: String, nextId: Int): PaymentReminder? {
 internal fun format2(value: Double): String {
     if (value.isNaN() || value.isInfinite()) return "0.00"
     val cents = (kotlin.math.abs(value) * 100 + 0.5).toLong()
-    val sign = if (value < -0.005) "-" else ""
+    val sign = if (value < 0 && cents > 0) "-" else ""
     return "$sign${cents / 100}.${(cents % 100).toString().padStart(2, '0')}"
 }
 internal fun percent(part: Double, total: Double): Int = if (total <= 0) 0 else (part / total * 100).toInt()

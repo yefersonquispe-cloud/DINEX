@@ -35,6 +35,15 @@ internal fun Movement.isInCurrentMonth(): Boolean = civilDateFromEpochDays().let
 internal fun Movement.isToday(): Boolean = isInCurrentMonth() && day == currentDayOfMonth()
 internal fun Movement.dateLabel(): String = "$day ${currentMonthShort(month).lowercase()} $year"
 
+/** Categoría para presupuestos: las que llegan importadas con otro nombre cuentan en "Otros". */
+internal fun Movement.budgetCategory(): String = categories.firstOrNull { it.name.equals(category.trim(), ignoreCase = true) }?.name ?: "Otros"
+
+/** Día escrito en el formulario, siempre válido para el mes actual (noviembre no tiene día 31). */
+internal fun movementDayOfMonth(text: String, today: DinexDate = civilDateFromEpochDays()): Int {
+    val lastDay = (31 downTo 28).first { validDate(today.year, today.month, it) }
+    return text.toIntOrNull()?.coerceIn(1, lastDay) ?: today.day
+}
+
 internal fun movementChartCategories(items: List<Movement>): List<CategoryInfo> = categories +
     items.filterNot { it.income }.map { it.category }.distinct().filter { name -> categories.none { it.name == name } }
         .map { name -> CategoryInfo(name, "OT", Gray, 0.0) }

@@ -8,6 +8,56 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class SharedCommonTest {
+    @Test fun typedAmountsUnderstandThousandsAndDecimals() {
+        assertEquals(1500.0, parseMoneyInput("1,500"))
+        assertEquals(12.5, parseMoneyInput("12,50"))
+        assertEquals(1234.5, parseMoneyInput("1,234.50"))
+        assertEquals(12.0, parseMoneyInput("12."))
+        assertEquals(null, parseMoneyInput("1.2.3,4567"))
+        assertEquals(null, parseMoneyInput(""))
+    }
+
+    @Test fun formDayAlwaysExistsInTheCurrentMonth() {
+        assertEquals(30, movementDayOfMonth("31", DinexDate(2026, 11, 18)))
+        assertEquals(28, movementDayOfMonth("30", DinexDate(2026, 2, 3)))
+        assertEquals(18, movementDayOfMonth("", DinexDate(2026, 11, 18)))
+    }
+
+    @Test fun voiceCategoriesMatchWholeWordsOnly() {
+        assertEquals("Otros", parseVoiceCommand("Gasté 80 soles en un pantalón", 1, null)?.category)
+        assertEquals("Comida", parseVoiceCommand("Gasté 4 soles en panes", 2, null)?.category)
+        assertEquals("Comida", parseVoiceCommand("Gasté 60 soles en el supermercado", 3, null)?.category)
+    }
+
+    @Test fun voiceAmountsKeepTheirThousands() {
+        assertEquals(1500.0, parseVoiceCommand("Recibí 1,500 soles de sueldo", 1, null)?.amount)
+        assertEquals(20.5, parseVoiceCommand("Gasté 20,50 soles en comida", 2, null)?.amount)
+    }
+
+    @Test fun importedDatesAcceptOneDigitDays() {
+        assertEquals(DinexDate(2026, 11, 5), parseImportDate("2026-11-5"))
+        assertEquals(null, parseImportDate("5/11/6"))
+    }
+
+    @Test fun importedCategoriesCountInsideTheBudgets() {
+        fun item(category: String) = Movement(1, "Compra", category, 10.0, false, 1, "Yape")
+        assertEquals("Comida", item("COMIDA").budgetCategory())
+        assertEquals("Otros", item("Alimentos varios").budgetCategory())
+    }
+
+    @Test fun repeatedMovementIdsAreRepairedWhenLoading() {
+        val item = Movement(4, "Compra", "Otros", 10.0, false, 1, "Yape")
+        val restored = unpackProfile(packProfile(FinancialData(movements = listOf(item, item.copy(title = "Otra")))))
+        assertEquals(2, restored.movements.map { it.id }.distinct().size)
+        assertEquals(listOf("Compra", "Otra"), restored.movements.map { it.title })
+    }
+
+    @Test fun labelsUseSingularForOne() {
+        assertEquals("1 meta", countLabel(1, "meta", "metas"))
+        assertEquals("3 metas", countLabel(3, "meta", "metas"))
+        assertEquals("0.00", format2(-0.001))
+    }
+
 
     @Test
     fun categoryBudgetsAreSuggestedFromMonthlyIncomeAndStartAtZero() {
