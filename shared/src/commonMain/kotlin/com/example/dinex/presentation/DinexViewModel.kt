@@ -43,6 +43,9 @@ internal data class DinexUiState(
 /** Límite de preguntas a Dinex IA por usuario y por día. */
 internal const val DAILY_AI_QUERIES = 3
 
+/** Largo máximo del nombre que aceptan las reglas de Firestore. */
+private const val MAX_CLOUD_NAME = 80
+
 /** Owns session and financial actions; composables only render state and send events. */
 internal class DinexViewModel(
     private val repository: DinexRepository = DinexRepository(),
@@ -74,6 +77,7 @@ internal class DinexViewModel(
     private var cloudSession: CloudSession? = repository.cloudSession()
     private var pendingGoogle: GoogleSignIn? = null
     private var syncJob: Job? = null
+    private var resumeJob: Job? = null
 
     init {
         val email = initialEmail
@@ -83,7 +87,7 @@ internal class DinexViewModel(
                 logout()
                 mutableState.value = value.copy(authNotice = "Por seguridad, vuelve a iniciar sesión para proteger tu cuenta en la nube.")
             } else {
-                viewModelScope.launch { resumeCloud(email) }
+                resumeJob = viewModelScope.launch { resumeCloud(email) }
             }
         }
     }
@@ -91,6 +95,10 @@ internal class DinexViewModel(
         val email = value.email ?: return
         mutableState.value = value.copy(data = repository.profile(email))
         if (value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
+        // Al volver a la app se trae lo hecho en otros equipos y se sube lo registrado por voz.
+        if (cloud != null && cloudSession != null && syncJob?.isActive != true && resumeJob?.isActive != true) {
+            resumeJob = viewModelScope.launch { resumeCloud(email) }
+        }
     }
 
     /** Consultas a Dinex IA que le quedan hoy a la cuenta activa (máximo [DAILY_AI_QUERIES]). */
@@ -226,7 +234,11 @@ internal class DinexViewModel(
     }
 
     fun sendPasswordReset(email: String) = launchAuth {
-        cloud?.sendPasswordReset(email)
+        try {
+            cloud?.sendPasswordReset(email)
+        } catch (error: CloudAuthException) {
+            if (error.code != "EMAIL_NOT_FOUND") throw error
+        }
         // El mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados.
         "Si $email tiene una cuenta, te llegará un enlace para crear una nueva contraseña."
     }
@@ -253,9 +265,10 @@ internal class DinexViewModel(
     fun acceptGoogleTerms() = launchAuth {
         val cloud = cloud ?: return@launchAuth null
         val google = pendingGoogle ?: return@launchAuth null
-        pendingGoogle = null
         val session = if (google.session.fresh()) google.session else cloud.refresh(google.session)
         finishNewGoogleAccount(cloud, google.copy(session = session))
+        // Se conserva hasta terminar: si se corta el internet, la persona puede volver a aceptar.
+        pendingGoogle = null
         null
     }
 
@@ -285,8 +298,11 @@ internal class DinexViewModel(
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: CloudAuthException) {
-                if (error.code == "CREDENTIAL_TOO_OLD_LOGIN_AGAIN") "Por seguridad, cierra sesión, vuelve a entrar y repite la eliminación."
-                else cloudErrorMessage(error.code)
+                if (error.code == "CREDENTIAL_TOO_OLD_LOGIN_AGAIN") {
+                    // La cuenta sigue activa: se repone la copia que se borró antes de este aviso.
+                    runCatching { validSession()?.let { cloud?.upload(it, localCloudProfile(email, value.activeAccount?.name.orEmpty(), epochMillis())) } }
+                    "Por seguridad, cierra sesión, vuelve a entrar y repite la eliminación."
+                } else cloudErrorMessage(error.code)
             } catch (_: Throwable) {
                 "Necesitas internet para eliminar tu cuenta."
             }
@@ -301,7 +317,7 @@ internal class DinexViewModel(
     }
 
     private fun localCloudProfile(email: String, name: String, updatedAt: Long) =
-        CloudProfile(name, email, cloudProfileText(repository.profile(email)), updatedAt, repository.termsConsent(email))
+        CloudProfile(name.take(MAX_CLOUD_NAME), email, cloudProfileText(repository.profile(email)), updatedAt, repository.termsConsent(email))
 
     fun clearAuthMessages() { mutableState.value = value.copy(authError = null, authNotice = null) }
 
@@ -331,6 +347,7 @@ internal class DinexViewModel(
     private suspend fun completeCloudLogin(session: CloudSession, name: String, trustLocal: Boolean) {
         val cloud = cloud ?: return
         val email = session.email.trim().lowercase()
+        val account = session.copy(email = email)
         val linked = value.accounts.any { it.email == email && it.passwordDigest == "cloud:${session.uid}" }
         val remote = cloud.download(session)
         val displayName = remote?.name?.takeIf { it.isNotBlank() } ?: name.ifBlank { email.substringBefore('@') }
@@ -338,8 +355,8 @@ internal class DinexViewModel(
         reconcile(cloud, session, email, displayName, remote, preferRemote = !linked && !trustLocal)
         val accounts = value.accounts.filterNot { it.email == email } + UserAccount(displayName, email, "cloud:${session.uid}")
         repository.saveAccounts(accounts)
-        cloudSession = session
-        repository.setCloudSession(session)
+        cloudSession = account
+        repository.setCloudSession(account)
         repository.setSession(email)
         mutableState.value = DinexUiState(accounts, email, repository.profile(email), reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
             budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour, profilePhoto = repository.profilePhoto(email),
@@ -383,8 +400,11 @@ internal class DinexViewModel(
         val current = cloudSession ?: return null
         if (current.fresh()) return current
         return cloud.refresh(current).also {
-            cloudSession = it
-            repository.setCloudSession(it)
+            // Si mientras tanto se cerró sesión o cambió la cuenta, esta renovación ya no aplica.
+            if (cloudSession?.uid == current.uid) {
+                cloudSession = it
+                repository.setCloudSession(it)
+            }
         }
     }
 
@@ -413,6 +433,8 @@ internal class DinexViewModel(
     fun logout() {
         val pending = syncJob?.isActive == true
         syncJob?.cancel()
+        resumeJob?.cancel()
+        pendingGoogle = null
         val session = cloudSession
         val email = value.email
         if (pending && cloud != null && session != null && email != null) {
@@ -488,7 +510,7 @@ internal class DinexViewModel(
             mutableState.value = value.copy(budgetWarning = "Los movimientos importados llevan el gasto de hoy a ${money(after)}, por encima de tu límite de ${money(limit)}.")
             if (value.budgetAlerts && before <= limit) DinexAlerts.budgetExceeded(after, limit)
         }
-        showMessage("${clean.size} movimientos importados")
+        showMessage("${countLabel(clean.size, "movimiento importado", "movimientos importados")}")
     }
     fun importNotifications(items: List<CapturedTransaction>, location: String?) {
         importMovements(items.map {

@@ -169,4 +169,88 @@ class CloudSyncTest {
         assertEquals("ana@gmail.com", fixture.model.state.value.email)
         assertEquals(false, fixture.model.state.value.googleTermsRequired)
     }
+
+    /** Firebase de mentira que permite simular cortes de internet y respuestas de error. */
+    private class CloudFixture(googleName: String = "Ana", private val profileExists: Boolean = true) {
+        var offline = false
+        var resetError = false
+        var deleteError: String? = null
+        var remoteAt = 5L
+        var remote = FinancialData(onboardingCompleted = true)
+        val requests = mutableListOf<Pair<String, String>>()
+        val store = MemoryStore()
+        private val account = """"localId":"uid-1","email":"ana@gmail.com","idToken":"t","refreshToken":"r","expiresIn":"3600""""
+        val cloud = DinexCloud(http = { method, url, body, _ ->
+            if (offline) throw IllegalStateException("sin internet")
+            requests += method to url + " " + body.orEmpty()
+            when {
+                "signInWithPassword" in url -> CloudResponse(200, "{$account}")
+                "signInWithIdp" in url -> CloudResponse(200, """{$account,"displayName":"$googleName","isNewUser":${!profileExists}}""")
+                "sendOobCode" in url && resetError -> CloudResponse(400, """{"error":{"message":"EMAIL_NOT_FOUND"}}""")
+                ":delete" in url && deleteError != null -> CloudResponse(400, """{"error":{"message":"$deleteError"}}""")
+                method == "GET" && !profileExists -> CloudResponse(404, "{}")
+                method == "GET" -> CloudResponse(200, """{"fields":{"name":{"stringValue":"Ana"},"email":{"stringValue":"ana@gmail.com"},"profile":{"stringValue":${jsonString(cloudProfileText(remote))}},"updatedAt":{"integerValue":"$remoteAt"}}}""")
+                else -> CloudResponse(200, "{}")
+            }
+        })
+        val repository = DinexRepository(store, migrateLegacy = false)
+        val model = DinexViewModel(repository, cloud)
+    }
+
+    @Test fun acceptingTermsCanBeRetriedAfterLosingConnection() = googleTest {
+        val fixture = CloudFixture(profileExists = false)
+        fixture.model.signInWithGoogle(FakeGoogle)
+        fixture.offline = true
+        fixture.model.acceptGoogleTerms()
+        assertNull(fixture.model.state.value.email)
+        assertTrue(fixture.model.state.value.googleTermsRequired)
+        assertTrue(fixture.model.state.value.authError != null)
+        fixture.offline = false
+        fixture.model.acceptGoogleTerms()
+        assertEquals("ana@gmail.com", fixture.model.state.value.email)
+    }
+
+    @Test fun passwordResetNeverRevealsWhetherAnEmailIsRegistered() = googleTest {
+        val fixture = CloudFixture().apply { resetError = true }
+        fixture.model.sendPasswordReset("nadie@gmail.com")
+        assertNull(fixture.model.state.value.authError)
+        assertTrue(fixture.model.state.value.authNotice.orEmpty().startsWith("Si nadie@gmail.com tiene una cuenta"))
+    }
+
+    @Test fun changesMadeOutsideTheAppReachTheCloudWhenReturning() = googleTest {
+        val fixture = CloudFixture()
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        val voice = Movement(1, "Por voz", "Comida", 10.0, false, 1, "Voz")
+        fixture.repository.saveProfile("ana@gmail.com", fixture.model.state.value.data.copy(movements = listOf(voice)))
+        fixture.requests.clear()
+        fixture.model.refreshProfile()
+        assertTrue(fixture.requests.any { it.first == "PATCH" && "Por voz" in it.second })
+    }
+
+    @Test fun changesFromAnotherDeviceArriveWhenReturningToTheApp() = googleTest {
+        val fixture = CloudFixture()
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        fixture.remote = FinancialData(onboardingCompleted = true, movements = listOf(Movement(9, "Desde la web", "Otros", 7.0, false, 1, "Yape")))
+        fixture.remoteAt = epochMillis() + 60_000
+        fixture.model.refreshProfile()
+        assertEquals("Desde la web", fixture.model.state.value.data.movements.single().title)
+    }
+
+    @Test fun cloudCopyReturnsWhenFirebaseAsksToLoginBeforeDeleting() = googleTest {
+        val fixture = CloudFixture().apply { deleteError = "CREDENTIAL_TOO_OLD_LOGIN_AGAIN" }
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        var result: String? = null
+        fixture.model.deleteAccount { result = it }
+        assertTrue(result.orEmpty().contains("vuelve a entrar"))
+        assertEquals("ana@gmail.com", fixture.model.state.value.email)
+        val removed = fixture.requests.indexOfLast { it.first == "DELETE" }
+        assertTrue(fixture.requests.indexOfLast { it.first == "PATCH" } > removed)
+    }
+
+    @Test fun veryLongGoogleNamesFitTheCloudRules() = googleTest {
+        val fixture = CloudFixture(googleName = "A".repeat(120), profileExists = false)
+        fixture.model.signInWithGoogle(FakeGoogle, acceptedTerms = true)
+        val upload = fixture.requests.first { it.first == "PATCH" }.second
+        assertTrue("A".repeat(80) in upload && "A".repeat(81) !in upload)
+    }
 }

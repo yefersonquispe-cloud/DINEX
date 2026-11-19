@@ -321,13 +321,13 @@ internal fun AuthFlow(
             }
         }
     }
-    if (googleTermsRequired) GoogleTermsDialog(busy, onAcceptGoogleTerms, onDeclineGoogleTerms) { legalTab = it }
+    if (googleTermsRequired) GoogleTermsDialog(busy, serverError, onAcceptGoogleTerms, onDeclineGoogleTerms) { legalTab = it }
     legalTab?.let { LegalDialog(it) { legalTab = null } }
 }
 
 /** Solo aparece la primera vez que alguien crea su cuenta con Google (Ley N.° 29733). */
 @Composable
-private fun GoogleTermsDialog(busy: Boolean, onAccept: () -> Unit, onDecline: () -> Unit, onLegal: (Int) -> Unit) {
+private fun GoogleTermsDialog(busy: Boolean, error: String?, onAccept: () -> Unit, onDecline: () -> Unit, onLegal: (Int) -> Unit) {
     var accepted by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = {},
@@ -348,6 +348,10 @@ private fun GoogleTermsDialog(busy: Boolean, onAccept: () -> Unit, onDecline: ()
                 Row(Modifier.padding(start = 48.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                     LegalLink("Ver términos") { onLegal(0) }
                     LegalLink("Ver privacidad") { onLegal(1) }
+                }
+                error?.let {
+                    Spacer(Modifier.height(10.dp))
+                    Text(it, color = Red, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         },
