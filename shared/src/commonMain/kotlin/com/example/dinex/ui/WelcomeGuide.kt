@@ -99,7 +99,9 @@ internal fun WelcomeGuideDialog(name: String, onDismiss: () -> Unit, onAction: (
                     }
                     HorizontalPager(pager, Modifier.weight(1f).fillMaxWidth()) { index ->
                         val offset = (page - index) + pager.currentPageOffsetFraction
-                        GuidePage(cards[index], offset, onAction)
+                        CompositionLocalProvider(LocalGuideActive provides (page == index)) {
+                            GuidePage(cards[index], offset, onAction)
+                        }
                     }
                     Row(
                         Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 14.dp),
@@ -135,54 +137,132 @@ internal fun WelcomeGuideDialog(name: String, onDismiss: () -> Unit, onAction: (
 @Composable
 private fun GuidePage(card: GuideCard, offset: Float, onAction: (GuideAction) -> Unit) {
     val distance = abs(offset).coerceIn(0f, 1f)
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // En pantallas altas el escenario ocupa todo el espacio libre, así no quedan huecos.
+        // En pantallas bajas la página se desplaza y el escenario tiene una altura fija.
+        val tall = maxHeight >= 560.dp
+        Column(
+            Modifier.fillMaxSize()
+                .then(if (tall) Modifier else Modifier.verticalScroll(rememberScrollState()))
+                .padding(start = 22.dp, end = 22.dp, top = 16.dp, bottom = 4.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            GuideStage(
+                card,
+                Modifier.fillMaxWidth()
+                    .then(if (tall) Modifier.weight(1f).heightIn(min = 220.dp) else Modifier.height(250.dp))
+                    .graphicsLayer {
+                        translationX = offset * size.width * .22f
+                        val scale = 1f - distance * .08f
+                        scaleX = scale; scaleY = scale; alpha = 1f - distance * .5f
+                    },
+            )
+            GuideText(card, onAction, Modifier.graphicsLayer { translationX = offset * size.width * -.12f; alpha = 1f - distance })
+        }
+    }
+}
+
+// Indica si la página está a la vista, para que las demostraciones arranquen solas solo ahí.
+private val LocalGuideActive = compositionLocalOf { true }
+
+/** Avance de 0 a 1 para que cada elemento entre en orden al llegar a la página. */
+@Composable
+private fun rememberEntrance(order: Int): Float {
+    val active = LocalGuideActive.current
+    val still = LocalDinexReducedMotion.current
+    val progress = remember { Animatable(if (still) 1f else 0f) }
+    LaunchedEffect(active, still) {
+        if (still) progress.snapTo(1f)
+        else if (active) { delay(90L * order); progress.animateTo(1f, tween(480, easing = FastOutSlowInEasing)) }
+    }
+    return progress.value
+}
+
+private fun Modifier.entrance(progress: Float) = graphicsLayer {
+    alpha = progress
+    translationY = (1f - progress) * 28.dp.toPx()
+}
+
+@Composable
+private fun GuideStage(card: GuideCard, modifier: Modifier) {
+    val shape = RoundedCornerShape(28.dp)
+    val still = LocalDinexReducedMotion.current
+    val drift = rememberInfiniteTransition(label = "fondo de la guía")
+    val angle by drift.animateFloat(0f, if (still) 0f else 6.2832f, infiniteRepeatable(tween(14000, easing = LinearEasing)), label = "giro")
+    val breath by drift.animateFloat(1f, if (still) 1f else 1.08f, infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "respiro")
+    val pop = rememberEntrance(0)
+    Box(
+        modifier.clip(shape)
+            .background(Brush.verticalGradient(listOf(card.accent.copy(alpha = .16f), card.accent.copy(alpha = .05f))))
+            .border(1.dp, card.accent.copy(alpha = .16f), shape),
+        contentAlignment = Alignment.Center,
     ) {
-        // Escenario con la demostración: se mueve más lento que el texto al deslizar.
+        // Círculos suaves que flotan despacio para dar vida al fondo sin distraer.
+        Canvas(Modifier.matchParentSize()) {
+            val dx = kotlin.math.cos(angle) * size.minDimension * .05f
+            val dy = kotlin.math.sin(angle) * size.minDimension * .05f
+            drawCircle(card.accent.copy(alpha = .07f), size.minDimension * .62f, Offset(size.width * .92f + dx, size.height * .06f + dy))
+            drawCircle(card.accent.copy(alpha = .06f), size.minDimension * .42f, Offset(size.width * .04f - dx, size.height * .98f - dy))
+            drawCircle(Color.White.copy(alpha = .35f), size.minDimension * .34f * breath, Offset(size.width * .5f, size.height * .5f))
+            for (i in 0 until 6) {
+                val a = angle + i * 1.047f
+                val r = size.minDimension * .40f
+                drawCircle(card.accent.copy(alpha = .22f), 3.dp.toPx(), Offset(size.width * .5f + kotlin.math.cos(a) * r, size.height * .5f + kotlin.math.sin(a) * r * .8f))
+            }
+        }
         Box(
-            Modifier.fillMaxWidth().heightIn(min = 230.dp)
-                .graphicsLayer {
-                    translationX = offset * size.width * .22f
-                    val scale = 1f - distance * .08f
-                    scaleX = scale; scaleY = scale; alpha = 1f - distance * .5f
-                }
-                .clip(RoundedCornerShape(26.dp))
-                .background(Brush.linearGradient(listOf(card.accent.copy(alpha = .20f), card.accent.copy(alpha = .05f))))
-                .border(1.dp, card.accent.copy(alpha = .18f), RoundedCornerShape(26.dp))
-                .padding(16.dp),
+            Modifier.fillMaxWidth().padding(20.dp).graphicsLayer {
+                val s = .88f + .12f * pop
+                scaleX = s; scaleY = s; alpha = pop
+            },
             contentAlignment = Alignment.Center,
         ) { card.demo() }
-        Column(
-            Modifier.graphicsLayer { translationX = offset * size.width * -.12f; alpha = 1f - distance },
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Spacer(Modifier.height(4.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Icon(card.icon, null, tint = readableAccent(card.accent), modifier = Modifier.size(18.dp))
-                Text(card.tag.uppercase(), color = readableAccent(card.accent), fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
+    }
+}
+
+@Composable
+private fun GuideText(card: GuideCard, onAction: (GuideAction) -> Unit, modifier: Modifier) {
+    val tone = readableAccent(card.accent)
+    val step = List(5) { rememberEntrance(it + 1) }
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Surface(shape = CircleShape, color = card.accent.copy(alpha = .12f), modifier = Modifier.entrance(step[0])) {
+            Row(Modifier.padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Icon(card.icon, null, tint = tone, modifier = Modifier.size(14.dp))
+                Text(card.tag.uppercase(), color = tone, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
             }
-            Text(card.title, color = Night, fontWeight = FontWeight.Bold, fontSize = 27.sp, lineHeight = 33.sp, letterSpacing = (-.5).sp)
-            Text(card.body, color = NightSoft, fontSize = 15.sp, lineHeight = 22.sp)
-            card.points.forEach { point ->
-                Row(verticalAlignment = Alignment.Top) {
-                    Icon(DinexNavigationIcons.Check, null, tint = readableAccent(card.accent), modifier = Modifier.padding(top = 2.dp).size(16.dp))
-                    Spacer(Modifier.width(10.dp))
-                    Text(point, color = Night, fontSize = 14.sp, lineHeight = 20.sp)
+        }
+        Text(card.title, color = Night, fontWeight = FontWeight.Bold, fontSize = 26.sp, lineHeight = 31.sp, letterSpacing = (-.5).sp, modifier = Modifier.entrance(step[1]))
+        Text(card.body, color = NightSoft, fontSize = 15.sp, lineHeight = 22.sp, modifier = Modifier.entrance(step[2]))
+        // Datos extra y ubicación de la función, agrupados en una tarjeta.
+        if (card.points.isNotEmpty() || card.where.isNotBlank()) {
+            Surface(shape = RoundedCornerShape(18.dp), color = Card, border = BorderStroke(1.dp, Border), modifier = Modifier.fillMaxWidth().padding(top = 4.dp).entrance(step[3])) {
+                Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    card.points.forEach { point ->
+                        Row(verticalAlignment = Alignment.Top) {
+                            Box(Modifier.size(20.dp).clip(CircleShape).background(card.accent.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
+                                Icon(DinexNavigationIcons.Check, null, tint = tone, modifier = Modifier.size(12.dp))
+                            }
+                            Spacer(Modifier.width(10.dp))
+                            Text(point, color = Night, fontSize = 14.sp, lineHeight = 20.sp)
+                        }
+                    }
+                    if (card.where.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(Modifier.size(20.dp).clip(CircleShape).background(Border.copy(alpha = .6f)), contentAlignment = Alignment.Center) {
+                            Icon(DinexNavigationIcons.MapPin, null, tint = Gray, modifier = Modifier.size(12.dp))
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(card.where, color = Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+                    }
                 }
             }
-            if (card.where.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(DinexNavigationIcons.MapPin, null, tint = Gray, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(card.where, color = Gray, fontSize = 13.sp, fontWeight = FontWeight.Medium)
-            }
-            card.action?.let { (label, action) ->
-                OutlinedButton(
-                    onClick = { onAction(action) },
-                    shape = CircleShape,
-                    border = BorderStroke(1.dp, card.accent.copy(alpha = .6f)),
-                ) { Text(label, color = readableAccent(card.accent), fontWeight = FontWeight.SemiBold) }
-            }
+        }
+        card.action?.let { (label, action) ->
+            OutlinedButton(
+                onClick = { onAction(action) },
+                shape = CircleShape,
+                border = BorderStroke(1.dp, card.accent.copy(alpha = .6f)),
+                modifier = Modifier.fillMaxWidth().height(46.dp).entrance(step[4]),
+            ) { Text(label, color = tone, fontWeight = FontWeight.SemiBold) }
         }
     }
 }
@@ -248,17 +328,32 @@ private fun MascotDemo() {
     val still = LocalDinexReducedMotion.current
     val bounce = rememberInfiniteTransition(label = "mascota")
     val y by bounce.animateFloat(0f, if (still) 0f else -10f, infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "salto")
+    val tilt by bounce.animateFloat(-4f, if (still) -4f else 4f, infiniteRepeatable(tween(1800, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "balanceo")
     var waves by remember { mutableIntStateOf(0) }
+    val wave = remember { Animatable(0f) }
+    LaunchedEffect(waves) {
+        if (waves > 0 && !still) { wave.snapTo(0f); wave.animateTo(1f, tween(500)) }
+    }
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Image(
             painterResource(Res.drawable.dinex_mascot_ai), "Mascota de Dinex",
-            Modifier.size(132.dp).offset(y = y.dp).clickable(onClickLabel = "Saludar") { waves++ },
+            Modifier.size(176.dp).offset(y = y.dp)
+                .graphicsLayer {
+                    rotationZ = (if (still) 0f else tilt) + kotlin.math.sin(wave.value * 18.85f) * 10f * (1f - wave.value)
+                    val pop = 1f + kotlin.math.sin(wave.value * 3.1416f) * .12f
+                    scaleX = pop; scaleY = pop
+                }
+                .clickable(onClickLabel = "Saludar") { waves++ },
             contentScale = ContentScale.Fit,
         )
-        Text(
-            when (waves % 3) { 0 -> "¡Tócame!"; 1 -> "¡Hola! Vamos a ahorrar juntos."; else -> "Decide mejor. Ahorra más." },
-            color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 14.sp,
-        )
+        Spacer(Modifier.height(10.dp))
+        Surface(shape = CircleShape, color = Card, border = BorderStroke(1.dp, Border)) {
+            Text(
+                when (waves % 3) { 0 -> "¡Tócame!"; 1 -> "¡Hola! Vamos a ahorrar juntos."; else -> "Decide mejor. Ahorra más." },
+                color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+            )
+        }
     }
 }
 
@@ -266,13 +361,31 @@ private fun MascotDemo() {
 private fun RegisterDemo() {
     var income by remember { mutableStateOf(false) }
     var method by remember { mutableStateOf("Yape") }
-    val tone by animateColorAsState(if (income) Green else Red, label = "tipo")
-    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            FilterChip(!income, { income = false }, { Text("Gasto") })
-            FilterChip(income, { income = true }, { Text("Ingreso") })
+    var touched by remember { mutableStateOf(false) }
+    val active = LocalGuideActive.current
+    val still = LocalDinexReducedMotion.current
+    // Se muestra sola alternando gasto, ingreso y método hasta que la persona la toque.
+    LaunchedEffect(active, touched) {
+        val methods = listOf("Yape", "Plin", "Efectivo")
+        while (active && !touched && !still) {
+            delay(1900)
+            if (method == methods.last()) income = !income
+            method = methods[(methods.indexOf(method) + 1) % methods.size]
         }
-        Surface(shape = RoundedCornerShape(20.dp), color = Card, border = BorderStroke(1.dp, Border), modifier = Modifier.fillMaxWidth()) {
+    }
+    val tone by animateColorAsState(if (income) Green else Red, label = "tipo")
+    Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        // Selector tipo segmento, con los colores de Dinex.
+        Row(Modifier.clip(CircleShape).background(Card).border(1.dp, Border, CircleShape).padding(4.dp)) {
+            listOf(false to "Gasto", true to "Ingreso").forEach { (value, label) ->
+                val selected = income == value
+                Box(
+                    Modifier.clip(CircleShape).background(if (selected) Green else Color.Transparent)
+                        .clickable { touched = true; income = value }.padding(horizontal = 20.dp, vertical = 8.dp),
+                ) { Text(label, color = if (selected) Color.White else Gray, fontWeight = FontWeight.SemiBold, fontSize = 13.sp) }
+            }
+        }
+        Surface(shape = RoundedCornerShape(20.dp), color = Card, border = BorderStroke(1.dp, Border), shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
             Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(40.dp).clip(CircleShape).background(tone.copy(alpha = .15f)), contentAlignment = Alignment.Center) {
                     Icon(if (income) DinexNavigationIcons.ArrowUp else DinexNavigationIcons.ArrowDown, null, tint = tone, modifier = Modifier.size(20.dp))
@@ -287,7 +400,18 @@ private fun RegisterDemo() {
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             listOf("Yape", "Plin", "Efectivo").forEach { option ->
-                AssistChip(onClick = { method = option }, label = { Text(option, fontSize = 11.sp, fontWeight = if (method == option) FontWeight.Bold else FontWeight.Normal) })
+                val selected = method == option
+                Surface(
+                    onClick = { touched = true; method = option }, shape = CircleShape,
+                    color = if (selected) Mint else Card,
+                    border = BorderStroke(1.dp, if (selected) Green.copy(alpha = .5f) else Border),
+                ) {
+                    Text(
+                        option, color = if (selected) GreenDark else Gray, fontSize = 12.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                    )
+                }
             }
         }
     }
@@ -306,6 +430,11 @@ private fun VoiceDemo() {
         listening = false
     }
     val still = LocalDinexReducedMotion.current
+    val active = LocalGuideActive.current
+    // Al llegar a la página, el micrófono se activa solo una vez para mostrar el ejemplo.
+    LaunchedEffect(active) {
+        if (active && shown == 0 && !listening) { delay(700); listening = true }
+    }
     val pulse = rememberInfiniteTransition(label = "voz")
     val scale by pulse.animateFloat(1f, if (listening && !still) 1.18f else 1f, infiniteRepeatable(tween(500), RepeatMode.Reverse), label = "pulso")
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -329,6 +458,16 @@ private fun VoiceDemo() {
 private fun GoalDemo() {
     var saved by remember { mutableFloatStateOf(150f) }
     val target = 500f
+    val active = LocalGuideActive.current
+    val still = LocalDinexReducedMotion.current
+    var played by remember { mutableStateOf(false) }
+    // La meta se llena sola la primera vez que se ve la página.
+    LaunchedEffect(active) {
+        if (active && !played && !still) {
+            played = true
+            animate(0f, 300f, animationSpec = tween(1400, easing = FastOutSlowInEasing)) { value, _ -> saved = value }
+        }
+    }
     val progress by animateFloatAsState(saved / target, label = "meta")
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -343,7 +482,7 @@ private fun GoalDemo() {
         Box(Modifier.fillMaxWidth().height(14.dp).clip(CircleShape).background(Border)) {
             Box(Modifier.fillMaxHeight().fillMaxWidth(progress).clip(CircleShape).background(Brush.horizontalGradient(listOf(Orange, Green))))
         }
-        Slider(saved, { saved = it }, valueRange = 0f..target, steps = 9)
+        Slider(saved, { saved = it }, valueRange = 0f..target, steps = 9, colors = guideSliderColors())
         Text(if (saved >= target) "¡Meta cumplida!" else "Mueve la barra para ahorrar", color = GreenDark, fontWeight = FontWeight.SemiBold, fontSize = 12.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
     }
 }
@@ -352,6 +491,16 @@ private fun GoalDemo() {
 private fun LimitDemo() {
     var limit by remember { mutableFloatStateOf(45f) }
     val spent = 52f
+    val active = LocalGuideActive.current
+    val still = LocalDinexReducedMotion.current
+    var played by remember { mutableStateOf(false) }
+    // El límite baja solo hasta pasarse, para que se vea el aviso en rojo.
+    LaunchedEffect(active) {
+        if (active && !played && !still) {
+            played = true
+            animate(90f, 45f, animationSpec = tween(1600, delayMillis = 300, easing = FastOutSlowInEasing)) { value, _ -> limit = value }
+        }
+    }
     val over = spent > limit
     val tone by animateColorAsState(if (over) Red else Green, label = "limite")
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -360,7 +509,7 @@ private fun LimitDemo() {
             Box(Modifier.fillMaxHeight().fillMaxWidth((spent / limit).coerceAtMost(1f)).clip(CircleShape).background(tone))
         }
         Text("Hoy gastaste S/ ${spent.toInt()}", color = Gray, fontSize = 12.sp)
-        Slider(limit, { limit = it }, valueRange = 20f..120f)
+        Slider(limit, { limit = it }, valueRange = 20f..120f, colors = guideSliderColors())
         Surface(shape = RoundedCornerShape(14.dp), color = tone.copy(alpha = .12f), modifier = Modifier.fillMaxWidth()) {
             Text(
                 if (over) "Te pasaste por S/ ${(spent - limit).toInt()}. Dinex te avisaría ahora." else "Vas bien: te quedan S/ ${(limit - spent).toInt()} para hoy.",
@@ -372,7 +521,17 @@ private fun LimitDemo() {
 
 @Composable
 private fun HeatmapDemo() {
-    val spots = remember { mutableStateListOf(Offset(.3f, .4f), Offset(.62f, .55f), Offset(.48f, .3f), Offset(.66f, .62f)) }
+    val start = remember { listOf(Offset(.3f, .4f), Offset(.62f, .55f), Offset(.48f, .3f), Offset(.66f, .62f)) }
+    val active = LocalGuideActive.current
+    val still = LocalDinexReducedMotion.current
+    val spots = remember { mutableStateListOf<Offset>().apply { if (still) addAll(start) } }
+    // Los puntos de gasto aparecen uno por uno y el calor late suave.
+    LaunchedEffect(active) {
+        if (active && spots.isEmpty()) start.forEach { delay(350); spots.add(it) }
+    }
+    val heat by rememberInfiniteTransition(label = "calor").animateFloat(
+        1f, if (still) 1f else 1.15f, infiniteRepeatable(tween(1100, easing = FastOutSlowInEasing), RepeatMode.Reverse), label = "latido",
+    )
     Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Canvas(
             Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(18.dp)).background(Color(0xFFE9EEE7))
@@ -386,7 +545,8 @@ private fun HeatmapDemo() {
             }
             spots.forEach { spot ->
                 val center = Offset(spot.x * size.width, spot.y * size.height)
-                drawCircle(Brush.radialGradient(listOf(Color(0xCCE03131), Color(0x66F59F00), Color.Transparent), center, 64f), 64f, center)
+                val radius = 64f * heat
+                drawCircle(Brush.radialGradient(listOf(Color(0xCCE03131), Color(0x66F59F00), Color.Transparent), center, radius), radius, center)
             }
         }
         Text("Toca el mapa para agregar un gasto (${spots.size} lugares)", color = Gray, fontSize = 12.sp)
@@ -396,6 +556,11 @@ private fun HeatmapDemo() {
 @Composable
 private fun ChatDemo() {
     var asked by remember { mutableStateOf(false) }
+    val active = LocalGuideActive.current
+    // La pregunta se envía sola al llegar a la página.
+    LaunchedEffect(active) {
+        if (active && !asked) { delay(1100); asked = true }
+    }
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Surface(
             shape = RoundedCornerShape(18.dp, 18.dp, 4.dp, 18.dp), color = Green,
@@ -423,9 +588,9 @@ private fun PrivacyDemo(openLegal: (Int) -> Unit) {
         Triple(DinexNavigationIcons.Bell, "Notificaciones", "Alertas y Yape/Plin"),
     )
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        permissions.forEach { (icon, title, use) ->
+        permissions.forEachIndexed { index, (icon, title, use) ->
             var allowed by remember { mutableStateOf(true) }
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.entrance(rememberEntrance(index + 1)), verticalAlignment = Alignment.CenterVertically) {
                 Icon(icon, null, tint = GreenDark, modifier = Modifier.size(20.dp))
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
@@ -441,3 +606,9 @@ private fun PrivacyDemo(openLegal: (Int) -> Unit) {
         }
     }
 }
+
+@Composable
+private fun guideSliderColors() = SliderDefaults.colors(
+    thumbColor = Green, activeTrackColor = Green, inactiveTrackColor = Border,
+    activeTickColor = Color.White.copy(alpha = .6f), inactiveTickColor = Green.copy(alpha = .35f),
+)
