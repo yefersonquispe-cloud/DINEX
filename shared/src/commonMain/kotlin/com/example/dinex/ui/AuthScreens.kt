@@ -122,9 +122,17 @@ internal fun AuthFlow(
             item {
                 if (!wideLayout) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
+                        // Logo de Dinex (el mismo de la cabecera de la app) junto al nombre.
+                        Box(
+                            Modifier.size(46.dp).clip(RoundedCornerShape(14.dp)).background(Mint),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Image(painterResource(Res.drawable.dinex_mascot_ai), "Logo Dinex", Modifier.size(40.dp), contentScale = ContentScale.Fit)
+                        }
+                        Spacer(Modifier.width(12.dp))
                         Column {
                             Text("DINEX", color = Night, fontWeight = FontWeight.Black, fontSize = 24.sp, letterSpacing = 2.sp)
-                            Text("Decide mejor. Ahorra más.", color = Gray, fontSize = 11.sp)
+                            Text("Tu dinero, con propósito.", color = Gray, fontSize = 12.sp)
                         }
                     }
                     Spacer(Modifier.height(30.dp))
@@ -317,7 +325,6 @@ internal fun AuthFlow(
                     }
                     Spacer(Modifier.height(6.dp))
                 }
-                Text("Tu cuenta está protegida con Firebase de Google: tu contraseña nunca se guarda en el equipo y tus datos se sincronizan de forma privada entre tu celular y la web.", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             }
         }
     }
@@ -452,7 +459,7 @@ private fun AuthBrandStory(modifier: Modifier = Modifier) {
                 Spacer(Modifier.width(12.dp))
                 Column {
                     Text("DINEX", color = Color.White, fontWeight = FontWeight.Black, fontSize = 20.sp, letterSpacing = 2.sp)
-                    Text("Decide mejor. Ahorra más.", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
+                    Text("Tu dinero, con propósito.", color = Color.White.copy(alpha = .72f), fontSize = 12.sp)
                 }
             }
             Spacer(Modifier.weight(1f))

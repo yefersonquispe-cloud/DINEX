@@ -235,7 +235,7 @@ internal fun cloudErrorMessage(code: String): String = when (code) {
     "TOO_MANY_ATTEMPTS_TRY_LATER" -> "Demasiados intentos. Espera unos minutos y vuelve a intentarlo."
     "WEAK_PASSWORD", "PASSWORD_DOES_NOT_MEET_REQUIREMENTS" -> "La contraseña no es segura. Revisa los requisitos."
     "OPERATION_NOT_ALLOWED", "CONFIGURATION_NOT_FOUND" -> "El inicio de sesión no está disponible por ahora."
-    "GOOGLE_NO_ACCOUNT" -> "No hay una cuenta de Google en este teléfono. Agrégala en Ajustes e inténtalo de nuevo."
+    "GOOGLE_NO_ACCOUNT" -> "No pudimos abrir Google en este momento. Inténtalo de nuevo o entra con tu correo."
     "GOOGLE_NOT_READY" -> "Google todavía está cargando. Espera unos segundos e inténtalo de nuevo."
     "GOOGLE_POPUP_ERROR" -> "No se pudo abrir la ventana de Google. Permite ventanas emergentes e inténtalo otra vez."
     "GOOGLE_CREDENTIAL_INVALID", "INVALID_IDP_RESPONSE", "INVALID_ID_TOKEN" -> "No pudimos verificar tu cuenta de Google. Inténtalo otra vez."
