@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         configureDinexStorage(this)
         DinexAlerts.sink = AndroidDinexAlerts(this)
+        if (savedInstanceState == null) handleWidgetAction(intent)
 
         setContent {
             App(onThemeChanged = { dark ->
@@ -49,8 +50,21 @@ class MainActivity : ComponentActivity() {
                     isAppearanceLightStatusBars = !dark
                     isAppearanceLightNavigationBars = !dark
                 }
-            }, onDataChanged = { DinexBalanceWidget.updateAll(this) })
+            }, onDataChanged = { DinexWidgets.updateAll(this) })
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleWidgetAction(intent)
+    }
+
+    /** Un botón del widget se atiende una sola vez, aunque la app se reabra desde recientes. */
+    private fun handleWidgetAction(intent: Intent?) {
+        if (intent == null || intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0) return
+        DinexQuickActions.request(intent.getStringExtra(DinexWidgets.EXTRA_ACTION))
+        intent.removeExtra(DinexWidgets.EXTRA_ACTION)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {

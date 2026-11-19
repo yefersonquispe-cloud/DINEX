@@ -65,11 +65,23 @@
                 android:name="android.service.notification.default_filter_types"
                 android:value="conversations|alerting|silent|ongoing" />
         </service>
-        <receiver android:name=".DinexBalanceWidget" android:exported="true">
+        <receiver android:name=".DinexBalanceWidget" android:exported="true" android:label="@string/widget_balance_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/dinex_balance_widget_info" />
+        </receiver>
+        <receiver android:name=".DinexBudgetWidget" android:exported="true" android:label="@string/widget_budget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/dinex_budget_widget_info" />
+        </receiver>
+        <receiver android:name=".DinexGoalsWidget" android:exported="true" android:label="@string/widget_goals_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/dinex_goals_widget_info" />
         </receiver>
         <provider
             android:name="androidx.core.content.FileProvider"

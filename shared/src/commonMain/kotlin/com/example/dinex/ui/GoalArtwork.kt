@@ -118,14 +118,6 @@ internal fun goalTheme(name: String): GoalTheme {
     }
 }
 
-/** Nombre de la meta para mostrar: "CELULAR" o "celular" se ven como "Celular". */
-internal fun displayGoalName(name: String): String {
-    val clean = name.trim()
-    if (clean.isEmpty()) return "Mi ahorro"
-    val shouting = clean == clean.uppercase() || clean == clean.lowercase()
-    return if (!shouting) clean else clean.lowercase().split(' ').joinToString(" ") { w -> w.replaceFirstChar(Char::uppercase) }
-}
-
 /** Distintivo sobrio de la meta para listas: su inicial con el color de su tema. */
 @Composable
 internal fun GoalAvatar(name: String, size: Dp) {

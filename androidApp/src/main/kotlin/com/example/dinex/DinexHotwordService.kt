@@ -138,7 +138,7 @@ class DinexHotwordService : Service() {
                     if (commandMode) {
                         val command = phrases.firstOrNull().orEmpty()
                         val message = if (command.isBlank()) "No entendí la frase. Pulsa Hablar para repetir." else runCatching {
-                            recordDinexVoiceCommand(command)
+                            recordDinexVoiceCommand(command).also { DinexWidgets.updateAll(this@DinexHotwordService) }
                         }.getOrDefault("No pude guardar. Abre Dinex y vuelve a intentarlo.")
                         overlay.showResult(message)
                         stopRecognizer()

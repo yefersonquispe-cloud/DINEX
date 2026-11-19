@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_balance_label">Dinex · Saldo</string>
+    <string name="widget_budget_label">Dinex · Presupuesto de hoy</string>
+    <string name="widget_goals_label">Dinex · Metas de ahorro</string>
+    <string name="widget_balance_description">Tu saldo, el gasto de hoy y accesos rápidos.</string>
+    <string name="widget_budget_description">Cuánto te queda por gastar hoy.</string>
+    <string name="widget_goals_description">El avance de tus metas de ahorro.</string>
+    <string name="widget_available">Saldo disponible</string>
+    <string name="widget_expense">Gasto</string>
+    <string name="widget_income">Ingreso</string>
+    <string name="widget_save">Ahorrar</string>
+    <string name="widget_income_label">Ingresos</string>
+    <string name="widget_expense_label">Gastos</string>
+    <string name="widget_week">Últimos 7 días</string>
+    <string name="widget_recent">Últimos movimientos</string>
+    <string name="widget_recent_hidden">Ocultos para proteger tu privacidad</string>
+    <string name="widget_recent_none">Aún no registras movimientos</string>
+    <string name="widget_budget_title">Gasto de hoy</string>
+    <string name="widget_goals_title">Mis ahorros</string>
+    <string name="widget_goals_empty">Crea tu primera meta y mira crecer tu ahorro.</string>
+    <string name="widget_no_target">Sin meta</string>
+    <string name="widget_signed_out_title">Tu dinero, con propósito</string>
+    <string name="widget_signed_out_body">Entra a Dinex para empezar</string>
+    <string name="widget_toggle_privacy">Mostrar u ocultar montos</string>
+    <string name="widget_sample_balance" translatable="false">S/ 1,250.00</string>
+    <string name="widget_sample_income" translatable="false">S/ 1,000.00</string>
+    <string name="widget_sample_expense" translatable="false">S/ 320.00</string>
+    <string name="widget_sample_today" translatable="false">Hoy S/ 18.00 de S/ 45.00</string>
+    <string name="widget_sample_status" translatable="false">Te quedan S/ 27.00</string>
+    <string name="widget_sample_movement" translatable="false">Almuerzo</string>
+    <string name="widget_sample_detail" translatable="false">Hoy · Comida</string>
+    <string name="widget_sample_goal" translatable="false">Viaje</string>
+</resources>

@@ -35,7 +35,8 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}, 
     val model = viewModel { DinexViewModel(cloud = DinexCloud()) }
     val googleIdentity = rememberGoogleIdentity()
     val state by model.state.collectAsState()
-    var launchVisible by rememberSaveable { mutableStateOf(true) }
+    // Quien entra desde un botón del widget va directo a lo que pidió, sin la animación.
+    var launchVisible by rememberSaveable { mutableStateOf(DinexQuickActions.pending == null) }
     // La entrada es oscura: mientras dura, los íconos del sistema se muestran claros.
     SideEffect { onThemeChanged(state.darkMode || launchVisible) }
     LaunchedEffect(state.email, state.data, state.darkMode) { onDataChanged() }
@@ -133,6 +134,18 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     }
     val assistantModel = viewModel(key = "asistente-${state.email}") { AssistantViewModel(model) }
     val name = state.displayName
+    val quickAction = DinexQuickActions.pending
+    LaunchedEffect(quickAction) {
+        when (DinexQuickActions.consume()) {
+            DinexQuickAction.EXPENSE -> manualIncome = false
+            DinexQuickAction.INCOME -> manualIncome = true
+            DinexQuickAction.SAVE -> { savingGoalId = null; savingDialog = true }
+            DinexQuickAction.GOALS -> { selectedGoalId = null; goalDetails = true }
+            DinexQuickAction.PLAN -> model.selectPage(2)
+            DinexQuickAction.HISTORY -> model.selectPage(1)
+            null -> Unit
+        }
+    }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
       // En la web, con pantalla ancha, se usa el diseño de escritorio (WebWorkspace.kt).
