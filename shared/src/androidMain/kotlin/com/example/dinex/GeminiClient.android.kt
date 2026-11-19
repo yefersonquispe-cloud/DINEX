@@ -42,6 +42,8 @@ internal suspend fun generateGeminiContent(
     temperature: Double,
     preferVision: Boolean = false,
 ): String = withContext(Dispatchers.IO) {
+    // Con servidor seguro, la imagen y el texto van al servidor; la clave nunca está en el teléfono.
+    if (dinexAiProxyEnabled) return@withContext generateThroughProxy(parts, if (preferVision) "receipt" else "chat")
     var lastError: Throwable? = null
     for (model in if (preferVision) visionGeminiModels else fastGeminiModels) {
         try {
@@ -144,3 +146,13 @@ private fun requestGemini(
 }
 
 private class GeminiModelUnavailable(message: String) : IllegalStateException(message)
+
+/** Envía las partes (texto e imagen) al servidor seguro de Dinex IA con el token de Firebase. */
+private suspend fun generateThroughProxy(parts: JSONArray, mode: String): String {
+    val token = DinexAiAuth.idToken?.invoke() ?: error("Inicia sesión para usar Dinex IA")
+    val body = JSONObject().put("mode", mode).put("parts", parts).toString()
+    val response = cloudRequest("POST", DINEX_AI_PROXY_URL, body, token)
+    val json = runCatching { JSONObject(response.body) }.getOrNull()
+    if (response.status !in 200..299) error(json?.optString("error")?.ifBlank { null } ?: "Error ${response.status} del servidor de Dinex IA")
+    return json?.optString("text").orEmpty().ifBlank { error("El servidor de Dinex IA no devolvió texto") }
+}

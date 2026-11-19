@@ -83,7 +83,8 @@ actual fun rememberReceiptScanner(
             val reading = raw.takeIf { it.isNotBlank() }?.let(::readReceiptText)
             val localResult = reading?.takeIf { it.kind != ReceiptKind.PRODUCTO && it.total != null }?.toPurchase()
                 ?: parsePurchase(text, labels, barcode, openFoodProduct)
-            val geminiResult = readGeminiApiKey(context).takeIf { it.isNotBlank() }?.let { apiKey ->
+            val geminiKey = readGeminiApiKey(context).takeIf { it.isNotBlank() } ?: "servidor".takeIf { dinexAiProxyEnabled }
+            val geminiResult = geminiKey?.let { apiKey ->
                 runCatching { analyzePurchaseWithGemini(context, uri, apiKey, localResult, barcode, raw) }.getOrNull()
             }
             currentResult(geminiResult?.mergeReliableLocalData(localResult, reading) ?: localResult)

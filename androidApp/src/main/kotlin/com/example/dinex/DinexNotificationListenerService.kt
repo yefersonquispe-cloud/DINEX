@@ -22,6 +22,10 @@ class DinexNotificationListenerService : NotificationListenerService() {
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
         if ((sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) return
+        // Privacidad: los chats y conversaciones se ignoran por completo. Dinex solo revisa
+        // avisos de pago (Yape, Plin, bancos), que no son mensajes de conversación.
+        if (sbn.notification.category == Notification.CATEGORY_MESSAGE) return
+        if (NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(sbn.notification) != null) return
         val extras = sbn.notification.extras
         val text = buildList {
             add(extras.getCharSequence(Notification.EXTRA_TITLE))
@@ -30,12 +34,6 @@ class DinexNotificationListenerService : NotificationListenerService() {
             add(extras.getCharSequence(Notification.EXTRA_SUB_TEXT))
             add(extras.getCharSequence(Notification.EXTRA_INFO_TEXT))
             extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)?.forEach(::add)
-            // Some apps publish messaging notifications rather than EXTRA_TEXT.
-            runCatching {
-                NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(sbn.notification)?.messages?.takeLast(1)?.forEach { message ->
-                    add(message.text)
-                }
-            }
         }.filterNotNull().map { it.toString().trim() }.filter { it.isNotBlank() }.distinct().joinToString(" · ")
         if (text.isBlank()) return
         val source = runCatching { packageManager.getApplicationLabel(packageManager.getApplicationInfo(sbn.packageName, 0)).toString() }.getOrDefault(sbn.packageName)

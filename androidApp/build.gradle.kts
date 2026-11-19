@@ -5,7 +5,11 @@ val dinexLocalProperties = Properties().apply {
     val propertiesFile = rootProject.file("local.properties")
     if (propertiesFile.exists()) propertiesFile.inputStream().use(::load)
 }
-val geminiApiKey = dinexLocalProperties.getProperty("GEMINI_API_KEY", "").ifBlank {
+// Si existe el servidor seguro de Dinex IA, la clave de Gemini NO se incluye en el APK.
+val dinexAiProxyConfigured = dinexLocalProperties.getProperty("DINEX_AI_PROXY_URL", "").ifBlank {
+    providers.environmentVariable("DINEX_AI_PROXY_URL").orNull ?: ""
+}.startsWith("https://")
+val geminiApiKey = if (dinexAiProxyConfigured) "" else dinexLocalProperties.getProperty("GEMINI_API_KEY", "").ifBlank {
     providers.environmentVariable("GOOGLE_API_KEY").orNull
         ?: providers.environmentVariable("GEMINI_API_KEY").orNull
         ?: ""

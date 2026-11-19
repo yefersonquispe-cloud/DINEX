@@ -56,7 +56,7 @@ private class AndroidGeminiAssistant(context: Context) : GeminiAssistant {
         get() = "${Build.MANUFACTURER.orEmpty().replaceFirstChar { it.uppercase() }} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}"
 
     override val isConfigured: Boolean
-        get() = apiKey.isNotBlank() || nanoStatus == NanoStatus.AVAILABLE
+        get() = apiKey.isNotBlank() || dinexAiProxyEnabled || nanoStatus == NanoStatus.AVAILABLE
 
     override suspend fun refreshNanoStatus() {
         val client = clientOrNull()

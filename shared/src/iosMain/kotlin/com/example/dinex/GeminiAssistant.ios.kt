@@ -7,7 +7,7 @@ import androidx.compose.runtime.remember
 actual fun rememberGeminiAssistant(): GeminiAssistant = remember {
     val apiKey = readIosGeminiApiKey()
     object : GeminiAssistant {
-        override val isConfigured = apiKey.isNotBlank()
+        override val isConfigured = apiKey.isNotBlank() || dinexAiProxyEnabled
         override suspend fun ask(message: String, financialContext: String): GeminiReply {
             if (apiKey.isBlank()) return GeminiReply(
                 "Configura GEMINI_API_KEY en el xcconfig de iOS para activar Dinex IA.",

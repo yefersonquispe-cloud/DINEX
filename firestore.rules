@@ -49,6 +49,25 @@ service cloud.firestore {
       allow delete: if isOwner();
     }
 
+    // Reportes de respuestas de Dinex IA (política de contenido generado por IA de Google Play).
+    // Cada persona solo puede crear reportes a su nombre; nadie puede leerlos, cambiarlos ni borrarlos
+    // desde la app. El equipo de Dinex los revisa desde la consola de Firebase.
+    match /aiReports/{reportId} {
+      allow create: if request.auth != null
+        && request.resource.data.keys().hasOnly(['uid', 'reportId', 'reason', 'comment', 'answer', 'question', 'engine', 'createdAt'])
+        && request.resource.data.keys().hasAll(['uid', 'reportId', 'reason', 'answer', 'createdAt'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.reportId == reportId
+        && reportId.size() <= 80
+        && request.resource.data.reason in ['ofensiva', 'peligrosa', 'incorrecta', 'otra']
+        && request.resource.data.answer is string && request.resource.data.answer.size() <= 4000
+        && (!('comment' in request.resource.data) || (request.resource.data.comment is string && request.resource.data.comment.size() <= 500))
+        && (!('question' in request.resource.data) || (request.resource.data.question is string && request.resource.data.question.size() <= 500))
+        && (!('engine' in request.resource.data) || (request.resource.data.engine is string && request.resource.data.engine.size() <= 20))
+        && request.resource.data.createdAt is int;
+      allow read, update, delete: if false;
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

@@ -13,17 +13,39 @@ plugins {
 val webGeminiKey = providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText.orElse("")
     .map { text -> text.lineSequence().map { it.trim() }.firstOrNull { it.startsWith("GEMINI_WEB_API_KEY=") }?.substringAfter('=')?.trim().orEmpty() }
     .zip(providers.environmentVariable("GEMINI_WEB_API_KEY").orElse("")) { local, environment -> local.ifBlank { environment } }
+// Dirección del servidor seguro de Dinex IA (DINEX_AI_PROXY_URL en local.properties). No es secreta.
+// Cuando existe, Gemini se consulta a través del servidor y la clave ya no se incluye en la web ni en el APK.
+val dinexAiProxyUrl = providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText.orElse("")
+    .map { text -> text.lineSequence().map { it.trim() }.firstOrNull { it.startsWith("DINEX_AI_PROXY_URL=") }?.substringAfter('=')?.trim().orEmpty() }
+    .zip(providers.environmentVariable("DINEX_AI_PROXY_URL").orElse("")) { local, environment -> local.ifBlank { environment } }
 val webSecretsDir = layout.buildDirectory.dir("generated/webSecrets/kotlin")
 val generateWebSecrets = tasks.register("generateWebSecrets") {
     val key = webGeminiKey
+    val proxy = dinexAiProxyUrl
     val output = webSecretsDir
     inputs.property("geminiWebKey", key)
+    inputs.property("aiProxy", proxy)
     outputs.dir(output)
     doLast {
         val dir = output.get().asFile.resolve("com/example/dinex").apply { mkdirs() }
-        val safe = key.get().filter { it.isLetterOrDigit() || it in "._-" }
+        // Con servidor seguro configurado, la clave no se publica en la web.
+        val safe = if (proxy.get().isNotBlank()) "" else key.get().filter { it.isLetterOrDigit() || it in "._-" }
         dir.resolve("WebSecrets.kt").writeText(
             "package com.example.dinex\n\n/** Generado desde local.properties. No editar. */\ninternal const val WEB_GEMINI_API_KEY = \"$safe\"\n",
+        )
+    }
+}
+val dinexConfigDir = layout.buildDirectory.dir("generated/dinexConfig/kotlin")
+val generateDinexConfig = tasks.register("generateDinexConfig") {
+    val proxy = dinexAiProxyUrl
+    val output = dinexConfigDir
+    inputs.property("aiProxy", proxy)
+    outputs.dir(output)
+    doLast {
+        val dir = output.get().asFile.resolve("com/example/dinex").apply { mkdirs() }
+        val safe = proxy.get().takeIf { it.startsWith("https://") }?.filter { it.isLetterOrDigit() || it in ":/._-" }.orEmpty()
+        dir.resolve("DinexConfig.kt").writeText(
+            "package com.example.dinex\n\n/** Generado desde local.properties. No editar. */\ninternal const val DINEX_AI_PROXY_URL = \"$safe\"\n",
         )
     }
 }
@@ -91,6 +113,7 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)
         }
+        commonMain { kotlin.srcDir(generateDinexConfig) }
         commonMain.dependencies {
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
             implementation(libs.compose.runtime)

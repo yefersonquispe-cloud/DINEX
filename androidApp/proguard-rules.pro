@@ -19,3 +19,10 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+# Dinex: en la versión publicada se quitan los registros de depuración (Log.d / Log.v / Log.i),
+# para que nunca aparezcan datos del dispositivo o de la cuenta en el registro del sistema.
+-assumenosideeffects class android.util.Log {
+    public static int d(...);
+    public static int v(...);
+    public static int i(...);
+}
