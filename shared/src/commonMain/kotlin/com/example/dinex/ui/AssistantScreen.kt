@@ -13,6 +13,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -56,6 +57,7 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
     val savings = data.savings
     val chatListState = rememberLazyListState()
     var draft by remember { mutableStateOf("") }
+    var reportTarget by remember { mutableStateOf<ChatMessage?>(null) }
     val reducedMotion = LocalDinexReducedMotion.current
     val nanoStatus = assistant.nanoStatus
     val nanoProgress = assistant.nanoProgress
@@ -75,6 +77,20 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
         if (loading) return
         model.send(question, assistant, data)
         if (question == draft) draft = ""
+    }
+
+    reportTarget?.let { target ->
+        AiReportDialog(target, onDismiss = { reportTarget = null }) { reason, comment ->
+            model.report(target, reason, comment)
+            reportTarget = null
+        }
+    }
+    chat.reportNotice?.let { notice ->
+        AlertDialog(
+            onDismissRequest = model::clearReportNotice,
+            text = { Text(notice, color = Night) },
+            confirmButton = { TextButton(onClick = model::clearReportNotice) { Text("Entendido") } },
+        )
     }
 
     BoxWithConstraints(Modifier.fillMaxSize().imePadding(), contentAlignment = Alignment.TopCenter) {
@@ -155,7 +171,9 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
                             Text("Revisa tus gastos, piensa en tu próxima compra o empieza un plan de ahorro.", color = Gray, fontSize = 14.sp, lineHeight = 21.sp)
                         }
                     }
-                    items(messages) { item -> ChatBubble(item) }
+                    items(messages) { item ->
+                        ChatBubble(item, onReport = if (!item.user && !item.error && item.id > 0) ({ reportTarget = it }) else null)
+                    }
                     if (loading) item { AssistantThinking() }
                 }
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), contentPadding = PaddingValues(vertical = 7.dp)) {
@@ -275,7 +293,7 @@ private fun AssistantThinking() {
 }
 
 @Composable
-internal fun ChatBubble(message: ChatMessage) {
+internal fun ChatBubble(message: ChatMessage, onReport: ((ChatMessage) -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().padding(vertical = 2.dp),
         horizontalArrangement = if (message.user) Arrangement.End else Arrangement.Start,
@@ -314,7 +332,63 @@ internal fun ChatBubble(message: ChatMessage) {
                     Spacer(Modifier.height(4.dp))
                 }
                 SelectionContainer { Text(message.text, color = if (message.user) Color.White else Night, fontSize = 14.sp, lineHeight = 22.sp) }
+                // Política de Google Play: cada respuesta de la IA se puede reportar.
+                if (onReport != null) {
+                    Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
+                        if (message.reported) Text("Reportada · gracias", color = Gray, fontSize = 11.sp, modifier = Modifier.padding(vertical = 6.dp))
+                        else TextButton(
+                            onClick = { onReport(message) },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                            modifier = Modifier.height(30.dp).semantics { contentDescription = "Reportar esta respuesta de Dinex IA" },
+                        ) {
+                            Icon(DinexNavigationIcons.Shield, null, tint = Gray, modifier = Modifier.size(13.dp))
+                            Spacer(Modifier.width(4.dp))
+                            Text("Reportar", color = Gray, fontSize = 11.sp)
+                        }
+                    }
+                }
             }
         }
     }
 }
+
+/** Reporte de una respuesta de Dinex IA: motivo y comentario opcional. */
+@Composable
+private fun AiReportDialog(message: ChatMessage, onDismiss: () -> Unit, onSend: (AiReportReason, String) -> Unit) {
+    var reason by remember { mutableStateOf<AiReportReason?>(null) }
+    var comment by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Reportar respuesta", fontWeight = FontWeight.Bold) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Surface(shape = RoundedCornerShape(12.dp), color = CardRaised) {
+                    Text(message.text, color = Gray, fontSize = 12.sp, maxLines = 4, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(10.dp))
+                }
+                Text("¿Qué problema tiene?", color = Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                AiReportReason.entries.forEach { option ->
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickableRow { reason = option }.padding(vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = reason == option, onClick = { reason = option })
+                        Text(option.label, color = Night, fontSize = 14.sp)
+                    }
+                }
+                OutlinedTextField(
+                    comment, { if (it.length <= 500) comment = it },
+                    label = { Text("Comentario (opcional)") }, maxLines = 3, modifier = Modifier.fillMaxWidth(),
+                )
+                Text("Se enviará el texto de esta respuesta para revisarla. No se envían tus movimientos.", color = Gray, fontSize = 11.sp)
+            }
+        },
+        confirmButton = {
+            Button(onClick = { reason?.let { onSend(it, comment) } }, enabled = reason != null, colors = ButtonDefaults.buttonColors(containerColor = Green)) {
+                Text("Enviar reporte")
+            }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } },
+    )
+}
+
+private fun Modifier.clickableRow(onClick: () -> Unit) = this.clickable(onClick = onClick)

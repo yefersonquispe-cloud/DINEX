@@ -31,6 +31,10 @@ internal data class ChatMessage(
     val user: Boolean,
     val error: Boolean = false,
     val engine: GeminiEngine? = null,
+    /** Identificador dentro de la conversación; permite reportar una respuesta concreta. */
+    val id: Int = 0,
+    /** true cuando la persona ya reportó esta respuesta de la IA. */
+    val reported: Boolean = false,
 )
 
 internal data class SavingEntry(val amount: Double, val purpose: String, val target: Double, val goalId: Int? = null)

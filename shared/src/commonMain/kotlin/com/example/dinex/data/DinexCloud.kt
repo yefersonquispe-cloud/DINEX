@@ -54,6 +54,25 @@ internal data class GoogleSignIn(val session: CloudSession, val name: String, va
 /** Consultas a Dinex IA hechas en un día (día = días desde 1970, según el equipo). */
 internal data class AiUsage(val day: Int, val count: Int)
 
+/** Motivos para reportar una respuesta de Dinex IA. */
+internal enum class AiReportReason(val code: String, val label: String) {
+    OFFENSIVE("ofensiva", "Ofensiva o irrespetuosa"),
+    DANGEROUS("peligrosa", "Peligrosa o dañina"),
+    WRONG("incorrecta", "Información financiera incorrecta"),
+    OTHER("otra", "Otro motivo"),
+}
+
+/** Reporte de una respuesta concreta de Dinex IA: incluye el texto exacto que se reporta. */
+internal data class AiReport(
+    val id: String,
+    val reason: String,
+    val comment: String,
+    val answer: String,
+    val question: String,
+    val engine: String,
+    val createdAt: Long,
+)
+
 internal class DinexCloud(
     private val apiKey: String = FirebaseConfig.API_KEY,
     private val projectId: String = FirebaseConfig.PROJECT_ID,
@@ -153,6 +172,25 @@ internal class DinexCloud(
     }
 
     private fun updateMask(fields: List<String>) = fields.joinToString("&", prefix = "?") { "updateMask.fieldPaths=$it" }
+
+    /**
+     * Reporte de una respuesta inapropiada de Dinex IA (política de contenido generado por IA de
+     * Google Play). Se guarda en aiReports/{id}; la persona solo puede crearlo, nunca leer reportes.
+     */
+    suspend fun reportAiAnswer(session: CloudSession, report: AiReport) {
+        val body = "{\"fields\":{" +
+            "\"uid\":{\"stringValue\":${jsonString(session.uid)}}," +
+            "\"reportId\":{\"stringValue\":${jsonString(report.id)}}," +
+            "\"reason\":{\"stringValue\":${jsonString(report.reason)}}," +
+            "\"comment\":{\"stringValue\":${jsonString(report.comment.take(500))}}," +
+            "\"answer\":{\"stringValue\":${jsonString(report.answer.take(4_000))}}," +
+            "\"question\":{\"stringValue\":${jsonString(report.question.take(500))}}," +
+            "\"engine\":{\"stringValue\":${jsonString(report.engine)}}," +
+            "\"createdAt\":{\"integerValue\":\"${report.createdAt}\"}" +
+            "}}"
+        val url = "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/aiReports?documentId=${report.id}"
+        parseObject(http("POST", url, body, session.idToken))
+    }
 
     /** Derecho de cancelación: borra el documento en Firestore y luego la cuenta de Firebase. */
     suspend fun deleteAccount(session: CloudSession) {
