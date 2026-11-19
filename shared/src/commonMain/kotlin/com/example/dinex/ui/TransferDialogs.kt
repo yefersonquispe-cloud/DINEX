@@ -1,13 +1,21 @@
 package com.example.dinex
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -97,28 +105,76 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
     }, onError = { busy = false; error = it })
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() }, containerColor = Card, shape = RoundedCornerShape(RadiusLg),
-        title = { Text("Exportar reporte", fontWeight = FontWeight.Bold, color = Night) },
-        text = { Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Elige el periodo y el formato. Guardarás un archivo real con tus movimientos.", color = Gray, fontSize = 14.sp)
-            Text("Formato", color = Night, fontWeight = FontWeight.Bold)
-            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReportFormat.entries.forEach { item -> FilterChip(format == item, { format = item }, label = { Text(item.label) }, enabled = !busy) }
+        title = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Text("Exportar reporte", fontWeight = FontWeight.Bold, color = Night, textAlign = TextAlign.Center)
+                Text(if (format == ReportFormat.CSV) "Datos simples para abrir en otras apps" else "Incluye tu plan de ahorro personalizado", color = Gray, fontSize = 13.sp, textAlign = TextAlign.Center)
             }
-            Text("Periodo", color = Night, fontWeight = FontWeight.Bold)
-            ReportPeriod.entries.forEach { item ->
-                FilterChip(period == item, { period = item; error = ""; message = "" }, label = { Text(item.label) }, enabled = !busy)
+        },
+        text = { Column(Modifier.heightIn(max = 540.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Formato: control segmentado de tres partes iguales.
+            ExportLabel("Formato")
+            Row(Modifier.fillMaxWidth().clip(CircleShape).background(CardRaised).border(1.dp, Border, CircleShape).padding(4.dp)) {
+                ReportFormat.entries.forEach { item ->
+                    val chosen = format == item
+                    Box(
+                        Modifier.weight(1f).height(40.dp).clip(CircleShape).background(if (chosen) Green else Color.Transparent)
+                            .clickable(enabled = !busy) { format = item },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            when (item) { ReportFormat.XLSX -> "Excel"; ReportFormat.CSV -> "CSV"; ReportFormat.PDF -> "PDF" },
+                            color = if (chosen) Color.White else NightSoft, fontWeight = FontWeight.Bold, fontSize = 14.sp,
+                        )
+                    }
+                }
+            }
+            // Periodo: cuadrícula de dos columnas, ordenada y compacta.
+            ExportLabel("Periodo")
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ReportPeriod.entries.chunked(2).forEach { pair ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        pair.forEach { item ->
+                            val chosen = period == item
+                            Box(
+                                Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(14.dp))
+                                    .background(if (chosen) Green.copy(alpha = .12f) else Card)
+                                    .border(if (chosen) 1.5.dp else 1.dp, if (chosen) Green else Border, RoundedCornerShape(14.dp))
+                                    .clickable(enabled = !busy) { period = item; error = ""; message = "" },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(item.label, color = if (chosen) GreenDark else NightSoft, fontWeight = if (chosen) FontWeight.Bold else FontWeight.Medium,
+                                    fontSize = 13.sp, textAlign = TextAlign.Center, maxLines = 1)
+                            }
+                        }
+                        if (pair.size == 1) Spacer(Modifier.weight(1f))
+                    }
+                }
             }
             if (period == ReportPeriod.CUSTOM) {
-                OutlinedTextField(from, { from = it; error = "" }, label = { Text("Desde (AAAA-MM-DD)") }, singleLine = true, enabled = !busy)
-                OutlinedTextField(to, { to = it; error = "" }, label = { Text("Hasta (AAAA-MM-DD)") }, singleLine = true, enabled = !busy)
-                if (!validRange) Text("Ingresa fechas válidas y coloca la fecha inicial antes de la final.", color = Red)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(from, { from = it; error = "" }, label = { Text("Desde") }, placeholder = { Text("AAAA-MM-DD") }, singleLine = true, enabled = !busy, modifier = Modifier.weight(1f))
+                    OutlinedTextField(to, { to = it; error = "" }, label = { Text("Hasta") }, placeholder = { Text("AAAA-MM-DD") }, singleLine = true, enabled = !busy, modifier = Modifier.weight(1f))
+                }
+                if (!validRange) Text("Ingresa fechas válidas y coloca la fecha inicial antes de la final.", color = Red, fontSize = 12.sp)
             }
-            Text("${selected.size} movimientos", color = Night, fontWeight = FontWeight.Bold)
-            Text("Ingresos: ${money(selected.filter { it.income }.sumOf { it.amount })}\nEgresos: ${money(selected.filterNot { it.income }.sumOf { it.amount })}", color = Night)
-            if (selected.isEmpty()) Text("No hay movimientos en este periodo. Elige otro o registra uno primero.", color = Gray)
-            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Preparando y guardando tu reporte…", color = Gray) }
-            if (message.isNotBlank()) Text(message, color = Green)
-            if (error.isNotBlank()) Text(error, color = Red)
+            // Resumen de lo que se exportará, en tres cifras centradas.
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Mint).padding(vertical = 12.dp)) {
+                listOf(
+                    Triple("Movimientos", "${selected.size}", Night),
+                    Triple("Ingresos", money(selected.filter { it.income }.sumOf { it.amount }), GreenDark),
+                    Triple("Egresos", money(selected.filterNot { it.income }.sumOf { it.amount }), Red),
+                ).forEach { (label, value, tint) ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(label, color = Gray, fontSize = 11.sp)
+                        Text(value, color = tint, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+                    }
+                }
+            }
+            if (selected.isEmpty()) Text("No hay movimientos en este periodo. Elige otro o registra uno primero.", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+            if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green); Text("Preparando y guardando tu reporte…", color = Gray, fontSize = 12.sp) }
+            if (message.isNotBlank()) Text(message, color = Green, fontSize = 13.sp)
+            if (error.isNotBlank()) Text(error, color = Red, fontSize = 13.sp)
         } },
         confirmButton = { Button(enabled = !busy && validRange && selected.isNotEmpty(), onClick = {
             busy = true; error = ""; message = ""
@@ -127,7 +183,13 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
                 runCatching { withContext(Dispatchers.Default) { createMovementReport(selected, format, label, owner, context) } }
                     .onSuccess(files::save).onFailure { busy = false; error = it.message ?: "No pudimos preparar el reporte." }
             }
-        }) { Text("Guardar ${format.extension.uppercase()}") } },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cerrar") } },
+        }, colors = ButtonDefaults.buttonColors(containerColor = Green)) { Text("Guardar ${format.extension.uppercase()}", fontWeight = FontWeight.Bold) } },
+        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text("Cerrar", color = GreenDark) } },
     )
+}
+
+@Composable
+private fun ExportLabel(text: String) {
+    Text(text.uppercase(), color = Gray, fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.sp,
+        textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
 }
