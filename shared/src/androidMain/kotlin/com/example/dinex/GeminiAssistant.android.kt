@@ -42,7 +42,7 @@ actual fun rememberGeminiAssistant(): GeminiAssistant {
  * Prefiere Gemini Nano (AICore, en el dispositivo) y cae a la API de Gemini en
  * la nube cuando el teléfono no lo soporta, falta el modelo o Nano falla.
  */
-private class AndroidGeminiAssistant(context: Context) : GeminiAssistant {
+private class AndroidGeminiAssistant(private val context: Context) : GeminiAssistant {
     private val cloudReady = cloudGeminiAvailable(context)
     private var model: GenerativeModel? = null
 
@@ -189,6 +189,7 @@ private class AndroidGeminiAssistant(context: Context) : GeminiAssistant {
 
         return runCatching {
             val answer = generateGeminiContent(
+                context = context,
                 parts = JSONArray().put(
                     JSONObject().put(
                         "text", "Contexto actual de Dinex:\n$financialContext\n\nPregunta del usuario:\n$message",

@@ -165,6 +165,7 @@ private suspend fun analyzePurchaseWithGemini(
         )
         .put(JSONObject().put("text", prompt))
     val response = generateGeminiContent(
+        context = context,
         parts = parts,
         systemPrompt = "Eres el analizador visual de Dinex. Extraes compras con precisión y nunca incluyes texto fuera del JSON solicitado.",
         maxOutputTokens = 400,

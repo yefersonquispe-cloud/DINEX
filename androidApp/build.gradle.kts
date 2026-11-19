@@ -5,6 +5,11 @@ val dinexLocalProperties = Properties().apply {
     val propertiesFile = rootProject.file("local.properties")
     if (propertiesFile.exists()) propertiesFile.inputStream().use(::load)
 }
+// Solo durante la prueba (GEMINI_KEY_IN_APK=true en local.properties): la clave de Gemini va en el APK
+// como respaldo si Firebase no puede verificar la app. Con false (o sin la línea) el APK no lleva clave.
+val geminiKeyInApk = dinexLocalProperties.getProperty("GEMINI_KEY_IN_APK", "false").trim().equals("true", ignoreCase = true)
+val geminiTestKey = if (geminiKeyInApk) dinexLocalProperties.getProperty("GEMINI_API_KEY", "").trim() else ""
+
 // Firebase AI Logic: la configuración de Android sale de google-services.json (no se sube a Git).
 // La clave de Gemini ya no se incluye en el APK; Firebase la guarda en su servidor.
 fun firebaseAndroidConfig(packageName: String): Map<String, String> {
@@ -66,6 +71,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 7
         versionName = "1.6"
+        manifestPlaceholders["geminiApiKey"] = geminiTestKey
         firebaseAndroidConfig(applicationId.orEmpty()).forEach { (name, value) -> resValue("string", name, value) }
     }
     packaging {

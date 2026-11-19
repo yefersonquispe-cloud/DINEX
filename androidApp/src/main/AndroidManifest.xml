@@ -29,6 +29,10 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Dinex">
+        <!-- Vacío salvo durante la prueba (GEMINI_KEY_IN_APK=true): respaldo de Firebase AI Logic. -->
+        <meta-data
+            android:name="com.example.dinex.GEMINI_API_KEY"
+            android:value="${geminiApiKey}" />
         <activity
             android:exported="true"
             android:name=".MainActivity"
