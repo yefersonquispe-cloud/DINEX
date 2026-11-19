@@ -33,6 +33,8 @@ internal data class DinexUiState(
     val authBusy: Boolean = false,
     val authError: String? = null,
     val authNotice: String? = null,
+    /** Cuenta nueva creada con Google: falta aceptar los Términos antes de entrar. */
+    val googleTermsRequired: Boolean = false,
 ) {
     val activeAccount get() = accounts.firstOrNull { it.email == email }
     val initialBalanceRequired get() = email != null && !data.onboardingCompleted && data.movements.isEmpty()
@@ -70,6 +72,7 @@ internal class DinexViewModel(
     val state = mutableState.asStateFlow()
     private val value get() = mutableState.value
     private var cloudSession: CloudSession? = repository.cloudSession()
+    private var pendingGoogle: GoogleSignIn? = null
     private var syncJob: Job? = null
 
     init {
@@ -228,14 +231,47 @@ internal class DinexViewModel(
         "Si $email tiene una cuenta, te llegará un enlace para crear una nueva contraseña."
     }
 
-    fun signInWithGoogle(identity: GoogleIdentity) = launchAuth {
+    /**
+     * Quien ya tiene cuenta entra directo: aceptó los Términos al crearla.
+     * Solo una cuenta nueva debe aceptarlos, en el formulario o en el aviso posterior a Google.
+     */
+    fun signInWithGoogle(identity: GoogleIdentity, acceptedTerms: Boolean = false) = launchAuth {
         val cloud = cloud ?: return@launchAuth null
         val token = identity.requestToken() ?: return@launchAuth null
-        val (session, googleName) = cloud.signInWithGoogle(token)
-        completeCloudLogin(session, googleName, trustLocal = false)
-        repository.setTermsConsent(session.email, TermsConsent(DinexLegal.VERSION, epochMillis()))
-        runCatching { cloud.upload(session, localCloudProfile(session.email, value.activeAccount?.name.orEmpty(), epochMillis())) }
+        val google = cloud.signInWithGoogle(token)
+        when {
+            cloud.download(google.session) != null -> completeCloudLogin(google.session, google.name, trustLocal = false)
+            acceptedTerms -> finishNewGoogleAccount(cloud, google)
+            else -> {
+                pendingGoogle = google
+                mutableState.value = value.copy(googleTermsRequired = true)
+            }
+        }
         null
+    }
+
+    fun acceptGoogleTerms() = launchAuth {
+        val cloud = cloud ?: return@launchAuth null
+        val google = pendingGoogle ?: return@launchAuth null
+        pendingGoogle = null
+        val session = if (google.session.fresh()) google.session else cloud.refresh(google.session)
+        finishNewGoogleAccount(cloud, google.copy(session = session))
+        null
+    }
+
+    /** Sin consentimiento no se conserva la cuenta que Google acaba de crear. */
+    fun declineGoogleTerms() = launchAuth {
+        val google = pendingGoogle
+        pendingGoogle = null
+        mutableState.value = value.copy(googleTermsRequired = false)
+        if (google?.isNewUser == true) runCatching { cloud?.deleteAccount(google.session) }
+        "No creamos tu cuenta porque no aceptaste los Términos."
+    }
+
+    private suspend fun finishNewGoogleAccount(cloud: DinexCloud, google: GoogleSignIn) {
+        repository.setTermsConsent(google.session.email, TermsConsent(DinexLegal.VERSION, epochMillis()))
+        completeCloudLogin(google.session, google.name, trustLocal = false)
+        runCatching { cloud.upload(google.session, localCloudProfile(google.session.email, value.activeAccount?.name.orEmpty(), epochMillis())) }
     }
 
     /** Derecho de cancelación (ARCO): borra la cuenta en Firebase y todos sus datos de este equipo. */

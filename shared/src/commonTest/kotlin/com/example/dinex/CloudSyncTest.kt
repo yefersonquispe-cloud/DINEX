@@ -1,10 +1,14 @@
 package com.example.dinex
 
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.setMain
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class CloudSyncTest {
     private val goal = SavingsGoal(1, "Viaje", 500.0, 120.0, "imagen-grande")
     private val data = FinancialData(
@@ -50,7 +54,8 @@ class CloudSyncTest {
             requestBody = body.orEmpty()
             CloudResponse(200, """{"localId":"uid-1","email":"persona@gmail.com","displayName":"Ana Quispe","idToken":"firebase-token","refreshToken":"refresh","expiresIn":"3600"}""")
         })
-        val (session, name) = cloud.signInWithGoogle(GoogleIdentityToken("google-token", true))
+        val (session, name, isNew) = cloud.signInWithGoogle(GoogleIdentityToken("google-token", true))
+        assertEquals(false, isNew)
         assertTrue(requestBody.contains("id_token=google-token&providerId=google.com"))
         assertEquals("Ana Quispe", name)
         assertEquals("uid-1", session.uid)
@@ -94,5 +99,74 @@ class CloudSyncTest {
         assertEquals(3, repo.aiQueriesToday("qa@dinex.test", 100))
         repo.mergeAiUsage("qa@dinex.test", AiUsage(101, 1))   // día nuevo
         assertEquals(1, repo.aiQueriesToday("qa@dinex.test", 101))
+    }
+
+    private class MemoryStore : DinexStore {
+        val values = mutableMapOf<String, String>()
+        override fun get(key: String) = values[key]
+        override fun put(key: String, value: String?) { if (value == null) values.remove(key) else values[key] = value }
+    }
+
+    private object FakeGoogle : GoogleIdentity {
+        override val available = true
+        override suspend fun requestToken() = GoogleIdentityToken("google-token", true)
+    }
+
+    /** Firebase de mentira: [hasProfile] indica si la cuenta ya existía. */
+    private class GoogleFixture(hasProfile: Boolean) {
+        val requests = mutableListOf<Pair<String, String>>()
+        val store = MemoryStore()
+        val cloud = DinexCloud(http = { method, url, body, _ ->
+            requests += method to url + " " + body.orEmpty()
+            when {
+                "signInWithIdp" in url -> CloudResponse(200, """{"localId":"uid-1","email":"ana@gmail.com","displayName":"Ana","idToken":"t","refreshToken":"r","expiresIn":"3600","isNewUser":${!hasProfile}}""")
+                method == "GET" && !hasProfile -> CloudResponse(404, "{}")
+                method == "GET" -> CloudResponse(200, """{"fields":{"name":{"stringValue":"Ana"},"email":{"stringValue":"ana@gmail.com"},"profile":{"stringValue":${jsonString(cloudProfileText(FinancialData(onboardingCompleted = true)))}},"updatedAt":{"integerValue":"5"},"termsVersion":{"stringValue":"2026-01-a"},"termsAcceptedAt":{"integerValue":"7"}}}""")
+                else -> CloudResponse(200, "{}")
+            }
+        })
+        val model = DinexViewModel(DinexRepository(store, migrateLegacy = false), cloud)
+    }
+
+    private fun googleTest(block: suspend () -> Unit) = kotlinx.coroutines.test.runTest {
+        kotlinx.coroutines.Dispatchers.setMain(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler))
+        try { block() } finally { kotlinx.coroutines.Dispatchers.resetMain() }
+    }
+
+    @Test fun existingGoogleAccountEntersWithoutAskingForTermsAgain() = googleTest {
+        val fixture = GoogleFixture(hasProfile = true)
+        fixture.model.signInWithGoogle(FakeGoogle)
+        assertEquals("ana@gmail.com", fixture.model.state.value.email)
+        assertEquals(false, fixture.model.state.value.googleTermsRequired)
+        // Se conserva la constancia original: entrar no cuenta como una nueva aceptación.
+        assertEquals("2026-01-a", DinexRepository(fixture.store, migrateLegacy = false).termsConsent("ana@gmail.com")?.version)
+    }
+
+    @Test fun newGoogleAccountMustAcceptTermsBeforeEntering() = googleTest {
+        val fixture = GoogleFixture(hasProfile = false)
+        fixture.model.signInWithGoogle(FakeGoogle)
+        assertNull(fixture.model.state.value.email)
+        assertTrue(fixture.model.state.value.googleTermsRequired)
+        fixture.model.acceptGoogleTerms()
+        assertEquals("ana@gmail.com", fixture.model.state.value.email)
+        assertEquals(false, fixture.model.state.value.googleTermsRequired)
+        assertEquals(DinexLegal.VERSION, DinexRepository(fixture.store, migrateLegacy = false).termsConsent("ana@gmail.com")?.version)
+        assertTrue(fixture.requests.any { it.first == "PATCH" && "termsVersion" in it.second })
+    }
+
+    @Test fun decliningTermsRemovesTheNewGoogleAccount() = googleTest {
+        val fixture = GoogleFixture(hasProfile = false)
+        fixture.model.signInWithGoogle(FakeGoogle)
+        fixture.model.declineGoogleTerms()
+        assertNull(fixture.model.state.value.email)
+        assertEquals(false, fixture.model.state.value.googleTermsRequired)
+        assertTrue(fixture.requests.any { ":delete" in it.second })
+    }
+
+    @Test fun termsAcceptedInTheFormAreNotAskedTwice() = googleTest {
+        val fixture = GoogleFixture(hasProfile = false)
+        fixture.model.signInWithGoogle(FakeGoogle, acceptedTerms = true)
+        assertEquals("ana@gmail.com", fixture.model.state.value.email)
+        assertEquals(false, fixture.model.state.value.googleTermsRequired)
     }
 }

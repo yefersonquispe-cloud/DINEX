@@ -1,6 +1,7 @@
 package com.example.dinex
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -27,7 +28,6 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.launch
 
 /** View layer: navigation, screens and presentation-only dialog state. */
 @Composable
@@ -45,23 +45,28 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}, 
     ) {
         MaterialTheme(colorScheme = colors, typography = if (webLayout) webTypography() else dinexTypography, shapes = dinexShapes) {
             var launchVisible by rememberSaveable { mutableStateOf(true) }
-            if (launchVisible) {
-                DinexLaunchScreen(reduceMotion = state.reduceMotion, onReduceMotion = model::setReduceMotion) { launchVisible = false }
-            } else if (state.email == null) {
-                AuthFlow(
-                    accounts = state.accounts,
-                    busy = state.authBusy,
-                    serverError = state.authError,
-                    notice = state.authNotice,
-                    onRegister = model::register,
-                    onSignIn = model::signIn,
-                    onForgotPassword = model::sendPasswordReset,
-                    googleAvailable = googleIdentity.available,
-                    onGoogleSignIn = { model.signInWithGoogle(googleIdentity) },
-                    onClearMessages = model::clearAuthMessages,
-                )
-            } else {
-                key(state.email) { DinexSignedInView(model, state) }
+            Crossfade(launchVisible, animationSpec = tween(if (state.reduceMotion) 0 else 480), label = "entrada") { showingLaunch ->
+                if (showingLaunch) {
+                    DinexLaunchScreen(reduceMotion = state.reduceMotion, onReduceMotion = model::setReduceMotion) { launchVisible = false }
+                } else if (state.email == null) {
+                    AuthFlow(
+                        accounts = state.accounts,
+                        busy = state.authBusy,
+                        serverError = state.authError,
+                        notice = state.authNotice,
+                        onRegister = model::register,
+                        onSignIn = model::signIn,
+                        onForgotPassword = model::sendPasswordReset,
+                        googleAvailable = googleIdentity.available,
+                        onGoogleSignIn = { accepted -> model.signInWithGoogle(googleIdentity, accepted) },
+                        googleTermsRequired = state.googleTermsRequired,
+                        onAcceptGoogleTerms = model::acceptGoogleTerms,
+                        onDeclineGoogleTerms = model::declineGoogleTerms,
+                        onClearMessages = model::clearAuthMessages,
+                    )
+                } else {
+                    key(state.email) { DinexSignedInView(model, state) }
+                }
             }
         }
     }
@@ -151,8 +156,6 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 onAddReminder = { reminderDialog = true },
                 onResolveReminder = { reminderToResolve = it },
                 onProfile = { profileOpen = true },
-                onMarket = { marketOpen = true },
-                onTips = { tipsOpen = true },
             ),
             assistant = {
                 WebAssistantPage(assistant, data, chatMessages,
@@ -303,7 +306,6 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             when (action) {
                 GuideAction.Automation -> automationDialog = true
                 GuideAction.Market -> marketOpen = true
-                GuideAction.Tips -> tipsOpen = true
                 GuideAction.Assistant -> assistantOpen = true
             }
         },

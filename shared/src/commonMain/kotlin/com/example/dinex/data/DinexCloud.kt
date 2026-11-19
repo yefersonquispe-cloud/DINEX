@@ -48,6 +48,9 @@ internal data class CloudProfile(
 
 internal data class TermsConsent(val version: String, val acceptedAt: Long)
 
+/** Resultado de entrar con Google; [isNewUser] indica que Firebase acaba de crear la cuenta. */
+internal data class GoogleSignIn(val session: CloudSession, val name: String, val isNewUser: Boolean)
+
 /** Consultas a Dinex IA hechas en un día (día = días desde 1970, según el equipo). */
 internal data class AiUsage(val day: Int, val count: Int)
 
@@ -71,7 +74,7 @@ internal class DinexCloud(
     )
 
     /** Cambia el token de Google por una sesión de Firebase y devuelve también el nombre de la cuenta. */
-    suspend fun signInWithGoogle(token: GoogleIdentityToken): Pair<CloudSession, String> {
+    suspend fun signInWithGoogle(token: GoogleIdentityToken): GoogleSignIn {
         val credential = if (token.isIdToken) "id_token" else "access_token"
         val body = jsonObject(
             "postBody" to "$credential=${token.value}&providerId=google.com",
@@ -81,7 +84,7 @@ internal class DinexCloud(
         )
         val json = parseObject(http("POST", "$identity:signInWithIdp?key=$apiKey", body, null))
         val name = json.text("displayName") ?: json.text("fullName") ?: ""
-        return sessionFrom(json, "") to name
+        return GoogleSignIn(sessionFrom(json, ""), name, json["isNewUser"] == true)
     }
 
     suspend fun refresh(session: CloudSession): CloudSession {

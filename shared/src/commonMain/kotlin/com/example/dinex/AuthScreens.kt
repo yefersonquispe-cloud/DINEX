@@ -1,8 +1,19 @@
 package com.example.dinex
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
@@ -13,9 +24,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -26,7 +45,6 @@ import androidx.compose.ui.unit.sp
 import dinex.shared.generated.resources.Res
 import dinex.shared.generated.resources.dinex_mascot_ai
 import org.jetbrains.compose.resources.painterResource
-import kotlin.math.max
 
 // ═══════════════════════════════════════════════════════════════════════════
 // AUTHENTICATION
@@ -42,7 +60,10 @@ internal fun AuthFlow(
     onSignIn: (email: String, password: String) -> Unit,
     onForgotPassword: (email: String) -> Unit,
     googleAvailable: Boolean,
-    onGoogleSignIn: () -> Unit,
+    onGoogleSignIn: (acceptedTerms: Boolean) -> Unit,
+    googleTermsRequired: Boolean,
+    onAcceptGoogleTerms: () -> Unit,
+    onDeclineGoogleTerms: () -> Unit,
     onClearMessages: () -> Unit,
 ) {
     var createMode by remember { mutableStateOf(accounts.isEmpty()) }
@@ -68,6 +89,7 @@ internal fun AuthFlow(
         "Un símbolo (ej. ! @ # $ %)" to password.any { !it.isLetterOrDigit() && !it.isWhitespace() },
     )
     val passwordValid = passwordRules.all { it.second }
+    val consentMissing = attempted && !acceptedTerms
 
     BoxWithConstraints(Modifier.fillMaxSize().background(AppBg).statusBarsPadding().navigationBarsPadding()) {
         val wideLayout = maxWidth >= DesktopBreakpoint
@@ -192,8 +214,8 @@ internal fun AuthFlow(
                             // Consentimiento expreso y por escrito (Ley N.° 29733): la casilla empieza sin marcar.
                             Surface(
                                 shape = RoundedCornerShape(15.dp),
-                                color = if (attempted && !acceptedTerms) Red.copy(alpha = .08f) else CardRaised,
-                                border = androidx.compose.foundation.BorderStroke(1.dp, if (attempted && !acceptedTerms) Red.copy(alpha = .5f) else Border),
+                                color = if (consentMissing) Red.copy(alpha = .08f) else CardRaised,
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (consentMissing) Red.copy(alpha = .5f) else Border),
                             ) {
                                 Row(Modifier.fillMaxWidth().padding(end = 10.dp), verticalAlignment = Alignment.Top) {
                                     Checkbox(checked = acceptedTerms, onCheckedChange = { acceptedTerms = it; error = null })
@@ -250,38 +272,12 @@ internal fun AuthFlow(
                         }
                         if (googleAvailable) {
                             Spacer(Modifier.height(12.dp))
-                            OutlinedButton(
-                                onClick = {
-                                    onClearMessages()
-                                    if (!acceptedTerms) {
-                                        attempted = true
-                                        error = "Para continuar con Google acepta los Términos y la Política de Privacidad."
-                                    } else {
-                                        // Google no usa el correo ni la contraseña: se limpian sus avisos para que se vea la respuesta de Google.
-                                        error = null
-                                        attempted = false
-                                        onGoogleSignIn()
-                                    }
-                                },
-                                enabled = !busy,
-                                modifier = Modifier.fillMaxWidth().height(50.dp),
-                                shape = RoundedCornerShape(RadiusMd),
-                            ) {
-                                Text("G", color = Color(0xFF4285F4), fontWeight = FontWeight.Black, fontSize = 20.sp)
-                                Spacer(Modifier.width(10.dp))
-                                Text("Continuar con Google", fontWeight = FontWeight.SemiBold)
-                            }
-                            if (!createMode) {
-                                Row(verticalAlignment = Alignment.Top) {
-                                    Checkbox(checked = acceptedTerms, onCheckedChange = { acceptedTerms = it; error = null })
-                                    Column(Modifier.padding(top = 10.dp)) {
-                                        Text("Acepto los Términos y la Política de Privacidad para continuar con Google.", color = NightSoft, fontSize = 11.sp, lineHeight = 15.sp)
-                                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                                            LegalLink("Ver términos") { legalTab = 0 }
-                                            LegalLink("Ver privacidad") { legalTab = 1 }
-                                        }
-                                    }
-                                }
+                            GoogleSignInButton(busy) {
+                                // Google no usa el correo ni la contraseña: se limpian sus avisos para que se vea su respuesta.
+                                onClearMessages()
+                                error = null
+                                attempted = false
+                                onGoogleSignIn(createMode && acceptedTerms)
                             }
                         }
                         if (!createMode) {
@@ -315,7 +311,97 @@ internal fun AuthFlow(
             }
         }
     }
+    if (googleTermsRequired) GoogleTermsDialog(busy, onAcceptGoogleTerms, onDeclineGoogleTerms) { legalTab = it }
     legalTab?.let { LegalDialog(it) { legalTab = null } }
+}
+
+/** Solo aparece la primera vez que alguien crea su cuenta con Google (Ley N.° 29733). */
+@Composable
+private fun GoogleTermsDialog(busy: Boolean, onAccept: () -> Unit, onDecline: () -> Unit, onLegal: (Int) -> Unit) {
+    var accepted by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = {},
+        containerColor = Card,
+        shape = RoundedCornerShape(RadiusLg),
+        title = { Text("Un último paso", color = Night, fontWeight = FontWeight.Bold) },
+        text = {
+            Column {
+                Text("Estás creando tu cuenta de Dinex con Google. Solo te lo pedimos esta vez.", color = NightSoft, fontSize = 14.sp, lineHeight = 20.sp)
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.Top) {
+                    Checkbox(accepted, { accepted = it }, enabled = !busy)
+                    Text(
+                        "Leí y acepto los Términos y la Política de Privacidad, y autorizo a Dinex a tratar mis datos personales y financieros según la Ley N.° 29733.",
+                        color = NightSoft, fontSize = 12.sp, lineHeight = 17.sp, modifier = Modifier.padding(top = 10.dp),
+                    )
+                }
+                Row(Modifier.padding(start = 48.dp), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    LegalLink("Ver términos") { onLegal(0) }
+                    LegalLink("Ver privacidad") { onLegal(1) }
+                }
+            }
+        },
+        confirmButton = {
+            Button(onClick = onAccept, enabled = accepted && !busy, colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White)) {
+                Text("Crear mi cuenta", fontWeight = FontWeight.SemiBold)
+            }
+        },
+        dismissButton = { TextButton(onClick = onDecline, enabled = !busy) { Text("Cancelar", color = Gray) } },
+    )
+}
+
+/** Logo oficial de Google ("G" de cuatro colores). */
+private val GoogleMark: ImageVector by lazy {
+    ImageVector.Builder("GoogleG", 24.dp, 24.dp, 48f, 48f).apply {
+        listOf(
+            0xFFEA4335 to "M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z",
+            0xFF4285F4 to "M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z",
+            0xFFFBBC05 to "M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z",
+            0xFF34A853 to "M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z",
+        ).forEach { (color, path) -> addPath(addPathNodes(path), fill = SolidColor(Color(color))) }
+    }.build()
+}
+
+/** Botón de Google: logo sobre círculo blanco, brillo que recorre el botón y respuesta al tocarlo. */
+@Composable
+private fun GoogleSignInButton(busy: Boolean, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val reduced = LocalDinexReducedMotion.current
+    var started by remember { mutableStateOf(false) }
+    LaunchedEffect(busy) { if (!busy) started = false }
+    val lift by animateFloatAsState(if (hovered && !busy && !reduced) 1f else 0f, tween(180), label = "botón de Google elevado")
+    val sheen by rememberInfiniteTransition(label = "brillo de Google").animateFloat(
+        -.4f, 1.4f, infiniteRepeatable(tween(3400, easing = LinearEasing)), label = "recorrido del brillo",
+    )
+    val shape = CircleShape
+    Box(
+        Modifier.fillMaxWidth().height(58.dp).dinexPress(interaction)
+            .graphicsLayer { translationY = -lift * 2.dp.toPx(); alpha = if (busy && !started) .6f else 1f }
+            .shadow((5 + lift * 9).dp, shape, ambientColor = Color.Black.copy(alpha = .35f), spotColor = Color.Black.copy(alpha = .45f))
+            .clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xFF303134), Color(0xFF131314))))
+            .border(1.dp, Brush.verticalGradient(listOf(Color.White.copy(alpha = .30f), Color.White.copy(alpha = .06f))), shape)
+            .drawWithContent {
+                drawContent()
+                if (!reduced && !busy) {
+                    val x = size.width * sheen
+                    drawRect(Brush.linearGradient(
+                        listOf(Color.Transparent, Color.White.copy(alpha = .13f), Color.Transparent),
+                        Offset(x - 70.dp.toPx(), 0f), Offset(x + 70.dp.toPx(), size.height),
+                    ))
+                }
+            }
+            .hoverable(interaction)
+            .clickable(enabled = !busy, role = Role.Button, interactionSource = interaction, indication = LocalIndication.current) { started = true; onClick() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.align(Alignment.CenterStart).padding(start = 9.dp).size(40.dp).clip(CircleShape).background(Color.White), contentAlignment = Alignment.Center) {
+            if (busy && started) CircularProgressIndicator(color = Color(0xFF4285F4), strokeWidth = 2.dp, modifier = Modifier.size(20.dp))
+            else Icon(GoogleMark, null, tint = Color.Unspecified, modifier = Modifier.size(22.dp))
+        }
+        Text(if (busy && started) "Conectando con Google…" else "Continuar con Google", color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 16.sp, letterSpacing = .1.sp)
+    }
 }
 
 /** Ojito para mostrar u ocultar la contraseña. */
