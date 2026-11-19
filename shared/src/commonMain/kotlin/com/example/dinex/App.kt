@@ -35,7 +35,9 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}, 
     val model = viewModel { DinexViewModel(cloud = DinexCloud()) }
     val googleIdentity = rememberGoogleIdentity()
     val state by model.state.collectAsState()
-    SideEffect { onThemeChanged(state.darkMode) }
+    var launchVisible by rememberSaveable { mutableStateOf(true) }
+    // La entrada es oscura: mientras dura, los íconos del sistema se muestran claros.
+    SideEffect { onThemeChanged(state.darkMode || launchVisible) }
     LaunchedEffect(state.email, state.data, state.darkMode) { onDataChanged() }
     val density = LocalDensity.current
     CompositionLocalProvider(
@@ -44,10 +46,9 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}, 
         LocalWebLayout provides webLayout,
     ) {
         MaterialTheme(colorScheme = colors, typography = if (webLayout) webTypography() else dinexTypography, shapes = dinexShapes) {
-            var launchVisible by rememberSaveable { mutableStateOf(true) }
-            Crossfade(launchVisible, animationSpec = tween(if (state.reduceMotion) 0 else 480), label = "entrada") { showingLaunch ->
+            Crossfade(launchVisible, animationSpec = tween(if (state.reduceMotion) 0 else 320), label = "entrada") { showingLaunch ->
                 if (showingLaunch) {
-                    DinexLaunchScreen(reduceMotion = state.reduceMotion, onReduceMotion = model::setReduceMotion) { launchVisible = false }
+                    DinexLaunchScreen(reduceMotion = state.reduceMotion) { launchVisible = false }
                 } else if (state.email == null) {
                     AuthFlow(
                         accounts = state.accounts,

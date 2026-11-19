@@ -1,25 +1,34 @@
 package com.example.dinex
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.MotionDurationScale
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.geometry.lerp
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathMeasure
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.rotate
-import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.semantics.*
+import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -27,18 +36,65 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.pow
 import kotlin.math.sin
 
-/** Two stages: a real stroke reveal, followed by the polished typographic mark. */
+// Línea de tiempo de la entrada, en milisegundos.
+private const val TraceStart = 60f
+private const val TraceEnd = 1350f
+private const val FillEnd = 1800f
+private const val CoinStart = 1720f
+private const val CoinHit = 2060f
+private const val RiseStart = 2380f
+private const val RiseEnd = 2860f
+private const val HoldEnd = 3500f
+private const val ZoomStart = 3640f
+private const val LaunchEnd = 4300f
+
+// Avance máximo por cuadro y tiempo tras el cual la entrada deja de esperar a un equipo lento.
+private const val MaxFrameStep = 64f
+private const val MaxLaunchMillis = 6000L
+
+private const val GoldenAngle = 2.39996f
+
+private val LaunchInk = Color(0xFF07100C)
+private val LaunchGreen = Color(0xFF2BD47F)
+private val LaunchLime = Color(0xFFC6F06A)
+private val CoinLight = Color(0xFFFFE08A)
+private val CoinDark = Color(0xFFE5A52B)
+
+private fun Float.between(start: Float, end: Float) = ((this - start) / (end - start)).coerceIn(0f, 1f)
+private fun easeOut(x: Float) = 1f - (1f - x).pow(3)
+private fun easeInOut(x: Float) = x * x * (3f - 2f * x)
+private fun backOut(x: Float): Float { val c = 1.70158f; return 1f + (c + 1f) * (x - 1f).pow(3) + c * (x - 1f).pow(2) }
+
+/** Trazos de la billetera de Dinex, en una cuadrícula de 100 × 100. */
+private class WalletShape {
+    val flap = Path().apply {
+        moveTo(22f, 40f); lineTo(61f, 21f)
+        cubicTo(67f, 18f, 74f, 21f, 75f, 28f); lineTo(76.5f, 40f)
+    }
+    val body = Path().apply { addRoundRect(RoundRect(14f, 38f, 80f, 86f, CornerRadius(12f))) }
+    val clasp = Path().apply { addRoundRect(RoundRect(60f, 52f, 90f, 72f, CornerRadius(8f))) }
+    val dot = Path().apply { addOval(androidx.compose.ui.geometry.Rect(Offset(70f, 62f), 3.6f)) }
+    val traces = listOf(flap, body, clasp, dot)
+    val measures = traces.map { path -> PathMeasure().apply { setPath(path, false) } }
+    val totalLength = measures.sumOf { it.length.toDouble() }.toFloat()
+}
+
+/**
+ * Entrada de Dinex: una línea de luz dibuja la billetera, se rellena, cae una moneda que la
+ * hace rebotar con un destello, aparece el nombre y la cámara entra por el broche verde.
+ */
 @Composable
 internal fun DinexLaunchScreen(
     reduceMotion: Boolean,
-    onReduceMotion: (Boolean) -> Unit,
     onFinished: () -> Unit,
 ) {
-    val writing = remember { Animatable(0f) }
-    val finish = remember { Animatable(0f) }
+    var timeline by remember { mutableFloatStateOf(0f) }
     val latestFinish by rememberUpdatedState(onFinished)
     var completed by remember { mutableStateOf(false) }
     fun continueOnce() {
@@ -47,219 +103,260 @@ internal fun DinexLaunchScreen(
     LaunchedEffect(reduceMotion) {
         val systemScale = currentCoroutineContext()[MotionDurationScale]?.scaleFactor ?: 1f
         if (reduceMotion || systemScale == 0f) {
-            writing.snapTo(1f)
-            finish.snapTo(1f)
-            delay(120)
+            timeline = HoldEnd // Sin movimiento: se muestra directamente el logo con su nombre.
+            delay(700)
         } else {
-            // El lápiz escribe cada letra y luego la palabra toma fuerza, letra por letra.
-            writing.animateTo(1f, tween(1500, easing = LinearEasing))
-            finish.animateTo(1f, tween(700, easing = FastOutSlowInEasing))
-            delay(220)
+            // Si el dispositivo se traba al abrir, la animación espera en vez de saltarse fases.
+            val startedAt = withFrameMillis { it }
+            var previous = startedAt
+            while (timeline < LaunchEnd) {
+                val now = withFrameMillis { it }
+                val elapsed = (now - previous).toFloat()
+                val step = if (now - startedAt > MaxLaunchMillis) elapsed else elapsed.coerceAtMost(MaxFrameStep)
+                timeline = (timeline + step / systemScale).coerceAtMost(LaunchEnd)
+                previous = now
+            }
         }
         continueOnce()
     }
-    Box(
-        Modifier.fillMaxSize().background(AppBg)
-            .statusBarsPadding().navigationBarsPadding(),
-    ) {
-        DinexAuroraBackground()
-        Canvas(Modifier.fillMaxSize().clearAndSetSemantics {}) {
-            drawRect(Brush.radialGradient(
-                listOf(Mint.copy(alpha = .75f), Color.Transparent),
-                Offset(size.width * .66f, size.height * .43f), size.maxDimension * .62f,
-            ))
-            // A restrained technical texture, without bitmap branding.
-            val spacing = 48.dp.toPx()
-            var x = 0f
-            while (x < size.width) {
-                var y = 0f
-                while (y < size.height) {
-                    drawCircle(Green.copy(alpha = .06f), 1f, Offset(x, y))
-                    y += spacing
-                }
-                x += spacing
-            }
-        }
+    val shape = remember { WalletShape() }
+    val t = timeline
+
+    BoxWithConstraints(Modifier.fillMaxSize().background(LaunchInk)) {
+        val logoSize = minOf(maxWidth, maxHeight) * .42f
+        val logo = logoSize.coerceAtMost(190.dp)
+        val rise = easeInOut(t.between(RiseStart, RiseEnd)) * (1f - easeInOut(t.between(HoldEnd, ZoomStart)))
+        val liftDp = 62.dp
+        Canvas(
+            Modifier.fillMaxSize().semantics { contentDescription = "Dinex. Decide mejor. Ahorra más."; heading() },
+        ) { drawLaunchScene(shape, t, rise, logo.toPx(), liftDp.toPx()) }
+
+        // Nombre y lema, debajo del logo.
+        val textOut = 1f - t.between(HoldEnd, HoldEnd + 170f)
         Column(
-            Modifier.align(Alignment.Center).widthIn(max = 600.dp).fillMaxWidth().padding(32.dp),
+            Modifier.align(Alignment.Center).offset(y = logo * .42f + 14.dp).clearAndSetSemantics {},
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text(
-                "TU FUTURO EMPIEZA AQUÍ", color = Gray, fontSize = 10.sp, letterSpacing = 2.5.sp, fontWeight = FontWeight.Medium,
-                modifier = Modifier.graphicsLayer { alpha = (writing.value * 5f).coerceIn(0f, 1f) },
-            )
-            Spacer(Modifier.height(34.dp))
-            Box(Modifier.fillMaxWidth().height(125.dp).semantics {
-                contentDescription = "Dinex. Tu dinero, con propósito."
-                heading()
-            }, contentAlignment = Alignment.Center) {
-                DrawnDinex(writing.value, finish.value)
+            Row {
+                "DINEX".forEachIndexed { index, letter ->
+                    val shown = t.between(RiseStart + 120f + index * 70f, RiseStart + 520f + index * 70f)
+                    Text(
+                        letter.toString(), color = if (letter == 'X') LaunchGreen else Color.White,
+                        fontSize = 42.sp, fontWeight = FontWeight.ExtraBold,
+                        modifier = Modifier.padding(horizontal = 4.dp).graphicsLayer {
+                            alpha = shown * textOut
+                            translationY = (1f - backOut(shown)) * 26.dp.toPx()
+                        },
+                    )
+                }
             }
-            Spacer(Modifier.height(24.dp))
-            Box(Modifier.width(64.dp).height(2.dp), contentAlignment = Alignment.Center) {
-                Box(Modifier.fillMaxHeight().fillMaxWidth(finish.value).background(
-                    Brush.horizontalGradient(listOf(Color.Transparent, Green.copy(alpha = .8f), Color.Transparent)),
-                ))
-            }
-            Spacer(Modifier.height(24.dp))
-            Text(
-                "Tu dinero, con propósito.",
-                color = Night,
-                fontWeight = FontWeight.Medium, fontSize = 19.sp, textAlign = TextAlign.Center,
-                modifier = Modifier.graphicsLayer {
-                    val shown = (finish.value * 1.8f - .2f).coerceIn(0f, 1f)
-                    alpha = shown; translationY = (1f - shown) * 12.dp.toPx()
-                },
+            val underline = easeOut(t.between(RiseStart + 380f, RiseStart + 820f))
+            Box(
+                Modifier.padding(top = 4.dp).size(112.dp, 2.dp)
+                    .graphicsLayer { scaleX = underline; alpha = underline * textOut }
+                    .background(Brush.horizontalGradient(listOf(Color.Transparent, LaunchGreen, LaunchLime, Color.Transparent))),
             )
-            Spacer(Modifier.height(9.dp))
+            val tagline = easeOut(t.between(RiseStart + 480f, RiseStart + 900f))
             Text(
-                "Pequeñas decisiones. Grandes mañanas.", color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center,
-                modifier = Modifier.graphicsLayer {
-                    val shown = (finish.value * 2f - 1f).coerceIn(0f, 1f)
-                    alpha = shown; translationY = (1f - shown) * 10.dp.toPx()
-                },
+                "Decide mejor. Ahorra más.", color = Color.White.copy(alpha = .68f), fontSize = 15.sp, textAlign = TextAlign.Center,
+                modifier = Modifier.padding(top = 8.dp).graphicsLayer { alpha = tagline * textOut; translationY = (1f - tagline) * 10.dp.toPx() },
             )
         }
-        Row(
-            Modifier.align(Alignment.BottomCenter).widthIn(max = 600.dp).fillMaxWidth().padding(20.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            TextButton(onClick = { onReduceMotion(true); continueOnce() }, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Reducir movimiento", color = Gray, fontSize = 12.sp)
-            }
-            TextButton(onClick = ::continueOnce, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Continuar", color = GreenDark, fontSize = 12.sp)
-            }
-        }
+        LaunchSkip(Modifier.align(Alignment.BottomEnd), 1f - t.between(ZoomStart - 150f, ZoomStart), ::continueOnce)
     }
 }
 
 @Composable
-private fun DrawnDinex(writing: Float, finish: Float) {
-    Canvas(Modifier.fillMaxSize().clearAndSetSemantics {}) {
-        val scale = minOf(size.width / 850f, size.height / 210f)
-        val left = (size.width - 850f * scale) / 2
-        val top = (size.height - 210f * scale) / 2
-        fun p(x: Float, y: Float) = Offset(left + x * scale, top + y * scale)
-        val strokes = listOf(
-            Path().apply {
-                moveTo(p(35f, 30f).x, p(35f, 30f).y); lineTo(p(35f, 180f).x, p(35f, 180f).y)
-                cubicTo(p(180f, 190f).x, p(180f, 190f).y, p(180f, 20f).x, p(180f, 20f).y, p(35f, 30f).x, p(35f, 30f).y)
-            },
-            Path().apply { moveTo(p(220f, 30f).x, p(220f, 30f).y); lineTo(p(220f, 180f).x, p(220f, 180f).y) },
-            Path().apply {
-                moveTo(p(285f, 180f).x, p(285f, 180f).y); lineTo(p(285f, 30f).x, p(285f, 30f).y)
-                lineTo(p(430f, 180f).x, p(430f, 180f).y); lineTo(p(430f, 30f).x, p(430f, 30f).y)
-            },
-            Path().apply {
-                moveTo(p(610f, 30f).x, p(610f, 30f).y); lineTo(p(500f, 30f).x, p(500f, 30f).y)
-                lineTo(p(500f, 180f).x, p(500f, 180f).y); lineTo(p(615f, 180f).x, p(615f, 180f).y)
-            },
-            Path().apply { moveTo(p(500f, 102f).x, p(500f, 102f).y); lineTo(p(593f, 102f).x, p(593f, 102f).y) },
-            Path().apply { moveTo(p(677f, 30f).x, p(677f, 30f).y); lineTo(p(817f, 180f).x, p(817f, 180f).y) },
-            Path().apply { moveTo(p(817f, 30f).x, p(817f, 30f).y); lineTo(p(677f, 180f).x, p(677f, 180f).y) },
-        )
-        val measures = strokes.map { PathMeasure().apply { setPath(it, false) } }
-        // Entre un trazo y otro el lápiz se levanta y viaja hasta la siguiente letra.
-        val penTravel = 58f * scale
-        val total = measures.sumOf { it.length.toDouble() }.toFloat() + penTravel * (strokes.size - 1)
-        var budget = writing * total
-        var tip = p(35f, 30f)
-        var lift = 0f
-        var trail = emptyList<Offset>()
-        // Un brillo recorre la palabra cuando termina de escribirse.
-        val sweep = finish * 1.3f - .15f
-        val shineStart = (sweep - .1f).coerceIn(0f, 1f)
-        val shine = sweep.coerceIn(shineStart, 1f)
-        val shineEnd = (sweep + .1f).coerceIn(shine, 1f)
-        val ink = Brush.linearGradient(
-            0f to Night, shineStart to Night, shine to (if (finish in .01f..<1f) Color(0xFF34C77E) else Night), shineEnd to Night, 1f to GreenDark,
-            start = p(0f, 0f), end = p(850f, 0f),
-        )
-        strokes.forEachIndexed { index, path ->
-            val measure = measures[index]
-            val length = measure.length
-            val local = (budget / length).coerceIn(0f, 1f)
-            val portion = length * local * local * (3f - 2f * local) // acelera y frena como una mano real
-            // Cada trazo toma grosor y da un pequeño salto, uno detrás de otro.
-            val own = (finish * 1.7f - index * .1f).coerceIn(0f, 1f)
-            val back = own - 1f
-            val weight = 5f + 15f * (1f + 2.70158f * back * back * back + 1.70158f * back * back)
-            translate(top = -sin(own * PI.toFloat()) * 10f * scale) {
-                drawPath(path, Green.copy(alpha = .07f), style = Stroke(20f * scale, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                if (portion > 0f) {
-                    val visible = Path()
-                    measure.getSegment(0f, portion, visible, true)
-                    drawPath(visible, ink, style = Stroke(weight * scale, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                    if (local < 1f) {
-                        // Tinta fresca justo detrás de la punta.
-                        val fresh = Path()
-                        measure.getSegment((portion - 44f * scale).coerceAtLeast(0f), portion, fresh, true)
-                        drawPath(fresh, GreenDark, style = Stroke(8.5f * scale, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                    }
-                }
-            }
-            if (budget in 0f..length) {
-                tip = measure.getPosition(portion)
-                trail = (1..7).map { step -> measure.getPosition((portion - step * 15f * scale).coerceAtLeast(0f)) }
-            } else if (budget > length && index < strokes.lastIndex && budget <= length + penTravel) {
-                val travel = (budget - length) / penTravel
-                tip = lerp(measure.getPosition(length), measures[index + 1].getPosition(0f), travel * travel * (3f - 2f * travel))
-                lift = sin(travel * PI.toFloat())
-                trail = emptyList()
-            } else if (index == strokes.lastIndex && budget >= length) tip = measure.getPosition(length)
-            budget -= length + penTravel
+private fun LaunchSkip(modifier: Modifier, opacity: Float, onSkip: () -> Unit) {
+    TextButton(
+        onClick = onSkip,
+        modifier = modifier.navigationBarsPadding().padding(horizontal = 20.dp, vertical = 10.dp)
+            .heightIn(min = 48.dp).graphicsLayer { alpha = opacity },
+    ) { Text("Saltar", color = Color.White.copy(alpha = .85f), fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
+}
+
+private fun DrawScope.drawLaunchScene(shape: WalletShape, t: Float, rise: Float, logoPx: Float, liftPx: Float) {
+    val screen = Offset(size.width / 2, size.height / 2)
+    val fill = easeInOut(t.between(TraceEnd - 60f, FillEnd))
+    drawLaunchGrid(screen, t)
+
+    // Rebote al caer la moneda, sube para el nombre y luego la cámara entra por el broche.
+    val settle = t.between(CoinHit, CoinHit + 460f)
+    val wave = sin(settle * PI.toFloat()) * (1f - settle)
+    val bounce = 1f + wave * .14f
+    val zoom = t.between(ZoomStart, LaunchEnd).pow(3)
+    val logoUnit = logoPx / 100f * bounce * (1f - rise * .16f)
+    val unit = logoUnit * (1f + zoom * 70f)
+    val float = sin((t - RiseEnd).coerceAtLeast(0f) / 300f) * logoPx * .014f * rise
+    val restingCenter = screen + Offset(0f, wave * logoPx * .05f + float - liftPx * rise)
+    val pivot = Offset(83f, 62f)
+    val restingPivot = restingCenter + (pivot - Offset(50f, 56f)) * logoUnit
+    val origin = lerp(restingPivot, screen, easeOut(t.between(ZoomStart, ZoomStart + 340f))) - pivot * unit
+
+    // Resplandor detrás del logo, más fuerte en el instante del golpe.
+    val hit = 1f - t.between(CoinHit, CoinHit + 520f)
+    val glow = fill * .22f + (if (t >= CoinHit) hit * .3f else 0f)
+    if (glow > 0f) {
+        val radius = logoPx * (1.5f + (1f - hit) * .12f)
+        drawCircle(Brush.radialGradient(listOf(LaunchGreen.copy(alpha = glow.coerceAtMost(1f)), Color.Transparent), restingCenter, radius), radius, restingCenter)
+    }
+
+    withTransform({ translate(origin.x, origin.y); scale(unit, unit, Offset.Zero) }) {
+        drawWalletGuides(t, fill)
+        drawImpact(t)
+        drawCoin(t)
+        if (fill > 0f) drawWalletFill(shape, fill, t)
+        drawWalletTrace(shape, t, fill)
+        drawImpactFlash(t)
+    }
+    drawWarpLines(screen, t)
+}
+
+/** Cuadrícula que se abre desde el centro de la pantalla. */
+private fun DrawScope.drawLaunchGrid(screen: Offset, t: Float) {
+    val reveal = easeOut(t.between(0f, 900f))
+    if (reveal <= 0f) return
+    val color = Color.White.copy(alpha = .07f)
+    val step = 34.dp.toPx()
+    var x = screen.x % step
+    while (x < size.width) { drawLine(color, Offset(x, 0f), Offset(x, size.height), 1f); x += step }
+    var y = screen.y % step
+    while (y < size.height) { drawLine(color, Offset(0f, y), Offset(size.width, y), 1f); y += step }
+    val radius = max(size.width, size.height) * (.08f + reveal * .72f)
+    drawRect(Brush.radialGradient(0f to Color.Transparent, .55f to LaunchInk.copy(alpha = .35f), 1f to LaunchInk, center = screen, radius = radius))
+}
+
+/** Líneas de construcción, como un plano, que se apagan al rellenarse el logo. */
+private fun DrawScope.drawWalletGuides(t: Float, fill: Float) {
+    val draw = easeInOut(t.between(TraceStart, TraceStart + 800f))
+    val opacity = .16f * (1f - fill) * draw
+    if (opacity <= 0f) return
+    val color = Color.White.copy(alpha = opacity)
+    drawLine(color, Offset(50f - 62f * draw, 62f), Offset(50f + 62f * draw, 62f), .35f)
+    drawLine(color, Offset(50f, 56f - 52f * draw), Offset(50f, 56f + 52f * draw), .35f)
+    drawCircle(color, 44f * draw, Offset(50f, 56f), style = Stroke(.35f))
+}
+
+/** La línea de luz recorre cada trazo, con cola de cometa y chispas que quedan atrás. */
+private fun DrawScope.drawWalletTrace(shape: WalletShape, t: Float, fill: Float) {
+    val opacity = 1f - fill
+    if (t < TraceStart || opacity <= 0f) return
+    var budget = easeInOut(t.between(TraceStart, TraceEnd)) * shape.totalLength
+    shape.traces.forEachIndexed { index, path ->
+        val measure = shape.measures[index]
+        val length = measure.length
+        val portion = budget.coerceIn(0f, length)
+        if (portion > 0f) {
+            val visible = Path()
+            measure.getSegment(0f, portion, visible, true)
+            drawPath(visible, LaunchGreen.copy(alpha = .35f * opacity), style = Stroke(2.6f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            drawPath(visible, Color.White.copy(alpha = .95f * opacity), style = Stroke(.9f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+            if (budget <= length) drawTraceTip(measure, portion, t)
         }
-        if (writing in .001f..<1f) {
-            trail.forEachIndexed { step, point ->
-                val jitter = sin(writing * 120f + step * 2f) * 5f * scale
-                drawCircle((if (step % 2 == 0) Lime else Green).copy(alpha = (1f - step / 8f) * .55f), (3.2f - step * .32f) * scale, point + Offset(jitter, -jitter))
-            }
-        }
-        // El lápiz sigue la letra y al terminar sale volando.
-        val leaving = (finish / .4f).coerceIn(0f, 1f)
-        if (writing > 0f && leaving < 1f) {
-            val away = Offset(90f, -90f) * (leaving * leaving) * maxOf(scale, .62f)
-            drawPencil(tip + away, maxOf(scale, .62f), sin(writing * 95f) * 7f + leaving * 40f, lift, ((writing * 14f).coerceIn(0f, 1f)) * (1f - leaving))
-        }
-        if (finish > 0f) {
-            val opacity = sin(finish * PI.toFloat()).coerceIn(0f, 1f)
-            for (index in 0..11) {
-                val angle = index * (PI.toFloat() / 6f)
-                val radius = (14f + (index % 3 + 3) * 22f * finish) * scale
-                val star = p(747f, 105f) + Offset(cos(angle) * radius * 1.6f, sin(angle) * radius)
-                val arm = (index % 2 + 3f) * scale
-                drawLine(GreenDark.copy(alpha = opacity), star - Offset(arm, 0f), star + Offset(arm, 0f), 1.5f)
-                drawLine(GreenDark.copy(alpha = opacity), star - Offset(0f, arm), star + Offset(0f, arm), 1.5f)
-            }
-        }
+        budget -= length
     }
 }
 
-/** Lápiz con punta de grafito, madera, cuerpo, virola y borrador. */
-private fun DrawScope.drawPencil(tip: Offset, size: Float, wobble: Float, lift: Float, opacity: Float) {
-    val raised = tip + Offset(0f, -16f * lift * size)
-    if (lift > 0f) drawCircle(Night.copy(alpha = .14f * lift * opacity), 5f * size, tip)
-    rotate(wobble, pivot = raised) {
-        val along = Offset(.58f, -.81f)
-        val across = Offset(.81f, .58f)
-        fun at(distance: Float, side: Float) = raised + along * (distance * size) + across * (side * size)
-        fun piece(from: Float, to: Float, halfFrom: Float, halfTo: Float, color: Color) {
-            val shape = Path().apply {
-                at(from, -halfFrom).let { moveTo(it.x, it.y) }
-                at(to, -halfTo).let { lineTo(it.x, it.y) }
-                at(to, halfTo).let { lineTo(it.x, it.y) }
-                at(from, halfFrom).let { lineTo(it.x, it.y) }
-                close()
-            }
-            drawPath(shape, color.copy(alpha = opacity))
-        }
-        piece(0f, 15f, 0f, 5.5f, Color(0xFFEBC594))
-        piece(0f, 5.5f, 0f, 2f, Color(0xFF2B2E35))
-        piece(15f, 66f, 5.5f, 5.5f, Color(0xFFF2A93B))
-        piece(15f, 66f, 1.8f, 1.8f, Color(0xFFFFC765))
-        piece(66f, 73f, 5.5f, 5.5f, Color(0xFFB9C5D2))
-        piece(73f, 83f, 5.5f, 4.6f, Color(0xFFE66678))
+private fun DrawScope.drawTraceTip(measure: PathMeasure, portion: Float, t: Float) {
+    val tail = Path()
+    measure.getSegment((portion - 22f).coerceAtLeast(0f), portion, tail, true)
+    drawPath(tail, LaunchLime.copy(alpha = .9f), style = Stroke(1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    for (spark in 1..7) {
+        val distance = portion - spark * 4.2f
+        if (distance <= 0f) break
+        val base = measure.getPosition(distance)
+        val drift = spark * .55f
+        val point = base + Offset(sin(spark * 2.1f + t / 90f) * drift, cos(spark * 1.7f + t / 110f) * drift)
+        drawCircle(LaunchLime.copy(alpha = (1f - spark / 8f) * .8f), .75f - spark * .06f, point)
+    }
+    val point = measure.getPosition(portion)
+    drawCircle(Brush.radialGradient(listOf(LaunchLime.copy(alpha = .85f), Color.Transparent), point, 9f), 9f, point)
+    drawCircle(Color.White, 1.2f, point)
+}
+
+/** Relleno diagonal desde la esquina inferior izquierda y un brillo que cruza el logo. */
+private fun DrawScope.drawWalletFill(shape: WalletShape, fill: Float, t: Float) {
+    val reach = fill * 210f
+    val wipe = Path().apply { moveTo(0f, 110f); lineTo(reach, 110f); lineTo(0f, 110f - reach); close() }
+    clipPath(wipe) {
+        drawPath(shape.flap, Color(0xFFB9CDBF), style = Stroke(6f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        drawPath(shape.body, Brush.linearGradient(listOf(Color.White, Color(0xFFD5E4DA)), Offset(14f, 38f), Offset(80f, 86f)))
+        drawPath(shape.clasp, LaunchInk, style = Stroke(3f))
+        drawPath(shape.clasp, Brush.linearGradient(listOf(LaunchGreen, Color(0xFF0E8F55)), Offset(60f, 52f), Offset(90f, 72f)))
+        drawPath(shape.dot, Color.White)
+    }
+    val sweep = t.between(CoinHit + 40f, CoinHit + 760f)
+    if (sweep > 0f && sweep < 1f) clipPath(shape.body) {
+        val center = -20f + sweep * 140f
+        drawRect(
+            Brush.linearGradient(listOf(Color.Transparent, LaunchGreen.copy(alpha = .3f), Color.Transparent), Offset(center - 16f, 38f), Offset(center + 16f, 86f)),
+            Offset(0f, 30f), Size(100f, 64f),
+        )
+    }
+}
+
+/** Moneda que gira mientras cae; la billetera se dibuja encima y parece guardarla. */
+private fun DrawScope.drawCoin(t: Float) {
+    if (t < CoinStart || t >= CoinHit) return
+    val fall = t.between(CoinStart, CoinHit)
+    val center = Offset(47f, -46f + fall * fall * 104f)
+    val turn = abs(cos(fall * PI.toFloat() * 2.5f)).coerceAtLeast(.18f)
+    withTransform({ scale(turn, 1f, center) }) {
+        drawCircle(Brush.linearGradient(listOf(CoinLight, CoinDark), center - Offset(9f, 9f), center + Offset(9f, 9f)), 10f, center)
+        drawCircle(Color.White.copy(alpha = .55f), 7f, center, style = Stroke(.9f))
+        drawLine(Color.White.copy(alpha = .85f), center - Offset(0f, 4f), center + Offset(0f, 4f), 1.6f, cap = StrokeCap.Round)
+    }
+}
+
+/** Ondas y chispas que salen de la billetera cuando la moneda entra. */
+private fun DrawScope.drawImpact(t: Float) {
+    if (t < CoinHit) return
+    val center = Offset(47f, 60f)
+    for (ring in 0..1) {
+        val progress = t.between(CoinHit + ring * 120f, CoinHit + 620f + ring * 120f)
+        if (progress <= 0f || progress >= 1f) continue
+        val spread = easeOut(progress)
+        drawCircle(LaunchGreen.copy(alpha = (1f - progress) * .65f), 26f + spread * 62f, center, style = Stroke(1.4f * (1f - progress) + .2f))
+    }
+    val colors = listOf(LaunchLime, LaunchGreen, Color.White, CoinLight)
+    repeat(30) { index ->
+        val progress = t.between(CoinHit, CoinHit + 560f + index % 5 * 60f)
+        if (progress >= 1f) return@repeat
+        val angle = index * GoldenAngle
+        val direction = Offset(cos(angle), sin(angle))
+        val travel = 30f + easeOut(progress) * (22f + index * 37 % 42)
+        val streak = 2f + (1f - progress) * 5f
+        drawLine(
+            colors[index % colors.size].copy(alpha = 1f - progress),
+            center + direction * (travel - streak), center + direction * travel,
+            1.1f * (1f - progress) + .3f, cap = StrokeCap.Round,
+        )
+    }
+}
+
+private fun DrawScope.drawImpactFlash(t: Float) {
+    val flash = 1f - t.between(CoinHit, CoinHit + 240f)
+    if (t < CoinHit || flash <= 0f) return
+    val center = Offset(47f, 58f)
+    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = flash * flash * .75f), Color.Transparent), center, 58f), 58f, center)
+}
+
+/** Líneas de velocidad mientras la cámara atraviesa el broche. */
+private fun DrawScope.drawWarpLines(screen: Offset, t: Float) {
+    val warp = t.between(ZoomStart, LaunchEnd)
+    if (warp <= 0f || warp >= 1f) return
+    val reach = max(size.width, size.height)
+    val strength = sin(warp * PI.toFloat())
+    repeat(44) { index ->
+        val angle = index * GoldenAngle
+        val direction = Offset(cos(angle), sin(angle))
+        val phase = (warp * 2.2f + (index * 53 % 100) / 100f) % 1f
+        val start = reach * (.1f + phase * phase * .8f)
+        val length = reach * (.03f + phase * .16f)
+        drawLine(
+            Color.White.copy(alpha = strength * phase * .55f),
+            screen + direction * start, screen + direction * (start + length),
+            1.6.dp.toPx(), cap = StrokeCap.Round,
+        )
     }
 }
