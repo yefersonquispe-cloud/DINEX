@@ -1,14 +1,21 @@
 package com.example.dinex
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.interaction.InteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
@@ -58,6 +65,32 @@ internal fun Modifier.dinexEntrance(): Modifier {
         alpha = .15f + progress.value * .85f
         translationY = (1f - progress.value) * 12.dp.toPx()
     }
+}
+
+/** Se hunde un poco al presionar, como un botón físico. */
+@Composable
+internal fun Modifier.dinexPress(interaction: InteractionSource, pressedScale: Float = .97f): Modifier {
+    val pressed by interaction.collectIsPressedAsState()
+    val reduced = LocalDinexReducedMotion.current
+    val scale by animateFloatAsState(if (pressed && !reduced) pressedScale else 1f, spring(stiffness = Spring.StiffnessMedium), label = "presión")
+    return graphicsLayer { scaleX = scale; scaleY = scale }
+}
+
+/** Monto que sube o baja suavemente hasta [target] y termina siempre en el valor exacto. */
+@Composable
+internal fun rememberCountUp(target: Double, durationMillis: Int = 750): Double {
+    val reduced = LocalDinexReducedMotion.current
+    var shown by remember { mutableDoubleStateOf(if (reduced) target else 0.0) }
+    LaunchedEffect(target, reduced) {
+        if (!reduced) {
+            val start = shown
+            animate(0f, 1f, animationSpec = tween(durationMillis, easing = FastOutSlowInEasing)) { progress, _ ->
+                shown = start + (target - start) * progress
+            }
+        }
+        shown = target
+    }
+    return shown
 }
 
 @Composable

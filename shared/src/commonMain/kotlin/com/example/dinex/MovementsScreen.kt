@@ -114,7 +114,7 @@ internal fun HistoryPage(movements: List<Movement>, onAdd: () -> Unit, onDelete:
                     }
                 }
                 items(visible, key = { it.id }) { movement ->
-                    DinexCard { MovementListRow(movement) { selected = movement } }
+                    DinexCard(if (LocalDinexReducedMotion.current) Modifier else Modifier.animateItem()) { MovementListRow(movement) { selected = movement } }
                 }
             }
         }

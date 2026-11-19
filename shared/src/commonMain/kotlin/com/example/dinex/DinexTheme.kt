@@ -7,6 +7,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -104,8 +105,8 @@ internal fun DinexCard(
     val hovered by interaction.collectIsHoveredAsState()
     val bg by animateColorAsState(if (hovered && onClick != null) SurfaceHover else if (elevated) CardRaised else Card, tween(if (LocalDinexReducedMotion.current) 0 else 160))
     Surface(
-        modifier = modifier.dinexEntrance().then(
-            if (onClick != null) Modifier.hoverable(interaction).clickable(onClick = onClick) else Modifier
+        modifier = modifier.dinexEntrance().dinexPress(interaction, .985f).then(
+            if (onClick != null) Modifier.hoverable(interaction).clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick) else Modifier
         ),
         shape = RoundedCornerShape(RadiusLg),
         color = Color.Transparent,

@@ -15,6 +15,10 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
@@ -684,11 +688,12 @@ internal fun BottomNavigation(page: Int, onSelect: (Int) -> Unit, onAdd: () -> U
             BottomItem(DinexNavigationIcons.Home, "Inicio", page == 0, Modifier.weight(1f)) { onSelect(0) }
             BottomItem(DinexNavigationIcons.Movements, "Movimientos", page == 1, Modifier.weight(1.3f)) { onSelect(1) }
             Box(Modifier.weight(1.05f), contentAlignment = Alignment.Center) {
+                val addInteraction = remember { MutableInteractionSource() }
                 Box(
-                    Modifier.size(54.dp).shadow(9.dp, CircleShape, spotColor = NavigationAqua.copy(alpha = .35f)).clip(CircleShape)
+                    Modifier.dinexPress(addInteraction, .9f).size(54.dp).shadow(9.dp, CircleShape, spotColor = NavigationAqua.copy(alpha = .35f)).clip(CircleShape)
                         .background(Green)
                         .semantics { contentDescription = "Registrar gasto, ingreso o ahorro" }
-                        .clickable(role = Role.Button, onClick = onAdd),
+                        .clickable(interactionSource = addInteraction, indication = LocalIndication.current, role = Role.Button, onClick = onAdd),
                     contentAlignment = Alignment.Center,
                 ) {
                     Icon(DinexNavigationIcons.Add, contentDescription = null, tint = Color.White, modifier = Modifier.size(29.dp))
@@ -710,7 +715,11 @@ internal fun BottomItem(icon: ImageVector, label: String, selected: Boolean, mod
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
-        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(25.dp))
+        val bounce by animateFloatAsState(
+            if (selected && !LocalDinexReducedMotion.current) 1.14f else 1f,
+            spring(dampingRatio = .42f, stiffness = Spring.StiffnessMediumLow), label = "ícono activo",
+        )
+        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(25.dp).graphicsLayer { scaleX = bounce; scaleY = bounce })
         Spacer(Modifier.height(5.dp))
         Text(
             label,

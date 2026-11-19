@@ -200,7 +200,7 @@ internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, sav
                 Icon(DinexNavigationIcons.Wallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
             }
             Spacer(Modifier.height(6.dp))
-            Text(money(balance), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 36.sp, letterSpacing = (-1).sp)
+            Text(moneyGrouped(rememberCountUp(balance)), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 36.sp, letterSpacing = (-1).sp)
             Spacer(Modifier.height(18.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 BalanceStat("Ingresos", "+ ${money(income)}", Modifier.weight(1f), expense = false)
