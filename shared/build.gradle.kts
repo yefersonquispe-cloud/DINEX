@@ -12,7 +12,7 @@ plugins {
 // nunca se guarda en el repositorio. Sin clave, Dinex IA en la web usa respuestas locales.
 val webGeminiKey = providers.fileContents(rootProject.layout.projectDirectory.file("local.properties")).asText.orElse("")
     .map { text -> text.lineSequence().map { it.trim() }.firstOrNull { it.startsWith("GEMINI_WEB_API_KEY=") }?.substringAfter('=')?.trim().orEmpty() }
-    .orElse(providers.environmentVariable("GEMINI_WEB_API_KEY"))
+    .zip(providers.environmentVariable("GEMINI_WEB_API_KEY").orElse("")) { local, environment -> local.ifBlank { environment } }
 val webSecretsDir = layout.buildDirectory.dir("generated/webSecrets/kotlin")
 val generateWebSecrets = tasks.register("generateWebSecrets") {
     val key = webGeminiKey

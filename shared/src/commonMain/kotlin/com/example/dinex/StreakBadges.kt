@@ -11,7 +11,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,10 +41,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -318,32 +314,6 @@ private fun DrawScope.drawSavingsEmblem(index: Int, box: Float, ink: Color, deta
         else -> drawCrown(box, ink, detail)                                                         // Leyenda: corona
     }
 }
-
-private fun DrawScope.drawFlame(box: Float, color: Color, inner: Color) {
-    fun p(x: Float, y: Float) = Offset(box * (.18f + x * .64f), box * (.1f + y * .8f))
-    val outer = Path().apply {
-        val a = p(.5f, 0f); moveTo(a.x, a.y)
-        cubic(p(.58f, .22f), p(.92f, .32f), p(.92f, .64f))
-        cubic(p(.92f, .86f), p(.72f, 1f), p(.5f, 1f))
-        cubic(p(.28f, 1f), p(.08f, .86f), p(.08f, .64f))
-        cubic(p(.08f, .46f), p(.2f, .36f), p(.3f, .26f))
-        cubic(p(.3f, .42f), p(.38f, .5f), p(.46f, .52f))
-        cubic(p(.4f, .36f), p(.42f, .16f), p(.5f, 0f))
-        close()
-    }
-    drawPath(outer, color)
-    val core = Path().apply {
-        val a = p(.5f, .48f); moveTo(a.x, a.y)
-        cubic(p(.6f, .62f), p(.72f, .7f), p(.72f, .82f))
-        cubic(p(.72f, .94f), p(.62f, 1f), p(.5f, 1f))
-        cubic(p(.38f, 1f), p(.28f, .94f), p(.28f, .82f))
-        cubic(p(.28f, .7f), p(.42f, .62f), p(.5f, .48f))
-        close()
-    }
-    drawPath(core, inner)
-}
-
-private fun Path.cubic(a: Offset, b: Offset, c: Offset) = cubicTo(a.x, a.y, b.x, b.y, c.x, c.y)
 
 private fun DrawScope.drawCrown(box: Float, color: Color, jewel: Color) {
     fun p(x: Float, y: Float) = Offset(box * (.12f + x * .76f), box * (.18f + y * .66f))
