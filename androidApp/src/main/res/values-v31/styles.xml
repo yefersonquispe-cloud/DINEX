@@ -1,8 +1,8 @@
 <resources>
     <style name="Theme.Dinex" parent="android:style/Theme.Material.NoActionBar">
-        <item name="android:windowBackground">#F7FAF7</item>
+        <item name="android:windowBackground">#07100C</item>
         <item name="android:colorAccent">#176B43</item>
-        <item name="android:windowSplashScreenBackground">#F7FAF7</item>
+        <item name="android:windowSplashScreenBackground">#07100C</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_empty</item>
         <item name="android:windowSplashScreenAnimationDuration">0</item>
         <item name="android:statusBarColor">@android:color/transparent</item>

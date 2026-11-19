@@ -12,7 +12,7 @@ html, body {
     margin: 0;
     padding: 0;
     overflow: hidden;
-    background: #f7faf7;
+    background: #07100c;
 }
 
 #dinex-loader {
@@ -23,8 +23,8 @@ html, body {
     align-items: center;
     justify-content: center;
     gap: 10px;
-    background: radial-gradient(circle at 50% 38%, #e5f3e9 0%, #f7faf7 62%);
-    color: #183326;
+    background: #07100c;
+    color: #ffffff;
 }
 
 .loader-mark {
@@ -36,7 +36,7 @@ html, body {
 
 .loader-tagline {
     font-size: 14px;
-    color: #536a5a;
+    color: rgba(255, 255, 255, .62);
 }
 
 .loader-bar {
@@ -44,7 +44,7 @@ html, body {
     height: 4px;
     margin-top: 18px;
     border-radius: 999px;
-    background: #d4e4d8;
+    background: rgba(255, 255, 255, .14);
     overflow: hidden;
 }
 
@@ -53,7 +53,7 @@ html, body {
     width: 40%;
     height: 100%;
     border-radius: inherit;
-    background: #176b43;
+    background: #2bd47f;
     animation: dinex-loading 1.1s ease-in-out infinite;
 }
 
