@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
@@ -139,19 +140,20 @@ internal fun MonthPass(income: Double, expense: Double, movementCount: Int) {
         Text("BALANCE DE LOS MOVIMIENTOS VISIBLES", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
         Text(money(income - expense), color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp)
         Spacer(Modifier.height(12.dp))
-        Row {
+        // Solo las tres cifras van centradas, cada una en su columna.
+        Row(Modifier.fillMaxWidth()) {
             PassValue("Entró", money(income), Lime, Modifier.weight(1f))
             PassValue("Salió", money(expense), Red, Modifier.weight(1f))
-            PassValue("Movs.", "$movementCount", Night, Modifier.weight(1f))
+            PassValue("Movimientos", "$movementCount", Night, Modifier.weight(1f))
         }
     }
 }
 
 @Composable
 internal fun PassValue(label: String, text: String, color: androidx.compose.ui.graphics.Color, modifier: Modifier) {
-    Column(modifier) {
-        Text(label, color = Gray, fontSize = 12.sp)
-        Text(text, color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(label, color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, maxLines = 1)
+        Text(text, color = color, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center, maxLines = 1)
     }
 }
 

@@ -898,3 +898,80 @@ internal fun InlineMessage(message: String, onDismiss: () -> Unit) {
         }
     }
 }
+
+/**
+ * Aviso al superar el presupuesto diario: muestra cuánto se gastó, el límite y el
+ * exceso con una barra, sin regañar, y ofrece revisar el plan.
+ */
+@Composable
+internal fun BudgetWarningDialog(
+    warning: String,
+    spentToday: Double,
+    limit: Double,
+    onDismiss: () -> Unit,
+    onOpenPlan: () -> Unit,
+) {
+    val over = (spentToday - limit).coerceAtLeast(0.0)
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(shape = RoundedCornerShape(28.dp), color = Card, shadowElevation = 18.dp, modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(horizontal = 22.dp, vertical = 22.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(46.dp).clip(CircleShape).background(Red.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
+                        Icon(DinexNavigationIcons.Bell, null, tint = Red, modifier = Modifier.size(22.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text("PRESUPUESTO DE HOY", color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                        Text("Superaste tu límite diario", color = Night, fontSize = 20.sp, fontWeight = FontWeight.Bold, lineHeight = 25.sp)
+                    }
+                }
+                Spacer(Modifier.height(18.dp))
+                if (limit > 0 && spentToday > 0) {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Bottom) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Gastaste hoy", color = Gray, fontSize = 12.sp)
+                            Text(money(spentToday), color = Night, fontSize = 28.sp, fontWeight = FontWeight.Black, letterSpacing = (-.5).sp)
+                        }
+                        Column(horizontalAlignment = Alignment.End) {
+                            Text("Tu límite", color = Gray, fontSize = 12.sp)
+                            Text(money(limit), color = Night, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                    Spacer(Modifier.height(10.dp))
+                    // La barra se llena hasta el límite; el tramo rojo es lo que se pasó.
+                    Box(Modifier.fillMaxWidth().height(10.dp).clip(CircleShape).background(Border)) {
+                        val share = (limit / spentToday).toFloat().coerceIn(0f, 1f)
+                        Box(Modifier.fillMaxHeight().fillMaxWidth().clip(CircleShape).background(Red))
+                        Box(Modifier.fillMaxHeight().fillMaxWidth(share).clip(CircleShape).background(Green))
+                    }
+                    Spacer(Modifier.height(12.dp))
+                    Surface(shape = RoundedCornerShape(14.dp), color = Red.copy(alpha = .10f)) {
+                        Text(
+                            "Te pasaste por ${money(over)}",
+                            color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
+                        )
+                    }
+                } else {
+                    Text(warning, color = NightSoft, fontSize = 15.sp, lineHeight = 22.sp)
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    "No pasa nada: mañana tu límite empieza de cero. Si este gasto era necesario, puedes ajustar tu presupuesto en el Plan.",
+                    color = Gray, fontSize = 13.sp, lineHeight = 19.sp,
+                )
+                Spacer(Modifier.height(20.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = onOpenPlan, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape,
+                        border = BorderStroke(1.dp, Border),
+                    ) { Text("Ver mi plan", color = Night, fontWeight = FontWeight.SemiBold) }
+                    Button(
+                        onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp), shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White),
+                    ) { Text("Entendido", fontWeight = FontWeight.SemiBold) }
+                }
+            }
+        }
+    }
+}

@@ -29,6 +29,7 @@ internal fun InsightsPage(
     onExport: () -> Unit = {},
     locationAvailable: Boolean = false,
     onRequestLocation: () -> Unit = {},
+    dailyLimit: Double = 0.0,
 ) {
     val months = history.map { it.dateIso().take(7) }.distinct().sortedDescending()
     val current = civilDateFromEpochDays()
@@ -90,10 +91,10 @@ internal fun InsightsPage(
                 (1..31).filter { validDate(selectedMonth.take(4).toInt(), selectedMonth.takeLast(2).toInt(), it) }.map { "$selectedMonth-${it.toString().padStart(2, '0')}" }) }
             item {
                 if (wide) Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
-                    if (!weekly) Box(Modifier.weight(1f)) { DailyBars(movements, selectedMonth.take(4).toInt(), selectedMonth.takeLast(2).toInt()) }
+                    if (!weekly) Box(Modifier.weight(1f)) { DailyBars(movements, selectedMonth.take(4).toInt(), selectedMonth.takeLast(2).toInt(), dailyLimit) }
                     Box(Modifier.weight(1f)) { SpendingOverview(movements) }
                 } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    if (!weekly) DailyBars(movements, selectedMonth.take(4).toInt(), selectedMonth.takeLast(2).toInt())
+                    if (!weekly) DailyBars(movements, selectedMonth.take(4).toInt(), selectedMonth.takeLast(2).toInt(), dailyLimit)
                     SpendingOverview(movements)
                 }
             }
@@ -173,67 +174,6 @@ internal fun ForecastCard(income: Double, expense: Double) {
         DinexProgress(monthProgress, Indigo)
         Spacer(Modifier.height(6.dp))
         Text("Día $day del mes", color = Gray, fontSize = 10.sp)
-    }
-}
-
-@Composable
-internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpochDays().year, month: Int = civilDateFromEpochDays().month) {
-    val currentDay = currentDayOfMonth()
-    val days = (1..31).filter { validDate(year, month, it) }
-    val values = days.map { day -> movements.filter { !it.income && it.day == day }.sumOf { it.amount } }
-    val peak = values.maxOrNull()?.takeIf { it > 0 } ?: 1.0
-    val initialDay = if (currentDay in days) currentDay else days.getOrElse(values.indices.maxByOrNull { values[it] } ?: days.lastIndex) { currentDay }
-    var selectedDay by remember(movements.toList(), currentDay) { mutableIntStateOf(initialDay) }
-    val selectedMovements = movements.filter { !it.income && it.day == selectedDay }
-    val selectedTotal = selectedMovements.sumOf { it.amount }
-    DinexCard(accent = ElectricBlue) {
-        Text("Gasto diario", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Night)
-        Text("Toca un día para ver el detalle", color = Gray, fontSize = 11.sp)
-        Spacer(Modifier.height(16.dp))
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).height(168.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            values.forEachIndexed { i, value ->
-                val day = days[i]
-                val selected = day == selectedDay
-                val height by animateFloatAsState((value / peak * .68).coerceIn(0.04, .68).toFloat(), tween(if (LocalDinexReducedMotion.current) 0 else 450))
-                Column(
-                    Modifier.width(32.dp).fillMaxHeight().clip(RoundedCornerShape(6.dp)).clickable { selectedDay = day }.padding(horizontal = 1.dp),
-                    verticalArrangement = Arrangement.Bottom,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    if (selected && value > 0) Text(money(value).removePrefix("S/ "), color = Lime, fontSize = 8.sp, maxLines = 1)
-                    Spacer(Modifier.height(3.dp))
-                    Box(
-                        Modifier.fillMaxWidth().fillMaxHeight(height)
-                            .clip(RoundedCornerShape(topStart = 5.dp, topEnd = 5.dp))
-                            .background(
-                                if (selected) Brush.verticalGradient(listOf(Lime, Indigo))
-                                else Brush.verticalGradient(listOf(Indigo.copy(alpha = .75f), ElectricBlue.copy(alpha = .25f))),
-                            ),
-                    )
-                    Spacer(Modifier.height(4.dp))
-                    Text(day.toString(), color = if (selected) Lime else Gray, fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal, fontSize = 9.sp)
-                }
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        Surface(shape = RoundedCornerShape(RadiusMd), color = CardRaised, border = androidx.compose.foundation.BorderStroke(1.dp, if (selectedMovements.isEmpty()) Border else Indigo.copy(alpha = .3f))) {
-            Column(Modifier.fillMaxWidth().padding(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Día $selectedDay", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                    Text(money(selectedTotal), color = if (selectedTotal > 0) Red else Gray, fontWeight = FontWeight.Black, fontSize = 13.sp)
-                }
-                Spacer(Modifier.height(6.dp))
-                if (selectedMovements.isEmpty()) Text("No registraste egresos este día.", color = Gray, fontSize = 11.sp)
-                else selectedMovements.forEach { movement ->
-                    Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(7.dp).clip(CircleShape).background(categories.firstOrNull { it.name == movement.category }?.color ?: Gray))
-                        Spacer(Modifier.width(7.dp))
-                        Text(movement.title, color = Night, fontSize = 11.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(money(movement.amount), color = Gray, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
     }
 }
 

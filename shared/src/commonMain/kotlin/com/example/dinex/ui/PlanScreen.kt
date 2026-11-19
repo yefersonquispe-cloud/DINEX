@@ -78,44 +78,112 @@ internal fun PlanPage(
     )
 }
 
+/**
+ * Presupuestos por categoría: una barra de reparto muestra cómo se divide el mes y cada
+ * categoría tiene su "batería" de 10 celdas, con un estado claro (va bien, cerca, te pasaste).
+ */
 @Composable
 internal fun CategoryPlans(movements: List<Movement>, budgets: Map<String, Double> = emptyMap(), suggestions: Map<String, Double> = suggestedCategoryBudgets(movements)) {
     val income = movements.filter { it.income }.sumOf { it.amount }
+    val rows = categories.map { category ->
+        val spent = movements.filter { !it.income && it.budgetCategory() == category.name }.sumOf { it.amount }
+        val limit = budgets[category.name] ?: suggestions[category.name] ?: 0.0
+        Triple(category, spent, limit)
+    }
+    val totalLimit = rows.sumOf { it.third }
+    val totalSpent = rows.sumOf { it.second }
+    val customCount = categories.count { budgets.containsKey(it.name) }
     DinexCard(accent = Lime) {
-        Text("Presupuestos por categoría", fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Night)
-        Text("Sugerencia basada en tus ingresos e historial", color = Gray, fontSize = 12.sp)
-        Text("Ingresos del mes: ${money(income)}", color = Gray, fontSize = 12.sp)
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text("PRESUPUESTO DEL MES", color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("Presupuestos por categoría", fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Night)
+            }
+            Text(
+                if (customCount > 0) "$customCount personalizados" else "Sugeridos",
+                color = NightSoft, fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                modifier = Modifier.clip(CircleShape).background(Border.copy(alpha = .45f)).padding(horizontal = 10.dp, vertical = 4.dp),
+            )
+        }
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(money(totalSpent), color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp)
+            Text("  de ${money(totalLimit)}", color = Gray, fontSize = 13.sp, modifier = Modifier.padding(bottom = 4.dp))
+        }
+        Text(
+            if (income > 0) "Repartido según tus ingresos del mes (${money(income)})" else "Registra tus ingresos para afinar estas sugerencias",
+            color = Gray, fontSize = 12.sp,
+        )
         Spacer(Modifier.height(12.dp))
-        categories.forEach { category ->
-            val spent = movements.filter { !it.income && it.budgetCategory() == category.name }.sumOf { it.amount }
-            val custom = budgets.containsKey(category.name)
-            val limit = budgets[category.name] ?: suggestions[category.name] ?: 0.0
-            val ratio = if (limit > 0) (spent / limit).toFloat().coerceIn(0f, 1f) else 0f
-            val warning = ratio >= .8f
-            val exceeded = limit > 0 && spent > limit
-            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CategoryMark(category.code, category.color)
-                    Spacer(Modifier.width(10.dp))
-                    Column(Modifier.weight(1f)) {
-                        Row {
-                            Text(category.name, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, color = Night, modifier = Modifier.weight(1f))
-                            Text("${money(spent)} / ${money(limit)}", color = if (warning) Orange else Gray, fontSize = 11.sp)
-                        }
-                        Spacer(Modifier.height(6.dp))
-                        DinexProgress(ratio, if (warning) Orange else category.color)
+        // Barra de reparto: cada color es una categoría; lo gastado se ve sólido sobre su tramo.
+        if (totalLimit > 0) {
+            Row(Modifier.fillMaxWidth().height(14.dp).clip(CircleShape), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                rows.filter { it.third > 0 }.forEach { (category, spent, limit) ->
+                    Box(Modifier.weight(limit.toFloat()).fillMaxHeight().background(category.color.copy(alpha = .22f))) {
+                        Box(Modifier.fillMaxHeight().fillMaxWidth((spent / limit).toFloat().coerceIn(0f, 1f)).background(category.color))
                     }
-                    Spacer(Modifier.width(8.dp))
-                    Text("${percent(spent, limit)}%", color = if (warning) Orange else Gray, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 }
-                Text(if (custom) "Personalizado" else "Sugerido automáticamente", color = Gray, fontSize = 10.sp, modifier = Modifier.padding(start = 44.dp, top = 3.dp))
-                if (warning) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (exceeded) "Superaste el límite por ${money(spent - limit)}" else "Cerca del límite en ${category.name.lowercase()}",
-                        color = Orange, fontSize = 10.sp,
-                    )
-                }
+            }
+            Spacer(Modifier.height(18.dp))
+        }
+        rows.forEachIndexed { index, (category, spent, limit) ->
+            CategoryBudgetRow(category, spent, limit)
+            if (index < rows.lastIndex) HorizontalDivider(color = Border.copy(alpha = .6f), modifier = Modifier.padding(vertical = 4.dp))
+        }
+    }
+}
+
+@Composable
+private fun CategoryBudgetRow(category: CategoryInfo, spent: Double, limit: Double) {
+    val ratio = if (limit > 0) spent / limit else 0.0
+    val (label, tone) = when {
+        limit <= 0 -> "Sin límite" to Gray
+        ratio > 1.0 -> "Te pasaste" to Red
+        ratio >= .8 -> "Cerca del límite" to Orange
+        spent <= 0 -> "Sin gastos" to GreenDark
+        else -> "Va bien" to GreenDark
+    }
+    Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            CategoryMark(category.code, category.color, 40.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(category.name, fontWeight = FontWeight.Bold, fontSize = 15.sp, color = Night)
+                Text(
+                    when {
+                        limit <= 0 -> "${money(spent)} gastados"
+                        spent > limit -> "${money(spent)} de ${money(limit)} · ${money(spent - limit)} de más"
+                        else -> "${money(spent)} de ${money(limit)} · quedan ${money(limit - spent)}"
+                    },
+                    color = Gray, fontSize = 12.sp, maxLines = 1,
+                )
+            }
+            Text(
+                label, color = tone, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clip(CircleShape).background(tone.copy(alpha = .10f)).padding(horizontal = 9.dp, vertical = 4.dp),
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        BudgetCells(ratio, category.color)
+    }
+}
+
+/** Batería de 10 celdas: se llenan con el color de la categoría; al pasarse, las últimas se vuelven rosa. */
+@Composable
+private fun BudgetCells(ratio: Double, color: androidx.compose.ui.graphics.Color) {
+    val filled = (ratio.coerceIn(0.0, 1.0) * 10).let { if (ratio > 0 && it < 1) 1.0 else it }
+    val still = LocalDinexReducedMotion.current
+    val animated by androidx.compose.animation.core.animateFloatAsState(filled.toFloat(), androidx.compose.animation.core.tween(if (still) 0 else 700), label = "celdas")
+    Row(Modifier.fillMaxWidth().height(9.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        repeat(10) { cell ->
+            val amount = (animated - cell).coerceIn(0f, 1f)
+            val cellColor = when {
+                ratio > 1.0 -> Red
+                ratio >= .8 && cell >= 7 -> Orange
+                else -> color
+            }
+            Box(Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(3.dp)).background(Border.copy(alpha = .55f))) {
+                Box(Modifier.fillMaxHeight().fillMaxWidth(amount).background(cellColor))
             }
         }
     }
@@ -170,50 +238,127 @@ internal fun CategoryBudgetEditorDialog(
     )
 }
 
+/**
+ * Próximos pagos: cada recordatorio con su "hoja de calendario", urgencia por color
+ * (hoy, mañana, próximo) y un resumen amable de lo que viene.
+ */
 @Composable
 internal fun PaymentPlanner(
     reminders: List<PaymentReminder>,
     onAdd: () -> Unit,
     onDelete: (PaymentReminder) -> Unit,
 ) {
+    val ordered = reminders.sortedBy { reminderUrgency(it.date) }
+    val total = reminders.sumOf { it.amount }
+    val next = ordered.firstOrNull()
     DinexCard(elevated = true) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Próximos pagos", color = Night, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("Guardados en tu dispositivo", color = Gray, fontSize = 11.sp)
+                Text("RECORDATORIOS", color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+                Text("Próximos pagos", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
             }
-            Text("${reminders.size}", color = Lime, fontWeight = FontWeight.Black, fontSize = 20.sp)
+            if (reminders.isNotEmpty()) Column(horizontalAlignment = Alignment.End) {
+                Text("Por pagar", color = Gray, fontSize = 11.sp)
+                Text(money(total), color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp)
+            }
         }
-        Spacer(Modifier.height(8.dp))
-        if (reminders.isEmpty()) {
-            Text("Aún no tienes pagos pendientes.", color = Gray, fontSize = 11.sp, modifier = Modifier.padding(vertical = 10.dp))
+        Spacer(Modifier.height(12.dp))
+        if (next == null) {
+            Surface(shape = RoundedCornerShape(18.dp), color = Green.copy(alpha = .08f), border = BorderStroke(1.dp, Green.copy(alpha = .2f))) {
+                Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(38.dp).clip(CircleShape).background(Green.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
+                        Icon(DinexNavigationIcons.Check, null, tint = GreenDark, modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text("Estás al día", color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        Text("Anota la luz, el internet o tu pensión y te avisamos a tiempo.", color = Gray, fontSize = 12.sp)
+                    }
+                }
+            }
         } else {
-            reminders.forEach { reminder -> PayLine(reminder, onDelete = { onDelete(reminder) }) }
+            // Frase personal sobre el pago más cercano.
+            Text(
+                reminderHeadline(next), color = NightSoft, fontSize = 13.sp, lineHeight = 19.sp,
+                modifier = Modifier.padding(bottom = 6.dp),
+            )
+            ordered.forEach { reminder -> PayLine(reminder, onDelete = { onDelete(reminder) }) }
         }
-        Spacer(Modifier.height(8.dp))
-        OutlinedButton(
+        Spacer(Modifier.height(12.dp))
+        Button(
             onClick = onAdd,
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(RadiusMd),
-            colors = ButtonDefaults.outlinedButtonColors(contentColor = GreenDark),
-            border = BorderStroke(1.dp, Green.copy(alpha = .35f)),
-        ) { Text("+ Agregar recordatorio") }
+            modifier = Modifier.fillMaxWidth().height(46.dp),
+            shape = CircleShape,
+            colors = ButtonDefaults.buttonColors(containerColor = Green.copy(alpha = .12f), contentColor = GreenDark),
+            elevation = null,
+        ) {
+            Icon(DinexNavigationIcons.Bell, null, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Agregar recordatorio", fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+/** 0 = hoy, 1 = mañana, 2 = con fecha, 3 = sin fecha. Sirve para ordenar y para el color. */
+private fun reminderUrgency(date: String): Int = when (date.trim().uppercase()) {
+    "HOY" -> 0
+    "MAÑANA", "MANANA" -> 1
+    "PRÓXIMO", "PROXIMO", "" -> 3
+    else -> 2
+}
+
+private fun reminderHeadline(reminder: PaymentReminder): String {
+    val amount = if (reminder.amount > 0) " de ${money(reminder.amount)}" else ""
+    return when (reminderUrgency(reminder.date)) {
+        0 -> "Hoy toca pagar ${reminder.title}$amount. Tenlo en cuenta antes de gastar."
+        1 -> "Mañana pagas ${reminder.title}$amount. Sepáralo desde hoy y duerme tranquilo."
+        2 -> "Tu próximo pago es ${reminder.title}$amount, el ${reminder.date.lowercase()}."
+        else -> "Tienes pendiente ${reminder.title}$amount. Ponle fecha para que te avisemos."
     }
 }
 
 @Composable
 internal fun PayLine(reminder: PaymentReminder, onDelete: () -> Unit) {
-    val code = reminder.title.take(3).uppercase()
-    Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        CategoryMark(code, Lime, 34.dp)
-        Spacer(Modifier.width(10.dp))
-        Column(Modifier.weight(1f)) {
-            Text(reminder.title, color = Night, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
-            Text(reminder.date, color = Gray, fontSize = 10.sp)
+    val urgency = reminderUrgency(reminder.date)
+    val tone = when (urgency) { 0 -> Red; 1 -> Orange; 2 -> GreenDark; else -> Gray }
+    val raw = reminder.date.trim()
+    // Hoja de calendario: día y mes si hay fecha; si no, HOY / MAÑ / —.
+    val (big, small) = when {
+        urgency == 0 -> "HOY" to ""
+        urgency == 1 -> "MAÑ" to ""
+        raw.contains('/') || raw.contains('-') -> raw.split('/', '-').let { parts ->
+            parts.first() to (parts.getOrNull(1)?.toIntOrNull()?.let { currentMonthShort(it) } ?: "")
         }
-        Text(money(reminder.amount), color = Night, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-        Spacer(Modifier.width(8.dp))
-        Text("×", modifier = Modifier.clip(CircleShape).clickable(onClick = onDelete).padding(6.dp), color = Gray, fontSize = 16.sp)
+        raw.toIntOrNull() != null -> raw to currentMonthShort()
+        else -> "—" to ""
+    }
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(18.dp)).background(CardRaised.copy(alpha = .7f)).padding(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            Modifier.size(width = 46.dp, height = 50.dp).clip(RoundedCornerShape(12.dp)).background(Card),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(Modifier.fillMaxWidth().height(10.dp).background(tone))
+            Spacer(Modifier.weight(1f))
+            Text(big, color = Night, fontWeight = FontWeight.Black, fontSize = if (big.length > 2) 13.sp else 17.sp)
+            if (small.isNotBlank()) Text(small, color = Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.weight(1f))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(reminder.title, color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
+            Text(
+                when (urgency) { 0 -> "Vence hoy"; 1 -> "Vence mañana"; 2 -> "Vence el ${raw.lowercase()}"; else -> "Sin fecha fija" },
+                color = tone, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+            )
+        }
+        if (reminder.amount > 0) Text(money(reminder.amount), color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Spacer(Modifier.width(4.dp))
+        IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+            Icon(DinexNavigationIcons.Close, "Quitar recordatorio ${reminder.title}", tint = Gray, modifier = Modifier.size(15.dp))
+        }
     }
 }
 

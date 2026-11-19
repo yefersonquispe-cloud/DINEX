@@ -7,6 +7,17 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -215,9 +226,9 @@ private fun BalanceStat(label: String, value: String, modifier: Modifier, expens
     val amountColor = if (expense) Color(0xFFFF7182) else Color(0xFF56FF9C)
     Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = Color(0xFF082B1D).copy(alpha = .96f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = .23f))) {
-        Column(Modifier.padding(horizontal = 12.dp, vertical = 11.dp)) {
-            Text(label, color = Color.White.copy(alpha = .82f), fontSize = 12.sp)
-            Text(value, color = amountColor, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2)
+        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(label, color = Color.White.copy(alpha = .82f), fontSize = 12.sp, textAlign = TextAlign.Center)
+            Text(value, color = amountColor, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2, textAlign = TextAlign.Center)
         }
     }
 }
@@ -279,7 +290,7 @@ internal fun SavingsHero(
         }
         if (totalTarget > 0) {
             Spacer(Modifier.height(10.dp))
-            SavingsProgress(progress, Green, 6.dp)
+            SavingsProgress(progress, Green, 12.dp)
             Spacer(Modifier.height(8.dp))
             Row {
                 Text("Meta total ${moneyGrouped(totalTarget)}", color = Gray, fontSize = 11.sp, modifier = Modifier.weight(1f))
@@ -297,7 +308,7 @@ internal fun SavingsHero(
                 val shown = goals.sortedByDescending { if (it.target > 0) it.saved / it.target else 0.0 }.take(3)
                 shown.forEachIndexed { index, goal ->
                     SavingsGoalRow(goal) { onOpenGoal(goal.id) }
-                    if (index < shown.lastIndex) HorizontalDivider(color = Border.copy(alpha = .7f), modifier = Modifier.padding(start = 58.dp))
+                    if (index < shown.lastIndex) HorizontalDivider(color = Border.copy(alpha = .7f), modifier = Modifier.padding(horizontal = 14.dp))
                 }
             }
             if (goals.size > 3) {
@@ -317,35 +328,32 @@ internal fun SavingsHero(
     }
 }
 
-/** Una meta en una fila compacta: ícono pequeño, nombre, cuánto lleva de cuánto y su barra. */
+/** Una meta en una fila: nombre, avance en porcentaje, cuánto lleva de cuánto y su barra. */
 @Composable
 private fun SavingsGoalRow(goal: SavingsGoal, onOpen: () -> Unit) {
-    val theme = goalTheme(goal.name)
     val name = displayGoalName(goal.name)
     val goalProgress = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
-    Row(
-        Modifier.fillMaxWidth().clickable(onClickLabel = "Abrir meta $name", onClick = onOpen).padding(horizontal = 12.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        Modifier.fillMaxWidth().clickable(onClickLabel = "Abrir meta $name", onClick = onOpen).padding(horizontal = 14.dp, vertical = 14.dp),
     ) {
-        Box(
-            Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(theme.top.copy(alpha = if (DinexThemeState.dark) .22f else .12f)),
-            contentAlignment = Alignment.Center,
-        ) { Image(painterResource(theme.main), null, Modifier.size(24.dp), contentScale = ContentScale.Fit) }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(name, color = Night, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (goal.target > 0) Text(savingsPercent(goalProgress), color = NightSoft, fontWeight = FontWeight.Medium, fontSize = 12.sp)
-            }
-            Spacer(Modifier.height(2.dp))
-            Text(
-                if (goal.target > 0) "${moneyGrouped(goal.saved)} de ${moneyGrouped(goal.target)}" else "${moneyGrouped(goal.saved)} ahorrados",
-                color = Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(name, color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            if (goal.target > 0) Text(
+                savingsPercent(goalProgress),
+                color = if (goalProgress >= 1f) Color.White else GreenDark, fontWeight = FontWeight.Bold, fontSize = 12.sp,
+                modifier = Modifier.clip(CircleShape).background(if (goalProgress >= 1f) Green else Green.copy(alpha = if (DinexThemeState.dark) .22f else .10f))
+                    .padding(horizontal = 9.dp, vertical = 3.dp),
             )
-            if (goal.target > 0) {
-                Spacer(Modifier.height(8.dp))
-                SavingsProgress(goalProgress, Green, 4.dp)
-            }
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(moneyGrouped(goal.saved), color = Night, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            if (goal.target > 0) Text(" de ${moneyGrouped(goal.target)}", color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            else Text(" ahorrados", color = Gray, fontSize = 12.sp)
+        }
+        if (goal.target > 0) {
+            Spacer(Modifier.height(10.dp))
+            SavingsProgress(goalProgress, Green, 10.dp)
         }
     }
 }
@@ -360,22 +368,55 @@ private fun savingsPercent(progress: Float): String {
     }
 }
 
-/** Barra fina y redondeada. Si hay algo ahorrado, siempre se ve al menos un punto de avance. */
+/**
+ * Barra de ahorro de Dinex: degradado verde que avanza animado, hitos al 25, 50 y 75 %
+ * que se encienden al pasarlos, un brillo que recorre el avance y una perla en la punta.
+ */
 @Composable
 private fun SavingsProgress(progress: Float, color: Color, height: androidx.compose.ui.unit.Dp) {
-    val animated by animateFloatAsState(
-        progress.coerceIn(0f, 1f),
-        tween(if (LocalDinexReducedMotion.current) 0 else 520),
-        label = "avance de ahorro",
+    val still = LocalDinexReducedMotion.current
+    val animated by animateFloatAsState(progress.coerceIn(0f, 1f), tween(if (still) 0 else 900, easing = FastOutSlowInEasing), label = "avance de ahorro")
+    val shine by rememberInfiniteTransition(label = "brillo de ahorro").animateFloat(
+        0f, if (still) 0f else 1f, infiniteRepeatable(tween(2200, easing = LinearEasing)), label = "brillo",
     )
-    BoxWithConstraints(Modifier.fillMaxWidth().height(height).clip(CircleShape).background(if (DinexThemeState.dark) CardRaised else Color(0xFFE9F0EB))) {
-        if (progress > 0f) {
-            val width = maxOf(maxWidth * animated, height * 2)
-            Box(
-                Modifier.width(width).fillMaxHeight().clip(CircleShape)
-                    .background(Brush.horizontalGradient(listOf(color.copy(alpha = .78f), color))),
-            )
+    val track = if (DinexThemeState.dark) CardRaised else Color(0xFFE6EFE9)
+    val dark = Color(0xFF0E5A36)
+    val lime = Color(0xFF7BE0A0)
+    val tick = if (DinexThemeState.dark) Color.White.copy(alpha = .18f) else Color(0xFFC9DACF)
+    Canvas(Modifier.fillMaxWidth().height(height).semantics { contentDescription = "Avance ${savingsPercent(progress)}" }) {
+        val h = size.height
+        val r = CornerRadius(h / 2f, h / 2f)
+        drawRoundRect(track, size = size, cornerRadius = r)
+        // Hitos: se ven sobre la pista y se encienden cuando el avance los pasa.
+        listOf(.25f, .5f, .75f).forEach { mark ->
+            val x = size.width * mark
+            val reached = animated >= mark
+            drawCircle(if (reached) Color.White.copy(alpha = .85f) else tick, h * .16f, Offset(x, h / 2f))
         }
+        if (progress <= 0f) return@Canvas
+        val w = maxOf(size.width * animated, h)
+        drawRoundRect(
+            Brush.horizontalGradient(listOf(dark, color, lime), startX = 0f, endX = maxOf(w, 1f)),
+            size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = r,
+        )
+        // Brillo que recorre la parte avanzada.
+        if (!still && w > h * 2) {
+            val band = w * .35f
+            val x = -band + (w + band) * shine
+            clipRect(right = w) {
+                drawRoundRect(
+                    Brush.horizontalGradient(listOf(Color.Transparent, Color.White.copy(alpha = .38f), Color.Transparent), startX = x, endX = x + band),
+                    size = androidx.compose.ui.geometry.Size(w, h), cornerRadius = r,
+                )
+            }
+        }
+        // Hitos ya alcanzados, en blanco sobre el verde.
+        listOf(.25f, .5f, .75f).filter { it * size.width < w - h / 2f }.forEach { mark ->
+            drawCircle(Color.White.copy(alpha = .8f), h * .16f, Offset(size.width * mark, h / 2f))
+        }
+        // Perla en la punta del avance.
+        drawCircle(Color.White, h * .36f, Offset(w - h / 2f, h / 2f))
+        drawCircle(color, h * .2f, Offset(w - h / 2f, h / 2f))
     }
 }
 
