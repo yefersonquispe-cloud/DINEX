@@ -38,6 +38,12 @@ internal data class DinexUiState(
 ) {
     val activeAccount get() = accounts.firstOrNull { it.email == email }
     val initialBalanceRequired get() = email != null && !data.onboardingCompleted && data.movements.isEmpty()
+    val displayName get() = activeAccount?.name ?: email.orEmpty().substringBefore('@')
+    val goals get() = data.savingGoals()
+    val streak get() = data.activeStreak()
+    val savedToday get() = data.streakDay == currentDayIndex()
+    val availableBalance get() = data.availableBalance()
+    val monthMovements get() = data.movements.filter { it.isInCurrentMonth() }
 }
 
 /** Límite de preguntas a Dinex IA por usuario y por día. */
@@ -51,7 +57,7 @@ internal class DinexViewModel(
     private val repository: DinexRepository = DinexRepository(),
     /** null en pruebas: la app funciona solo con los datos del equipo. */
     private val cloud: DinexCloud? = null,
-) : ViewModel() {
+) : ViewModel(), AiQuota {
     init { DinexThemeState.dark = repository.darkMode() }
     private val initialEmail = repository.session()
     private val mutableState = MutableStateFlow(DinexUiState(
@@ -102,8 +108,8 @@ internal class DinexViewModel(
     }
 
     /** Consultas a Dinex IA que le quedan hoy a la cuenta activa (máximo [DAILY_AI_QUERIES]). */
-    fun aiQueriesLeft(): Int = value.email?.let { (DAILY_AI_QUERIES - repository.aiQueriesToday(it)).coerceAtLeast(0) } ?: 0
-    fun recordAiQuery() {
+    override fun aiQueriesLeft(): Int = value.email?.let { (DAILY_AI_QUERIES - repository.aiQueriesToday(it)).coerceAtLeast(0) } ?: 0
+    override fun recordAiQuery() {
         val email = value.email ?: return
         repository.recordAiQuery(email)
         viewModelScope.launch { pushAiUsage(email) }
@@ -113,7 +119,7 @@ internal class DinexViewModel(
      * Antes de cada pregunta se consulta el conteo en la nube, para que el límite valga para la
      * cuenta en todos sus equipos. Sin internet se usa el conteo guardado en este equipo.
      */
-    suspend fun syncedAiQueriesLeft(): Int {
+    override suspend fun syncedAiQueriesLeft(): Int {
         val email = value.email ?: return 0
         val cloud = cloud
         if (cloud != null && cloudSession != null) {
@@ -194,17 +200,30 @@ internal class DinexViewModel(
         repository.saveAccounts(accounts)
         repository.saveProfile(account.email, FinancialData())
         repository.setSession(account.email)
-        mutableState.value = DinexUiState(accounts, account.email, reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
-            budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour)
+        mutableState.value = sessionState(accounts, account.email)
     }
 
     fun authenticate(email: String) {
         if (value.accounts.none { it.email == email }) return
         repository.setSession(email)
-        mutableState.value = DinexUiState(value.accounts, email, repository.profile(email), reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
-            budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour, profilePhoto = repository.profilePhoto(email))
+        mutableState.value = sessionState(value.accounts, email)
         if (value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
     }
+
+    /** Estado al cambiar de sesión: conserva las preferencias del equipo y carga los datos de la cuenta. */
+    private fun sessionState(accounts: List<UserAccount>, email: String?, authBusy: Boolean = false) = DinexUiState(
+        accounts = accounts,
+        email = email,
+        data = email?.let(repository::profile) ?: FinancialData(),
+        reduceMotion = value.reduceMotion,
+        largeText = value.largeText,
+        darkMode = value.darkMode,
+        budgetAlerts = value.budgetAlerts,
+        saveReminderEnabled = value.saveReminderEnabled,
+        saveReminderHour = value.saveReminderHour,
+        profilePhoto = email?.let(repository::profilePhoto).orEmpty(),
+        authBusy = authBusy,
+    )
 
     // ── Cuentas en Firebase ───────────────────────────────────────────────────
     fun signIn(email: String, password: String) = launchAuth {
@@ -358,9 +377,7 @@ internal class DinexViewModel(
         cloudSession = account
         repository.setCloudSession(account)
         repository.setSession(email)
-        mutableState.value = DinexUiState(accounts, email, repository.profile(email), reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
-            budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour, profilePhoto = repository.profilePhoto(email),
-            authBusy = true)
+        mutableState.value = sessionState(accounts, email, authBusy = true)
         if (value.data.streakDay == currentDayIndex()) DinexAlerts.cancelSaveReminder()
     }
 
@@ -445,8 +462,7 @@ internal class DinexViewModel(
         cloudSession = null
         repository.setCloudSession(null)
         repository.setSession(null)
-        mutableState.value = DinexUiState(accounts = value.accounts, reduceMotion = value.reduceMotion, largeText = value.largeText, darkMode = value.darkMode,
-            budgetAlerts = value.budgetAlerts, saveReminderEnabled = value.saveReminderEnabled, saveReminderHour = value.saveReminderHour)
+        mutableState.value = sessionState(value.accounts, email = null)
     }
 
     fun nextMovementId() = (value.data.movements.maxOfOrNull { it.id } ?: 0) + 1

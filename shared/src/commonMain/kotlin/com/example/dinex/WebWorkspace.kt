@@ -1628,44 +1628,22 @@ private fun ShowcasePreview() {
 
 /** Chat de Dinex IA para la web: conversación a la izquierda y contexto y consultas a la derecha. */
 @Composable
-internal fun WebAssistantPage(
-    assistant: GeminiAssistant,
-    data: FinancialData,
-    messages: androidx.compose.runtime.snapshots.SnapshotStateList<ChatMessage>,
-    queriesLeft: () -> Int,
-    syncQueriesLeft: suspend () -> Int,
-    onQueryUsed: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
+internal fun WebAssistantPage(assistant: GeminiAssistant, model: AssistantViewModel, data: FinancialData) {
+    val chat by model.state.collectAsState()
+    val messages = chat.messages
+    val loading = chat.loading
+    val remaining = chat.queriesLeft
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     var draft by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(false) }
-    var remaining by remember { mutableIntStateOf(queriesLeft()) }
-    LaunchedEffect(Unit) { remaining = syncQueriesLeft() }
+    LaunchedEffect(model) { model.refreshQuota() }
     LaunchedEffect(messages.size, loading) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1 + if (loading) 1 else 0) }
     val movements = data.movements
     val streak = data.activeStreak()
 
     fun send(question: String) {
-        val clean = question.trim()
-        if (clean.isBlank() || loading) return
-        loading = true
-        scope.launch {
-            remaining = syncQueriesLeft()
-            if (remaining <= 0) {
-                messages.add(ChatMessage("Ya usaste tus $DAILY_AI_QUERIES consultas de hoy. Mañana podrás hacer $DAILY_AI_QUERIES preguntas más a Dinex IA.", user = false, error = true))
-                loading = false
-                return@launch
-            }
-            messages.add(ChatMessage(clean, user = true))
-            draft = ""
-            val reply = runCatching {
-                assistant.ask(clean, buildFinancialContext(movements, data.dailyLimit, streak, data.savings, data.categoryBudgets))
-            }.getOrElse { GeminiReply("No pude conectarme. Inténtalo de nuevo.", successful = false, engine = GeminiEngine.NONE) }
-            if (reply.successful) { onQueryUsed(); remaining = queriesLeft() }
-            messages.add(ChatMessage(reply.text, user = false, error = !reply.successful, engine = reply.engine))
-            loading = false
-        }
+        if (loading) return
+        model.send(question, assistant, data)
+        if (question == draft) draft = ""
     }
 
     PageFrame(scroll = false) {

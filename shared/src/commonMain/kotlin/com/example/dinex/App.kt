@@ -79,9 +79,9 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     val movements = data.movements
     val reminders = data.reminders
     val dailyLimit = data.dailyLimit
-    val streak = data.activeStreak()
+    val streak = state.streak
     val savings = data.savings
-    val savedToday = data.streakDay == currentDayIndex()
+    val goals = state.goals
     var quickAdd by remember { mutableStateOf(false) }
     var manualIncome by remember { mutableStateOf<Boolean?>(null) }
     var scanResult by remember { mutableStateOf<ScannedPurchase?>(null) }
@@ -131,13 +131,8 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         automation.consumePendingVoiceCommand()?.let { model.handleVoice(it, automation.currentLocationLabel()) }
         onDispose { owner.lifecycle.removeObserver(observer) }
     }
-    val chatMessages = remember {
-        mutableStateListOf(ChatMessage(
-            "Hola, soy Dinex IA. Te ayudo a entender tus gastos y planear tus ahorros.",
-            user = false,
-        ))
-    }
-    val name = state.activeAccount?.name ?: state.email.orEmpty().substringBefore('@')
+    val assistantModel = viewModel(key = "asistente-${state.email}") { AssistantViewModel(model) }
+    val name = state.displayName
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
       // En la web, con pantalla ancha, se usa el diseño de escritorio (WebWorkspace.kt).
@@ -159,8 +154,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 onProfile = { profileOpen = true },
             ),
             assistant = {
-                WebAssistantPage(assistant, data, chatMessages,
-                    queriesLeft = model::aiQueriesLeft, syncQueriesLeft = model::syncedAiQueriesLeft, onQueryUsed = model::recordAiQuery)
+                WebAssistantPage(assistant, assistantModel, data)
             },
         )
       } else {
@@ -193,7 +187,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                     when (page) {
                         1 -> HistoryPage(movements, onAdd = { quickAdd = true }, onDelete = { movementToDelete = it },
                             onImport = { importDialog = true }, onExport = { exportDialog = true })
-                        2 -> PlanPage(movements.filter { it.isInCurrentMonth() }, dailyLimit, reminders, onDailyLimitChange = model::setDailyLimit,
+                        2 -> PlanPage(state.monthMovements, dailyLimit, reminders, onDailyLimitChange = model::setDailyLimit,
                             onAddReminder = { reminderDialog = true }, onDeleteReminder = { reminderToResolve = it }, categoryBudgets = data.categoryBudgets,
                             historyMovements = movements,
                             onCategoryBudgetsSave = { model.setCategoryBudgets(it) }, onCategoryBudgetsReset = model::resetCategoryBudgets)
@@ -203,10 +197,10 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                             locationAvailable = locationAvailable,
                             onRequestLocation = { automation.requestLocationPermission() },
                         )
-                        else -> HomePage(movements, dailyLimit, streak, savings, countLabel(data.savingGoals().size, "meta", "metas"), data.savingGoals().sumOf { it.target },
+                        else -> HomePage(movements, dailyLimit, streak, savings, countLabel(goals.size, "meta", "metas"), goals.sumOf { it.target },
                             onDailyLimitChange = model::setDailyLimit,
                             onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
-                            goals = data.savingGoals(), onOpenGoal = { selectedGoalId = it; goalDetails = true },
+                            goals = goals, onOpenGoal = { selectedGoalId = it; goalDetails = true },
                             onScan = { scanner() }, onVoice = { automationDialog = true },
                             onGoals = { savingGoalId = null; savingDialog = true },
                             notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
@@ -233,7 +227,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 ) {
                     SavingsBubble(
                         streak = streak,
-                        savedToday = savedToday,
+                        savedToday = state.savedToday,
                         onSaveToday = {
                             walletBubbleOpen = false
                             savingGoalId = null
@@ -271,14 +265,14 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             onDismiss = { scanResult = null; model.showMessage("Foto descartada") },
             onSave = { model.saveMovement(it); scanResult = null })
     }
-    if (savingDialog) SavingDialog(available = data.availableBalance(), goals = data.savingGoals(), initialGoalId = savingGoalId,
+    if (savingDialog) SavingDialog(available = state.availableBalance, goals = goals, initialGoalId = savingGoalId,
         onDismiss = { savingDialog = false }, onSave = { entry -> if (model.saveSaving(entry)) {
             savingDialog = false; goalDetails = true
             selectedGoalId = model.state.value.lastSavedGoalId
         } })
     if (goalDetails) {
-        val goal = data.savingGoals().firstOrNull { it.id == selectedGoalId }
-        if (goal == null) SavingsGoalsDialog(data.savingGoals(), onOpen = { selectedGoalId = it },
+        val goal = goals.firstOrNull { it.id == selectedGoalId }
+        if (goal == null) SavingsGoalsDialog(goals, onOpen = { selectedGoalId = it },
             onNew = { goalDetails = false; savingGoalId = null; savingDialog = true }, onDismiss = { goalDetails = false })
         else key(goal.id) { SavingsGoalDialog(goal, onDismiss = { selectedGoalId = null },
             onAdd = { goalDetails = false; savingGoalId = goal.id; savingDialog = true },
@@ -322,8 +316,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                         TextButton(onClick = { assistantOpen = false }) { Text("Cerrar") }
                     }
                     HorizontalDivider(color = Border)
-                    Box(Modifier.weight(1f)) { AssistantPage(assistant, movements, dailyLimit, streak, savings, chatMessages, data.categoryBudgets,
-                        queriesLeft = model::aiQueriesLeft, syncQueriesLeft = model::syncedAiQueriesLeft, onQueryUsed = model::recordAiQuery) }
+                    Box(Modifier.weight(1f)) { AssistantPage(assistant, assistantModel, data) }
                 }
             }
         }

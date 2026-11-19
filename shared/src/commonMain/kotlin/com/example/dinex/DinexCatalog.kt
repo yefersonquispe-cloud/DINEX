@@ -1,8 +1,6 @@
 package com.example.dinex
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.material3.lightColorScheme
-import androidx.compose.material3.darkColorScheme
 
 internal val streakLevels = listOf(
     StreakLevel("Cobre", 1, Color(0xFFC97843)),
@@ -32,62 +30,4 @@ internal val categories = listOf(
     CategoryInfo("Estudios", "ES", Color(0xFF8E65C5), 180.0),
     CategoryInfo("Entretenimiento", "OC", Color(0xFFD89945), 160.0),
     CategoryInfo("Otros", "OT", Color(0xFF71827A), 200.0),
-)
-
-internal val colors get() = if (DinexThemeState.dark) darkColorScheme(
-    primary = GreenDark,
-    onPrimary = Color(0xFF103C27),
-    primaryContainer = Mint,
-    onPrimaryContainer = GreenDark,
-    secondary = Indigo,
-    onSecondary = Color(0xFF2A2044),
-    secondaryContainer = CardRaised,
-    onSecondaryContainer = Indigo,
-    tertiary = Orange,
-    onTertiary = Color(0xFF4A3019),
-    tertiaryContainer = CardRaised,
-    onTertiaryContainer = Orange,
-    background = AppBg,
-    onBackground = Night,
-    surface = Card,
-    onSurface = Night,
-    surfaceVariant = CardRaised,
-    onSurfaceVariant = Gray,
-    // Dialogs, menus and sheets use these tones; without them Material falls back to its lilac defaults.
-    surfaceContainerLowest = Card,
-    surfaceContainerLow = Card,
-    surfaceContainer = Card,
-    surfaceContainerHigh = Card,
-    surfaceContainerHighest = CardRaised,
-    outline = Border,
-    error = Red,
-    onError = Color(0xFF3E1821),
-) else lightColorScheme(
-    primary = Green,
-    onPrimary = Color.White,
-    primaryContainer = Mint,
-    onPrimaryContainer = GreenDark,
-    secondary = Indigo,
-    onSecondary = Color.White,
-    secondaryContainer = Color(0xFFEDE9F7),
-    onSecondaryContainer = Color(0xFF3D316E),
-    tertiary = Orange,
-    onTertiary = Color.White,
-    tertiaryContainer = Color(0xFFFFEBD4),
-    onTertiaryContainer = Color(0xFF704111),
-    background = AppBg,
-    onBackground = Night,
-    surface = Card,
-    onSurface = Night,
-    surfaceVariant = CardRaised,
-    onSurfaceVariant = Gray,
-    // Dialogs, menus and sheets use these tones; without them Material falls back to its lilac defaults.
-    surfaceContainerLowest = Card,
-    surfaceContainerLow = Card,
-    surfaceContainer = Card,
-    surfaceContainerHigh = Card,
-    surfaceContainerHighest = CardRaised,
-    outline = Border,
-    error = Red,
-    onError = Color.White,
 )

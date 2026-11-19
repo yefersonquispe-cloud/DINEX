@@ -55,6 +55,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -62,14 +63,6 @@ import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 import kotlin.time.TimeSource
-
-private const val RefreshEveryMillis = 60_000L
-
-/** Last prices, kept while the app runs so reopening the screen does not spend API calls. */
-private object MarketCache {
-    var snapshot: MarketSnapshot? = null
-    var updatedAt: TimeSource.Monotonic.ValueTimeMark? = null
-}
 
 private enum class MarketFilter(val label: String) { All("Todo"), Currencies("Divisas"), Metals("Metales"), Crypto("Cripto") }
 private enum class CryptoSort(val label: String) { MarketCap("Capitalización"), Gainers("Más suben"), Losers("Más bajan") }
@@ -84,11 +77,12 @@ private class PriceDisplay(val inUsd: Boolean) {
 /** Full-screen live market: currency converter, exchange rates, metals and the top cryptocurrencies. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun MarketScreen(onClose: () -> Unit) {
-    var snapshot by remember { mutableStateOf(MarketCache.snapshot) }
-    var loading by remember { mutableStateOf(MarketCache.snapshot == null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var updatedAt by remember { mutableStateOf(MarketCache.updatedAt) }
+internal fun MarketScreen(onClose: () -> Unit, model: MarketViewModel = viewModel { MarketViewModel() }) {
+    val market by model.state.collectAsState()
+    val snapshot = market.snapshot
+    val loading = market.loading
+    val error = market.error
+    val updatedAt = market.updatedAt
     var now by remember { mutableStateOf(TimeSource.Monotonic.markNow()) }
     var inUsd by remember { mutableStateOf(false) }
     var filter by remember { mutableStateOf(MarketFilter.All) }
@@ -96,31 +90,7 @@ internal fun MarketScreen(onClose: () -> Unit) {
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
-    suspend fun refresh() {
-        loading = true
-        runCatching { loadMarketSnapshot() }
-            .onSuccess {
-                snapshot = it; error = null; updatedAt = TimeSource.Monotonic.markNow()
-                MarketCache.snapshot = it; MarketCache.updatedAt = updatedAt
-            }
-            .onFailure { failure ->
-                // CoinGecko's free tier answers 429 when one network asks too often.
-                error = if (failure.message.orEmpty().contains("429")) "Hay muchas consultas seguidas. Reintentamos en un minuto."
-                else "No pudimos actualizar los precios. Revisa tu conexión."
-            }
-        loading = false
-    }
-    // Prices refresh every minute while the screen is open, a pace the free API allows.
-    LaunchedEffect(Unit) {
-        updatedAt?.let { last ->
-            val wait = RefreshEveryMillis - last.elapsedNow().inWholeMilliseconds
-            if (wait > 0) delay(wait)
-        }
-        while (true) {
-            refresh()
-            delay(RefreshEveryMillis)
-        }
-    }
+    LaunchedEffect(model) { model.keepUpdated() }
     LaunchedEffect(Unit) {
         while (true) {
             delay(1_000)
@@ -146,18 +116,18 @@ internal fun MarketScreen(onClose: () -> Unit) {
                     inUsd = inUsd,
                     onCurrencyChange = { inUsd = it },
                     onClose = onClose,
-                    onRefresh = { scope.launch { refresh() } },
+                    onRefresh = model::refresh,
                 )
             }
             val data = snapshot
             when {
-                data == null && error != null -> MarketMessage(error!!, onRetry = { scope.launch { refresh() } })
+                data == null && error != null -> MarketMessage(error, onRetry = model::refresh)
                 data == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     CircularProgressIndicator(color = Green)
                 }
                 else -> PullToRefreshBox(
                     isRefreshing = loading,
-                    onRefresh = { scope.launch { refresh() } },
+                    onRefresh = model::refresh,
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     MarketContent(
