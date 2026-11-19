@@ -87,7 +87,7 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
                     runCatching { startForeground(NOTIFICATION_ID, listeningNotification()) }
                     handler.removeCallbacks(restartWake)
                     if (!commandActive) stopRecognizer()
-                    overlay.hide(); return START_NOT_STICKY
+                    overlay.hide(); return keepAlive()
                 }
             }
             ACTION_APP_HIDDEN -> {
@@ -95,7 +95,7 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
                 if (!foregroundStarted) { stopSelf(); return START_NOT_STICKY }
                 if (prefs().getBoolean(KEY_ENABLED, false)) overlay.render(idleUi(), openPanel = false)
                 if (!commandActive) scheduleWake(600)
-                return START_NOT_STICKY
+                return keepAlive()
             }
             ACTION_STOP -> { disable(); return START_NOT_STICKY }
             ACTION_RESUME -> {
@@ -103,7 +103,7 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
                 commandActive = false
                 touch()
                 scheduleWake(400)
-                return START_NOT_STICKY
+                return keepAlive()
             }
             ACTION_RESUME_HANDS_FREE -> {
                 if (!foregroundStarted) { stopSelf(); return START_NOT_STICKY }
@@ -111,15 +111,22 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
                 touch()
                 updateNotification()
                 scheduleWake(300)
-                return START_NOT_STICKY
+                return keepAlive()
             }
-            ACTION_LISTEN -> if (foregroundStarted) { onListen(); return START_NOT_STICKY }
+            ACTION_LISTEN -> if (foregroundStarted) { onListen(); return keepAlive() }
             // Solo en la versión de desarrollo: simula una frase dictada para probar sin micrófono.
             ACTION_DEBUG_PHRASE -> if (foregroundStarted && isDebuggable()) {
                 val phrase = intent.getStringExtra(EXTRA_PHRASE).orEmpty()
                 handler.postDelayed({ if (!destroyed) process(phrase) }, 300)
-                return START_NOT_STICKY
+                return keepAlive()
             }
+        }
+        // Sin intent = el sistema reinició el servicio después de cerrarlo (ahorro de batería).
+        val systemRestart = intent == null
+        if (systemRestart) {
+            if (!prefs().getBoolean(KEY_ENABLED, false)) { stopSelf(); return START_NOT_STICKY }
+            // El proceso murió, así que Dinex ya no está en pantalla: la burbuja debe volver a verse.
+            prefs().edit().putBoolean(KEY_APP_VISIBLE, false).apply()
         }
         if (!hasMicPermission()) { disable(); return START_NOT_STICKY }
         try {
@@ -128,7 +135,8 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
             prefs().edit().putBoolean(KEY_ENABLED, true).apply()
         } catch (_: SecurityException) {
             // Android 14+ no permite abrir el micrófono si la app no está a la vista.
-            prefs().edit().putBoolean(KEY_ENABLED, false).apply()
+            // Si fue un reinicio del sistema, Oye Dinex sigue activado y vuelve al abrir Dinex.
+            if (!systemRestart) prefs().edit().putBoolean(KEY_ENABLED, false).apply()
             stopSelf()
             return START_NOT_STICKY
         }
@@ -138,17 +146,21 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
         handler.post(idleCheck)
         if (!prefs().getBoolean(KEY_APP_VISIBLE, false)) overlay.render(idleUi(), openPanel = false)
         if (!commandActive) scheduleWake(200)
-        return START_NOT_STICKY
+        // Si el sistema cierra Dinex para ahorrar batería, Android vuelve a encender la burbuja.
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    /** Mientras Oye Dinex está encendido, Android debe volver a iniciarlo si lo cierra. */
+    private fun keepAlive() = if (foregroundStarted) START_STICKY else START_NOT_STICKY
 
     override fun onDestroy() {
         destroyed = true
         handler.removeCallbacksAndMessages(null)
         stopRecognizer()
         overlay.hide()
-        prefs().edit().putBoolean(KEY_ENABLED, false).apply()
+        // Solo el usuario apaga Oye Dinex (disable). Si lo cerró el sistema, queda activado para volver.
         super.onDestroy()
     }
 
