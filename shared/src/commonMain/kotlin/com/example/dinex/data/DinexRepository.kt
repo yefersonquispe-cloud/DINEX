@@ -114,8 +114,9 @@ internal class DinexRepository(
     }
     fun setCloudSession(session: CloudSession?) =
         store.put("cloud_session", session?.let { "${it.uid}|${it.email}|${it.refreshToken}" })
-    fun reduceMotion(): Boolean = store.get("reduce_motion") == "true"
-    fun setReduceMotion(value: Boolean) = store.put("reduce_motion", value.toString())
+    // Clave nueva: la anterior podía quedar activada sin querer desde el botón de la entrada.
+    fun reduceMotion(): Boolean = store.get("reduce_motion_v2") == "true"
+    fun setReduceMotion(value: Boolean) = store.put("reduce_motion_v2", value.toString())
     fun largeText(): Boolean = store.get("large_text") == "true"
     fun setLargeText(value: Boolean) = store.put("large_text", value.toString())
     fun budgetAlertsEnabled(): Boolean = store.get("alert_budget") != "false"
