@@ -1,5 +1,7 @@
 package com.example.dinex
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
@@ -78,6 +80,10 @@ internal fun AuthFlow(
     var attempted by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
+    val reducedMotion = LocalDinexReducedMotion.current
+    val cardRise = remember { Animatable(if (reducedMotion) 1f else 0f) }
+    LaunchedEffect(Unit) { cardRise.animateTo(1f, tween(if (reducedMotion) 0 else 620, delayMillis = if (reducedMotion) 0 else 160, easing = FastOutSlowInEasing)) }
+
     val normalizedEmail = email.trim().lowercase()
     val emailValid = normalizedEmail.matches(Regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$"))
     val nameValid = name.trim().length >= 2 && name.any(Char::isLetter)
@@ -133,6 +139,10 @@ internal fun AuthFlow(
                 )
                 Spacer(Modifier.height(22.dp))
                 Surface(
+                    modifier = Modifier.graphicsLayer {
+                        alpha = cardRise.value
+                        translationY = (1f - cardRise.value) * 90.dp.toPx()
+                    },
                     shape = RoundedCornerShape(22.dp),
                     color = Card.copy(alpha = .96f),
                     border = androidx.compose.foundation.BorderStroke(1.dp, Border),
