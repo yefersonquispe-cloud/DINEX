@@ -2,11 +2,20 @@
 
 package com.example.dinex
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -39,6 +49,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
@@ -120,8 +133,6 @@ internal class WebActions(
     val onAddReminder: () -> Unit,
     val onResolveReminder: (PaymentReminder) -> Unit,
     val onProfile: () -> Unit,
-    val onMarket: () -> Unit,
-    val onTips: () -> Unit,
 )
 
 // ---------------------------------------------------------------- Paleta y tipografía
@@ -228,8 +239,17 @@ internal fun WebWorkspace(
             Column(Modifier.weight(1f).fillMaxHeight()) {
                 WebTopBar(page, data.activeStreak(), state.darkMode, name, state.profilePhoto,
                     onToggleTheme = { model.setDarkMode(!state.darkMode) }, onProfile = actions.onProfile)
-                Box(Modifier.weight(1f).fillMaxWidth()) {
-                    when (page) {
+                val reduced = LocalDinexReducedMotion.current
+                AnimatedContent(
+                    targetState = page,
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    transitionSpec = {
+                        val time = if (reduced) 0 else 240
+                        (fadeIn(tween(time)) + slideInVertically(tween(time)) { if (reduced) 0 else 18 }) togetherWith fadeOut(tween(time / 2))
+                    },
+                    label = "página web",
+                ) { current ->
+                    when (current) {
                         WebPage.SUMMARY -> SummaryPage(data, actions) { page = it }
                         WebPage.MOVEMENTS -> MovementsWebPage(data.movements, actions)
                         WebPage.BUDGET -> BudgetWebPage(model, data, actions)
@@ -338,10 +358,12 @@ private fun SidebarItem(label: String, icon: ImageVector, active: Boolean, compa
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val shape = RoundedCornerShape(10.dp)
-    Box(Modifier.padding(vertical = 2.dp)) {
+    val fill by animateColorAsState(if (active) W.sidebarActive else if (hovered) W.sidebarActive.copy(alpha = .55f) else W.sidebarActive.copy(alpha = 0f), tween(160), label = "fondo del menú")
+    val nudge by animateFloatAsState(if (hovered && !active && !LocalDinexReducedMotion.current) 3f else 0f, tween(160), label = "desplazamiento del menú")
+    Box(Modifier.padding(vertical = 2.dp).graphicsLayer { translationX = nudge * density }) {
         Row(
             Modifier.then(if (compact) Modifier.size(48.dp) else Modifier.fillMaxWidth().height(42.dp)).clip(shape)
-                .background(if (active) W.sidebarActive else if (hovered) W.sidebarActive.copy(alpha = .55f) else Color.Transparent)
+                .background(fill)
                 .hoverable(interaction).clickable(onClickLabel = label, onClick = onClick).pointerHoverIcon(PointerIcon.Hand)
                 .padding(horizontal = if (compact) 0.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -450,7 +472,17 @@ private fun PageFrame(scroll: Boolean = true, content: @Composable ColumnScope.(
 
 @Composable
 private fun WCard(modifier: Modifier = Modifier, padding: Dp = 22.dp, content: @Composable ColumnScope.() -> Unit) {
-    Column(modifier.clip(CardShape).background(W.surface).border(1.dp, W.line, CardShape).padding(padding), content = content)
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val reduced = LocalDinexReducedMotion.current
+    val lift by animateFloatAsState(if (hovered && !reduced) 1f else 0f, tween(180), label = "tarjeta elevada")
+    Column(
+        modifier.dinexEntrance().graphicsLayer { translationY = -lift * 3.dp.toPx() }
+            .shadow((lift * 14).dp, CardShape, ambientColor = W.forest.copy(alpha = .18f), spotColor = W.forest.copy(alpha = .18f))
+            .hoverable(interaction).clip(CardShape).background(W.surface)
+            .border(1.dp, lerp(W.line, W.brand, lift * .35f), CardShape).padding(padding),
+        content = content,
+    )
 }
 
 @Composable
@@ -479,10 +511,11 @@ private fun LinkButton(text: String, onClick: () -> Unit) {
 @Composable
 private fun WButton(text: String, icon: ImageVector? = null, primary: Boolean = false, onClick: () -> Unit) {
     val shape = RoundedCornerShape(10.dp)
+    val interaction = remember { MutableInteractionSource() }
     Row(
-        Modifier.height(38.dp).clip(shape).background(if (primary) W.brand else W.surface)
+        Modifier.dinexPress(interaction).height(38.dp).clip(shape).background(if (primary) W.brand else W.surface)
             .then(if (primary) Modifier else Modifier.border(1.dp, W.line, shape))
-            .clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 14.dp),
+            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         icon?.let { Icon(it, null, tint = if (primary) Color.White else W.ink2, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp)) }
@@ -570,6 +603,15 @@ private fun EmptyNote(title: String, body: String, action: String? = null, onAct
     }
 }
 
+/** Va de 0 a 1 al aparecer: hace crecer gráficos y barras. */
+@Composable
+private fun rememberGrow(key: Any? = Unit, durationMillis: Int = 800): Float {
+    val reduced = LocalDinexReducedMotion.current
+    val grow = remember(key) { Animatable(if (reduced) 1f else 0f) }
+    LaunchedEffect(key) { grow.animateTo(1f, tween(durationMillis, easing = FastOutSlowInEasing)) }
+    return grow.value
+}
+
 /**
  * Dos columnas en pantallas anchas; una sola columna cuando no alcanza el espacio.
  * Con [equalHeight], ambas columnas miden lo mismo y la tarjeta que recibe `stretch`
@@ -621,6 +663,7 @@ private fun SummaryPage(data: FinancialData, actions: WebActions, onNavigate: (W
             TodayCard(movements.filter { !it.income && it.isToday() }.sumOf { it.amount }, data.dailyLimit.toDouble(), data.activeStreak(),
                 data.streakDay == currentDayIndex(), actions, stretch) { onNavigate(WebPage.BUDGET) }
         })
+        MonthInsights(month.filterNot { it.income }, movements.filter { !it.income && it.monthKey() == today.year * 12 + today.month - 2 }.sumOf { it.amount }, today)
         Columns(ratio = 1.55f, left = { stretch ->
             DailySpendingCard(month, today.year, today.month, stretch)
         }, right = { stretch ->
@@ -632,6 +675,47 @@ private fun SummaryPage(data: FinancialData, actions: WebActions, onNavigate: (W
             GoalsCompactCard(data.savingGoals(), actions) { onNavigate(WebPage.GOALS) }
             RemindersCard(data.reminders, actions, stretch)
         })
+    }
+}
+
+/** Tres datos del mes calculados con tus movimientos: tendencia, proyección y categoría principal. */
+@Composable
+private fun MonthInsights(expenses: List<Movement>, previousMonth: Double, today: DinexDate) {
+    val spent = expenses.sumOf { it.amount }
+    val projected = spent / today.day.coerceAtLeast(1) * daysInMonth(today.year, today.month)
+    val top = expenses.groupBy { it.category }.map { it.key to it.value.sumOf { item -> item.amount } }.maxByOrNull { it.second }
+    val change = if (previousMonth > 0) (projected - previousMonth) / previousMonth * 100 else null
+    BoxWithConstraints(Modifier.fillMaxWidth()) {
+        val tiles: List<@Composable (Modifier) -> Unit> = listOf(
+            { InsightTile(DinexNavigationIcons.Analysis, "Proyección del mes", moneyGrouped(rememberCountUp(projected)), "Si sigues a este ritmo", W.brand, it) },
+            { InsightTile(
+                if (change != null && change > 0) DinexNavigationIcons.ArrowUp else DinexNavigationIcons.ArrowDown, "Frente al mes pasado",
+                change?.let { value -> "${if (value > 0) "+" else ""}${fixed(value, 0)}%" } ?: "Sin datos",
+                if (change == null) "Aún no hay un mes anterior" else if (change > 0) "Vas gastando más" else "Vas gastando menos",
+                if (change != null && change > 0) W.negative else W.positive, it,
+            ) },
+            { InsightTile(DinexNavigationIcons.Target, "Categoría principal", top?.first ?: "Sin gastos",
+                top?.let { pair -> "${moneyGrouped(pair.second)} · ${percentLabel(pair.second, spent)} del mes" } ?: "Registra tu primer gasto", W.warning, it) },
+        )
+        if (maxWidth >= 700.dp) Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(20.dp)) { tiles.forEach { tile -> tile(Modifier.weight(1f).fillMaxHeight()) } }
+        else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { tiles.forEach { tile -> tile(Modifier.fillMaxWidth()) } }
+    }
+}
+
+@Composable
+private fun InsightTile(icon: ImageVector, label: String, value: String, note: String, tint: Color, modifier: Modifier) {
+    WCard(modifier, padding = 18.dp) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                Text(label, color = W.ink3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(value, color = W.ink, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(note, color = W.ink2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
     }
 }
 
@@ -653,7 +737,7 @@ private fun BalanceHero(available: Double, monthIncome: Double, monthExpense: Do
             Text("${currentMonthName(today.month)} ${today.year}", color = W.sidebarMuted, fontSize = 12.sp)
         }
         Spacer(Modifier.height(8.dp))
-        Text(moneyGrouped(available), color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
+        Text(moneyGrouped(rememberCountUp(available)), color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
         Spacer(Modifier.height(14.dp))
         // Evolución del saldo en el mes.
         val net = month.sumOf { if (it.income) it.amount else -it.amount }
@@ -703,6 +787,7 @@ private fun HeroStat(label: String, value: String, tint: Color, modifier: Modifi
 
 @Composable
 private fun Sparkline(points: List<Double>, modifier: Modifier) {
+    val grow = rememberGrow(points.size, 1100)
     Canvas(modifier) {
         if (points.size < 2) {
             drawLine(W.lime.copy(alpha = .6f), Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 2.dp.toPx(), StrokeCap.Round)
@@ -712,9 +797,11 @@ private fun Sparkline(points: List<Double>, modifier: Modifier) {
         fun at(i: Int) = Offset(size.width * i / (points.size - 1), size.height - ((points[i] - lo) / range * (size.height * .85f)).toFloat() - size.height * .075f)
         val line = Path().apply { moveTo(at(0).x, at(0).y); for (i in 1 until points.size) lineTo(at(i).x, at(i).y) }
         val area = Path().apply { addPath(line); lineTo(size.width, size.height); lineTo(0f, size.height); close() }
-        drawPath(area, Brush.verticalGradient(listOf(W.lime.copy(alpha = .28f), Color.Transparent)))
-        drawPath(line, W.lime, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-        drawCircle(W.lime, 4.dp.toPx(), at(points.lastIndex))
+        clipRect(right = size.width * grow) {
+            drawPath(area, Brush.verticalGradient(listOf(W.lime.copy(alpha = .28f), Color.Transparent)))
+            drawPath(line, W.lime, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+        }
+        if (grow >= 1f) drawCircle(W.lime, 4.dp.toPx(), at(points.lastIndex))
     }
 }
 
@@ -774,6 +861,7 @@ private fun DailySpendingCard(month: List<Movement>, year: Int, monthNumber: Int
     val total = values.sum()
     val average = if (today > 0) values.take(today).sum() / today else 0.0
     var hover by remember { mutableStateOf<Int?>(null) }
+    val grow = rememberGrow(monthNumber)
     WCard(modifier.fillMaxWidth()) {
         CardTitle("Gasto diario", "${currentMonthName(monthNumber)} · total ${moneyGrouped(total)} · promedio ${moneyGrouped(average)} por día")
         Spacer(Modifier.height(18.dp))
@@ -808,7 +896,7 @@ private fun DailySpendingCard(month: List<Movement>, year: Int, monthNumber: Int
                 values.forEachIndexed { index, value ->
                     val day = index + 1
                     val x = left + slot * index + (slot - barW) / 2
-                    val h = ((bottom - top) * value / nice).toFloat()
+                    val h = ((bottom - top) * value / nice).toFloat() * grow
                     val color = when {
                         day > today -> faded.copy(alpha = .5f)
                         day == today -> lime
@@ -871,10 +959,11 @@ private fun CategoryDonutCard(expenses: List<Movement>, modifier: Modifier = Mod
             Box(Modifier.size(150.dp), contentAlignment = Alignment.Center) {
                 val colors = groups.mapIndexed { i, g -> categoryColor(g.first, i) }
                 val surface = W.surface
+                val grow = rememberGrow(groups.size, 900)
                 Canvas(Modifier.fillMaxSize()) {
                     val stroke = 22.dp.toPx(); var start = -90f
                     groups.forEachIndexed { i, (_, value) ->
-                        val sweep = (value / total * 360).toFloat()
+                        val sweep = (value / total * 360).toFloat() * grow
                         drawArc(colors[i], start, sweep, false, Offset(stroke / 2, stroke / 2), Size(size.width - stroke, size.height - stroke), style = Stroke(stroke))
                         if (groups.size > 1) drawArc(surface, start + sweep - .8f, 1.6f, false, Offset(stroke / 2, stroke / 2), Size(size.width - stroke, size.height - stroke), style = Stroke(stroke + 2))
                         start += sweep
@@ -1052,7 +1141,9 @@ private fun MovementsWebPage(movements: List<Movement>, actions: WebActions) {
                 )
             } else {
                 LazyColumn(Modifier.fillMaxSize()) {
-                    items(visible) { item -> MovementTableRow(item) { actions.onDeleteMovement(item) } }
+                    items(visible, key = { "${it.id}-${it.epochDay()}-${it.title}" }) { item ->
+                        Box(if (LocalDinexReducedMotion.current) Modifier else Modifier.animateItem()) { MovementTableRow(item) { actions.onDeleteMovement(item) } }
+                    }
                 }
             }
         }
@@ -1339,6 +1430,7 @@ private fun MonthlyComparisonCard(movements: List<Movement>, selected: Int, modi
         val measurer = rememberTextMeasurer()
         val labelStyle = TextStyle(color = W.ink3, fontSize = 10.sp, fontFamily = MaterialTheme.typography.bodySmall.fontFamily)
         val positive = W.brand; val negative = W.negative; val line = W.line
+        val grow = rememberGrow(selected)
         Canvas(Modifier.fillMaxWidth().weight(1f).heightIn(min = 220.dp)) {
             val left = 48.dp.toPx(); val bottom = size.height - 22.dp.toPx(); val top = 6.dp.toPx()
             val top0 = niceTop(max(series.maxOf { max(it.first, it.second) }, 1.0))
@@ -1353,7 +1445,7 @@ private fun MonthlyComparisonCard(movements: List<Movement>, selected: Int, modi
             series.forEachIndexed { i, (inc, exp) ->
                 val cx = left + slot * i + slot / 2
                 listOf(inc to positive, exp to negative).forEachIndexed { j, (value, color) ->
-                    val h = ((bottom - top) * value / top0).toFloat()
+                    val h = ((bottom - top) * value / top0).toFloat() * grow
                     if (h > 0) drawRoundRect(color.copy(alpha = if (keys[i] == selected) 1f else .55f), Offset(if (j == 0) cx - barW - 2 else cx + 2, bottom - h), Size(barW, h), CornerRadius(3.dp.toPx()))
                 }
                 val label = measurer.measure(monthKeyShort(keys[i]), labelStyle)
