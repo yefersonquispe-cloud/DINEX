@@ -5,14 +5,27 @@ val dinexLocalProperties = Properties().apply {
     val propertiesFile = rootProject.file("local.properties")
     if (propertiesFile.exists()) propertiesFile.inputStream().use(::load)
 }
-// Si existe el servidor seguro de Dinex IA, la clave de Gemini NO se incluye en el APK.
-val dinexAiProxyConfigured = dinexLocalProperties.getProperty("DINEX_AI_PROXY_URL", "").ifBlank {
-    providers.environmentVariable("DINEX_AI_PROXY_URL").orNull ?: ""
-}.startsWith("https://")
-val geminiApiKey = if (dinexAiProxyConfigured) "" else dinexLocalProperties.getProperty("GEMINI_API_KEY", "").ifBlank {
-    providers.environmentVariable("GOOGLE_API_KEY").orNull
-        ?: providers.environmentVariable("GEMINI_API_KEY").orNull
-        ?: ""
+// Firebase AI Logic: la configuración de Android sale de google-services.json (no se sube a Git).
+// La clave de Gemini ya no se incluye en el APK; Firebase la guarda en su servidor.
+fun firebaseAndroidConfig(packageName: String): Map<String, String> {
+    val file = rootProject.file("androidApp/google-services.json")
+    if (!file.exists()) return emptyMap()
+    @Suppress("UNCHECKED_CAST")
+    val json = groovy.json.JsonSlurper().parse(file) as Map<String, Any?>
+    val project = json["project_info"] as? Map<String, Any?> ?: return emptyMap()
+    val client = (json["client"] as? List<Map<String, Any?>>).orEmpty().firstOrNull {
+        ((it["client_info"] as? Map<*, *>)?.get("android_client_info") as? Map<*, *>)?.get("package_name") == packageName
+    } ?: return emptyMap()
+    val appId = (client["client_info"] as? Map<*, *>)?.get("mobilesdk_app_id")?.toString().orEmpty()
+    val apiKey = ((client["api_key"] as? List<*>)?.firstOrNull() as? Map<*, *>)?.get("current_key")?.toString().orEmpty()
+    if (appId.isBlank() || apiKey.isBlank()) return emptyMap()
+    return mapOf(
+        "google_app_id" to appId,
+        "google_api_key" to apiKey,
+        "project_id" to project["project_id"].toString(),
+        "gcm_defaultSenderId" to project["project_number"].toString(),
+        "google_storage_bucket" to project["storage_bucket"]?.toString().orEmpty(),
+    )
 }
 
 plugins {
@@ -34,6 +47,10 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.compose.ui)
     implementation(libs.androidx.work.runtime)
+    implementation(platform(libs.firebase.bom))
+    // App Check: Play Integrity en la versión publicada y un token de prueba en las versiones debug.
+    releaseImplementation(libs.firebase.appcheck.playintegrity)
+    debugImplementation(libs.firebase.appcheck.debug)
 
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
@@ -49,7 +66,7 @@ android {
         targetSdk = libs.versions.android.targetSdk.get().toInt()
         versionCode = 7
         versionName = "1.6"
-        manifestPlaceholders["geminiApiKey"] = geminiApiKey
+        firebaseAndroidConfig(applicationId.orEmpty()).forEach { (name, value) -> resValue("string", name, value) }
     }
     packaging {
         resources {
@@ -83,5 +100,6 @@ android {
     }
     buildFeatures {
         compose = true
+        resValues = true
     }
 }

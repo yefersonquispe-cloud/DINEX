@@ -83,10 +83,11 @@ actual fun rememberReceiptScanner(
             val reading = raw.takeIf { it.isNotBlank() }?.let(::readReceiptText)
             val localResult = reading?.takeIf { it.kind != ReceiptKind.PRODUCTO && it.total != null }?.toPurchase()
                 ?: parsePurchase(text, labels, barcode, openFoodProduct)
-            val geminiKey = readGeminiApiKey(context).takeIf { it.isNotBlank() } ?: "servidor".takeIf { dinexAiProxyEnabled }
-            val geminiResult = geminiKey?.let { apiKey ->
-                runCatching { analyzePurchaseWithGemini(context, uri, apiKey, localResult, barcode, raw) }.getOrNull()
-            }
+            val geminiResult = if (cloudGeminiAvailable(context)) {
+                runCatching { analyzePurchaseWithGemini(context, uri, localResult, barcode, raw) }
+                    .onFailure { android.util.Log.d("DinexReceipt", "Gemini no pudo leer la foto: ${it::class.simpleName}: ${it.message}") }
+                    .getOrNull()
+            } else null
             currentResult(geminiResult?.mergeReliableLocalData(localResult, reading) ?: localResult)
         }
     }
@@ -116,7 +117,6 @@ actual fun rememberReceiptScanner(
 private suspend fun analyzePurchaseWithGemini(
     context: android.content.Context,
     uri: Uri,
-    apiKey: String,
     local: ScannedPurchase,
     barcode: String?,
     ocrText: String,
@@ -165,7 +165,6 @@ private suspend fun analyzePurchaseWithGemini(
         )
         .put(JSONObject().put("text", prompt))
     val response = generateGeminiContent(
-        apiKey = apiKey,
         parts = parts,
         systemPrompt = "Eres el analizador visual de Dinex. Extraes compras con precisión y nunca incluyes texto fuera del JSON solicitado.",
         maxOutputTokens = 400,

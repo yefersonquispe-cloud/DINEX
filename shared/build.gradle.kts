@@ -109,6 +109,9 @@ kotlin {
             implementation("com.google.mlkit:image-labeling:17.0.9")
             implementation("com.google.mlkit:barcode-scanning:17.3.0")
             implementation(libs.mlkit.genai.prompt)
+            // Firebase AI Logic: Gemini en la nube sin guardar la clave dentro del APK.
+            implementation(project.dependencies.platform(libs.firebase.bom))
+            implementation(libs.firebase.ai)
             implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.compose.uiTooling)

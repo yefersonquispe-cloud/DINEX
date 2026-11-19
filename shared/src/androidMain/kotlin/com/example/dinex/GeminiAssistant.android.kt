@@ -43,7 +43,7 @@ actual fun rememberGeminiAssistant(): GeminiAssistant {
  * la nube cuando el teléfono no lo soporta, falta el modelo o Nano falla.
  */
 private class AndroidGeminiAssistant(context: Context) : GeminiAssistant {
-    private val apiKey = readGeminiApiKey(context)
+    private val cloudReady = cloudGeminiAvailable(context)
     private var model: GenerativeModel? = null
 
     override var nanoStatus by mutableStateOf(NanoStatus.UNAVAILABLE)
@@ -56,7 +56,7 @@ private class AndroidGeminiAssistant(context: Context) : GeminiAssistant {
         get() = "${Build.MANUFACTURER.orEmpty().replaceFirstChar { it.uppercase() }} ${Build.MODEL} · Android ${Build.VERSION.RELEASE}"
 
     override val isConfigured: Boolean
-        get() = apiKey.isNotBlank() || dinexAiProxyEnabled || nanoStatus == NanoStatus.AVAILABLE
+        get() = cloudReady || nanoStatus == NanoStatus.AVAILABLE
 
     override suspend fun refreshNanoStatus() {
         val client = clientOrNull()
@@ -172,16 +172,16 @@ private class AndroidGeminiAssistant(context: Context) : GeminiAssistant {
     }
 
     private suspend fun askCloud(message: String, financialContext: String): GeminiReply {
-        if (apiKey.isBlank()) {
+        if (!cloudReady) {
             val hint = when (nanoStatus) {
                 NanoStatus.AVAILABLE ->
-                    "Gemini Nano no pudo responder. Inténtalo otra vez o configura GEMINI_API_KEY para usar la nube."
+                    "Gemini Nano no pudo responder. Inténtalo otra vez."
                 NanoStatus.DOWNLOADABLE ->
                     "Gemini Nano está disponible en este dispositivo, pero falta descargarlo. Abre Dinex IA y pulsa Descargar Gemini Nano."
                 NanoStatus.DOWNLOADING ->
                     "Gemini Nano se está descargando. Espera a que termine y vuelve a preguntar."
                 else ->
-                    "Este dispositivo no admite Gemini Nano. Agrega GEMINI_API_KEY=TU_CLAVE en local.properties y vuelve a ejecutar la app."
+                    "Este dispositivo no admite Gemini Nano y Dinex IA en la nube no está disponible en esta versión."
             }
             val detail = nanoDetail?.takeIf { it.isNotBlank() }?.let { "\n\nDetalle: $it" }.orEmpty()
             return GeminiReply(hint + detail, successful = false, engine = GeminiEngine.NONE)
@@ -189,7 +189,6 @@ private class AndroidGeminiAssistant(context: Context) : GeminiAssistant {
 
         return runCatching {
             val answer = generateGeminiContent(
-                apiKey = apiKey,
                 parts = JSONArray().put(
                     JSONObject().put(
                         "text", "Contexto actual de Dinex:\n$financialContext\n\nPregunta del usuario:\n$message",
@@ -202,8 +201,9 @@ private class AndroidGeminiAssistant(context: Context) : GeminiAssistant {
             GeminiReply(answer.replace("**", "").replace("###", ""), engine = GeminiEngine.CLOUD)
         }.getOrElse { error ->
             val friendly = when {
-                error.message?.contains("API key", ignoreCase = true) == true ->
-                    "La clave de Gemini no es válida o no tiene acceso. Revísala en local.properties."
+                error.message?.contains("App Check", ignoreCase = true) == true ||
+                    error.message?.contains("attestation", ignoreCase = true) == true ->
+                    "Firebase no pudo verificar esta copia de Dinex. Instálala desde Google Play para usar Dinex IA en la nube."
                 (error.message?.contains("quota", ignoreCase = true) == true) ||
                     (error.message?.contains("429") == true) ->
                     "Gemini alcanzó su límite temporal. Espera un momento y vuelve a intentarlo."
