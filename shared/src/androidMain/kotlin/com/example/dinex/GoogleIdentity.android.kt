@@ -25,7 +25,12 @@ internal actual fun rememberGoogleIdentity(): GoogleIdentity {
                 val request = GetCredentialRequest.Builder().addCredentialOption(option).build()
                 val credential = try {
                     CredentialManager.create(context).getCredential(context, request).credential
-                } catch (_: GetCredentialCancellationException) {
+                } catch (error: GetCredentialCancellationException) {
+                    // Si la persona cierra el selector no se muestra nada. Pero cuando la huella de la app
+                    // (SHA-1 de la firma de Google Play) no está registrada, Google también responde
+                    // "cancelado" con el código 16 o "reauth": antes la pantalla se quedaba sin hacer nada.
+                    val detail = error.message.orEmpty().lowercase()
+                    if ("[16]" in detail || "reauth" in detail || "developer" in detail) throw CloudAuthException("GOOGLE_NOT_CONFIGURED")
                     return null
                 } catch (_: NoCredentialException) {
                     // Con el selector de Google esto casi nunca es falta de cuentas: suele ser que esta

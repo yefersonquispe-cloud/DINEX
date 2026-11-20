@@ -306,6 +306,7 @@ internal fun cloudErrorMessage(code: String): String = when (code) {
     "TOO_MANY_ATTEMPTS_TRY_LATER" -> "Demasiados intentos. Espera unos minutos y vuelve a intentarlo."
     "WEAK_PASSWORD", "PASSWORD_DOES_NOT_MEET_REQUIREMENTS" -> "La contraseña no es segura. Revisa los requisitos."
     "OPERATION_NOT_ALLOWED", "CONFIGURATION_NOT_FOUND" -> "El inicio de sesión no está disponible por ahora."
+    "GOOGLE_NOT_CONFIGURED" -> "Google no aceptó esta versión de DINEX. Entra con tu correo mientras lo solucionamos."
     "GOOGLE_NO_ACCOUNT" -> "No pudimos abrir Google en este momento. Inténtalo de nuevo o entra con tu correo."
     "GOOGLE_NOT_READY" -> "Google todavía está cargando. Espera unos segundos e inténtalo de nuevo."
     "GOOGLE_POPUP_ERROR" -> "No se pudo abrir la ventana de Google. Permite ventanas emergentes e inténtalo otra vez."
