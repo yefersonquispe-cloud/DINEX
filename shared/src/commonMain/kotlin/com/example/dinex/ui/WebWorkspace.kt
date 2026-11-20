@@ -3,34 +3,40 @@
 package com.example.dinex
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -39,36 +45,37 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.key.isShiftPressed
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
-import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerIcon
 import androidx.compose.ui.input.pointer.pointerHoverIcon
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontVariation
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -79,17 +86,20 @@ import dinex.shared.generated.resources.dinex_app_icon
 import dinex.shared.generated.resources.manrope
 import org.jetbrains.compose.resources.Font
 import org.jetbrains.compose.resources.painterResource
-import kotlinx.coroutines.launch
-import kotlin.math.PI
 import kotlin.math.max
-import kotlin.math.min
 
 // ═══════════════════════════════════════════════════════════════════════════
 // DINEX WEB
 // Diseño propio para el navegador (pantallas de 760 px o más). Usa las mismas
-// funciones y datos que la app (DinexViewModel), pero con una distribución de
-// escritorio: barra lateral, encabezado y páginas en cuadrícula con ancho máximo.
-// En pantallas angostas la web sigue usando el diseño del celular.
+// funciones y datos que la app (DinexViewModel), con una distribución de
+// escritorio: barra lateral flotante, encabezado, buscador de comandos (Ctrl K)
+// y páginas con gráficos interactivos. En pantallas angostas se usa el diseño
+// del celular.
+//   WebWorkspace.kt  → marco, menú, buscador de comandos y piezas comunes
+//   WebCharts.kt     → gráficos
+//   WebSummary.kt    → página Resumen
+//   WebPages.kt      → Movimientos, Presupuesto, Metas y Análisis
+//   WebAssistant.kt  → Dinex IA y panel de la pantalla de acceso
 // ═══════════════════════════════════════════════════════════════════════════
 
 /** true cuando la app corre en el navegador (lo indica webApp/main.kt). */
@@ -98,18 +108,18 @@ internal val LocalWebLayout = staticCompositionLocalOf { false }
 /** Ancho mínimo para usar el diseño de escritorio en la web. */
 internal val WebDesktopMinWidth = 760.dp
 
-internal enum class WebPage(val title: String, val subtitle: String) {
-    SUMMARY("Resumen", "Tu dinero de un vistazo"),
-    MOVEMENTS("Movimientos", "Todo lo que entra y sale de tu cuenta"),
-    BUDGET("Presupuesto", "Límites diarios, categorías y próximos pagos"),
-    GOALS("Metas", "Ahorro con propósito"),
-    ANALYSIS("Análisis", "Patrones y tendencias de tus gastos"),
-    ASSISTANT("Dinex IA", "Pregunta lo que quieras sobre tus finanzas"),
-    MARKET("Mercado", "Tipos de cambio, metales y criptomonedas"),
-    TIPS("Consejos", "Recomendaciones según tus números"),
+internal enum class WebPage(val title: String, val subtitle: String, val shortcut: String) {
+    SUMMARY("Resumen", "Tu dinero de un vistazo", "1"),
+    MOVEMENTS("Movimientos", "Todo lo que entra y sale de tu cuenta", "2"),
+    BUDGET("Presupuesto", "Límites, simulador de ahorro y próximos pagos", "3"),
+    GOALS("Metas", "Ahorro con propósito y planificador", "4"),
+    ANALYSIS("Análisis", "Patrones y tendencias de tus gastos", "5"),
+    ASSISTANT("Dinex IA", "Pregunta lo que quieras sobre tus finanzas", "6"),
+    MARKET("Mercado", "Tipos de cambio, metales y criptomonedas", "7"),
+    TIPS("Consejos", "Recomendaciones según tus números", "8"),
 }
 
-private fun WebPage.icon(): ImageVector = when (this) {
+internal fun WebPage.icon(): ImageVector = when (this) {
     WebPage.SUMMARY -> DinexNavigationIcons.Home
     WebPage.MOVEMENTS -> DinexNavigationIcons.Movements
     WebPage.BUDGET -> DinexNavigationIcons.Plan
@@ -137,7 +147,8 @@ internal class WebActions(
 
 // ---------------------------------------------------------------- Paleta y tipografía
 
-private object W {
+/** Colores de la web: los mismos verdes y lima de DINEX, en modo claro y oscuro. */
+internal object W {
     private val dark get() = DinexThemeState.dark
     val canvas get() = if (dark) Color(0xFF0B130F) else Color(0xFFF2F4F0)
     val surface get() = if (dark) Color(0xFF121C17) else Color(0xFFFFFFFF)
@@ -155,12 +166,15 @@ private object W {
     val lime = Color(0xFFC6F06A)
     val forest = Color(0xFF0E1E16)
     val forest2 = Color(0xFF143826)
+    val forestDeep = Color(0xFF0A1610)
+    val mint = Color(0xFF8BE3B4)
+    val coral = Color(0xFFFFA697)
     val sidebarInk = Color(0xFFDCE7DF)
     val sidebarMuted = Color(0xFF7D9586)
     val sidebarActive = Color(0xFF1A2E23)
 }
 
-private val CardShape = RoundedCornerShape(16.dp)
+internal val WebCardShape = RoundedCornerShape(22.dp)
 
 /** Manrope (Google Fonts, licencia OFL): una sola fuente variable para todos los grosores. */
 @Composable
@@ -184,43 +198,38 @@ internal fun webTypography(): Typography {
     )
 }
 
-// ---------------------------------------------------------------- Datos derivados
+// ---------------------------------------------------------------- Textos y formatos
 
-private fun Movement.epochDay() = epochDaysOf(year, month, day)
-private fun Movement.monthKey() = year * 12 + month - 1
-private fun monthKeyLabel(key: Int) = "${currentMonthName(key % 12 + 1)} ${key / 12}"
-private fun monthKeyShort(key: Int) = "${reportMonthShort(key % 12 + 1).replaceFirstChar { it.uppercase() }} ${(key / 12) % 100}"
+internal fun webMonthLabel(key: Int) = "${currentMonthName(monthKeyMonth(key))} ${monthKeyYear(key)}"
+internal fun webMonthShort(key: Int) = reportMonthShort(monthKeyMonth(key)).replaceFirstChar { it.uppercase() }
 
-private fun daysInMonth(year: Int, month: Int): Int = (28..31).last { validDate(year, month, it) }
-
-private fun categoryColor(name: String, index: Int = 0): Color =
+internal fun categoryColor(name: String, index: Int = 0): Color =
     categories.firstOrNull { it.name.equals(name, true) }?.color
         ?: listOf(Color(0xFF3E8EB8), Color(0xFFC2577F), Color(0xFF4F9D69), Color(0xFF2F5D8A), Color(0xFFB5893B))[index % 5]
 
-private fun weekdayName(epochDay: Int): String =
-    listOf("Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo")[((epochDay % 7) + 7 + 3) % 7]
-
-private fun longToday(): String {
+internal fun longToday(): String {
     val today = civilDateFromEpochDays()
-    return "${weekdayName(currentDayIndex())}, ${today.day} de ${currentMonthName(today.month).lowercase()} de ${today.year}"
+    return "${webWeekdaysLong[weekdayIndex(currentDayIndex())]}, ${today.day} de ${currentMonthName(today.month).lowercase()}"
 }
 
-private fun shortMoney(value: Double): String {
+internal fun shortMoney(value: Double): String {
     fun short(v: Double) = fixed(v, 1).removeSuffix(".0")
-    return when {
-        value >= 1_000_000 -> "S/ ${short(value / 1_000_000)}M"
-        value >= 1_000 -> "S/ ${short(value / 1_000)}k"
-        else -> "S/ ${fixed(value, 0)}"
+    val sign = if (value < 0) "-" else ""
+    val abs = kotlin.math.abs(value)
+    return sign + when {
+        abs >= 1_000_000 -> "S/ ${short(abs / 1_000_000)}M"
+        abs >= 1_000 -> "S/ ${short(abs / 1_000)}k"
+        else -> "S/ ${fixed(abs, 0)}"
     }
 }
 
-private fun percentLabel(part: Double, total: Double): String {
+internal fun percentLabel(part: Double, total: Double): String {
     if (total <= 0) return "0%"
     val value = part / total * 100
     return if (value in 0.01..9.99) "${fixed(value, 1)}%" else "${value.toInt()}%"
 }
 
-// ---------------------------------------------------------------- Shell
+// ---------------------------------------------------------------- Marco
 
 @Composable
 internal fun WebWorkspace(
@@ -230,31 +239,59 @@ internal fun WebWorkspace(
     assistant: @Composable () -> Unit,
 ) {
     var page by rememberSaveable { mutableStateOf(WebPage.SUMMARY) }
+    var palette by remember { mutableStateOf(false) }
     val data = state.data
     val name = state.activeAccount?.name ?: state.email.orEmpty().substringBefore('@')
-    BoxWithConstraints(Modifier.fillMaxSize().background(W.canvas)) {
-        val compact = maxWidth < 1100.dp
+    val health = remember(data) { financialHealth(data) }
+    val toggleTheme = { model.setDarkMode(!state.darkMode) }
+    val focus = remember { FocusRequester() }
+    var anyFocus by remember { mutableStateOf(false) }
+    // Al empezar y al cerrar el buscador, el foco vuelve al escritorio para que Ctrl K siga funcionando.
+    LaunchedEffect(palette) { if (!palette) { kotlinx.coroutines.delay(200); runCatching { focus.requestFocus() } } }
+
+    BoxWithConstraints(
+        Modifier.fillMaxSize().background(W.canvas).webBackdrop()
+            .onPreviewKeyEvent { event ->
+                // Ctrl K (o ⌘ K en Mac) abre el buscador de comandos desde cualquier página.
+                if (event.type == KeyEventType.KeyDown && event.key == Key.K && (event.isCtrlPressed || event.isMetaPressed)) {
+                    palette = !palette; true
+                } else false
+            }
+            .focusRequester(focus).onFocusChanged { anyFocus = it.hasFocus }.focusable()
+            // Si nada tiene el foco (por ejemplo, tras un clic en una tarjeta), un clic lo devuelve al
+            // escritorio para que Ctrl K siga funcionando. No toca los campos de texto que ya lo tienen.
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press && !anyFocus) runCatching { focus.requestFocus() }
+                    }
+                }
+            },
+    ) {
+        val compact = maxWidth < 1180.dp
+        val tall = maxHeight >= 820.dp
         Row(Modifier.fillMaxSize()) {
-            WebSidebar(page, { page = it }, compact, name, state.email.orEmpty(), state.profilePhoto, actions)
+            WebSidebar(page, { page = it }, compact, name, state.email.orEmpty(), state.profilePhoto, health, actions, tall = tall, onPalette = { palette = true })
             Column(Modifier.weight(1f).fillMaxHeight()) {
-                WebTopBar(page, data.activeStreak(), state.darkMode, name, state.profilePhoto,
-                    onToggleTheme = { model.setDarkMode(!state.darkMode) }, onProfile = actions.onProfile)
+                WebTopBar(page, name, data.activeStreak(), state.darkMode, state.profilePhoto, data.reminders, actions, toggleTheme) { page = it }
                 val reduced = LocalDinexReducedMotion.current
                 AnimatedContent(
                     targetState = page,
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     transitionSpec = {
-                        val time = if (reduced) 0 else 240
-                        (fadeIn(tween(time)) + slideInVertically(tween(time)) { if (reduced) 0 else 18 }) togetherWith fadeOut(tween(time / 2))
+                        val time = if (reduced) 0 else 320
+                        (fadeIn(tween(time)) + slideInVertically(tween(time, easing = FastOutSlowInEasing)) { if (reduced) 0 else 26 }) togetherWith
+                            (fadeOut(tween(time / 3)) + slideOutVertically(tween(time / 3)) { if (reduced) 0 else -10 })
                     },
                     label = "página web",
                 ) { current ->
                     when (current) {
-                        WebPage.SUMMARY -> SummaryPage(data, actions) { page = it }
+                        WebPage.SUMMARY -> SummaryPage(data, health, actions) { page = it }
                         WebPage.MOVEMENTS -> MovementsWebPage(data.movements, actions)
                         WebPage.BUDGET -> BudgetWebPage(model, data, actions)
                         WebPage.GOALS -> GoalsWebPage(data, actions)
-                        WebPage.ANALYSIS -> AnalysisWebPage(data.movements, actions)
+                        WebPage.ANALYSIS -> AnalysisWebPage(data, health, actions)
                         WebPage.ASSISTANT -> assistant()
                         // Mercado y Consejos se muestran dentro del escritorio, sin tapar la barra lateral.
                         WebPage.MARKET -> MarketScreen(onClose = { page = WebPage.SUMMARY })
@@ -271,24 +308,60 @@ internal fun WebWorkspace(
                 }
             }
         }
-        state.message?.let { message ->
-            LaunchedEffect(message) {
-                kotlinx.coroutines.delay(4_000)
-                model.showMessage(null)
-            }
-            Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.BottomCenter) {
-                Row(
-                    Modifier.clip(RoundedCornerShape(12.dp)).background(W.forest).padding(start = 18.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(message, color = Color.White, fontSize = 14.sp)
-                    Spacer(Modifier.width(12.dp))
-                    TextButton(onClick = { model.showMessage(null) }) { Text("Cerrar", color = W.lime, fontWeight = FontWeight.SemiBold) }
+
+        // Aviso flotante (guardado, eliminado, errores…).
+        val message = state.message
+        LaunchedEffect(message) {
+            if (message != null) { kotlinx.coroutines.delay(4_000); model.showMessage(null) }
+        }
+        AnimatedVisibility(
+            visible = message != null,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 26.dp),
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit = fadeOut() + slideOutVertically { it / 2 },
+        ) {
+            var shown by remember { mutableStateOf("") }
+            if (message != null) shown = message
+            Row(
+                Modifier.shadow(18.dp, CircleShape, ambientColor = W.forest, spotColor = W.forest).clip(CircleShape)
+                    .background(W.forest).border(1.dp, Color.White.copy(alpha = .08f), CircleShape)
+                    .padding(start = 8.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.size(28.dp).clip(CircleShape).background(W.lime), contentAlignment = Alignment.Center) {
+                    Icon(DinexNavigationIcons.Check, null, tint = W.forest, modifier = Modifier.size(15.dp))
                 }
+                Spacer(Modifier.width(12.dp))
+                Text(shown, color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                Spacer(Modifier.width(10.dp))
+                TextButton(onClick = { model.showMessage(null) }) { Text("Cerrar", color = W.lime, fontWeight = FontWeight.SemiBold) }
             }
+        }
+
+        // Buscador de comandos.
+        AnimatedVisibility(palette, enter = fadeIn(tween(140)), exit = fadeOut(tween(120))) {
+            CommandPalette(
+                commands = webCommands(state.darkMode, actions, toggleTheme) { page = it },
+                onClose = { palette = false },
+            )
         }
     }
 }
+
+/** Fondo del lienzo: dos brillos suaves de los colores de la marca. */
+private fun Modifier.webBackdrop(): Modifier = drawBehind {
+    val dark = DinexThemeState.dark
+    drawCircle(
+        Brush.radialGradient(listOf(W.lime.copy(alpha = if (dark) .05f else .16f), Color.Transparent), Offset(size.width * .92f, 0f), size.minDimension * .7f),
+        size.minDimension * .7f, Offset(size.width * .92f, 0f),
+    )
+    drawCircle(
+        Brush.radialGradient(listOf(W.brand.copy(alpha = if (dark) .07f else .06f), Color.Transparent), Offset(size.width * .35f, size.height), size.minDimension * .8f),
+        size.minDimension * .8f, Offset(size.width * .35f, size.height),
+    )
+}
+
+// ---------------------------------------------------------------- Barra lateral
 
 @Composable
 private fun WebSidebar(
@@ -298,43 +371,62 @@ private fun WebSidebar(
     name: String,
     email: String,
     photo: String,
+    health: FinancialHealth,
     actions: WebActions,
+    tall: Boolean,
+    onPalette: () -> Unit,
 ) {
+    val shape = RoundedCornerShape(26.dp)
     Column(
-        Modifier.fillMaxHeight().width(if (compact) 76.dp else 248.dp).background(W.forest)
-            .padding(horizontal = if (compact) 12.dp else 16.dp, vertical = 20.dp),
+        Modifier.padding(start = 14.dp, top = 14.dp, bottom = 14.dp).fillMaxHeight().width(if (compact) 80.dp else 256.dp)
+            .shadow(20.dp, shape, ambientColor = W.forest.copy(alpha = .3f), spotColor = W.forest.copy(alpha = .3f)).clip(shape)
+            .background(Brush.verticalGradient(listOf(Color(0xFF12291D), W.forest, W.forestDeep)))
+            .drawBehind {
+                drawCircle(Brush.radialGradient(listOf(W.lime.copy(alpha = .13f), Color.Transparent), Offset(0f, 0f), size.width * 1.1f), size.width * 1.1f, Offset(0f, 0f))
+                // Puntos sutiles.
+                val step = 18.dp.toPx()
+                var y = step
+                while (y < size.height * .3f) {
+                    var x = step
+                    while (x < size.width) { drawCircle(Color.White.copy(alpha = .035f), 1.dp.toPx(), Offset(x, y)); x += step }
+                    y += step
+                }
+            }
+            .padding(horizontal = if (compact) 14.dp else 16.dp, vertical = 20.dp),
         horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
     ) {
-        // Marca
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = if (compact) 0.dp else 6.dp)) {
-            Image(painterResource(Res.drawable.dinex_app_icon), "DINEX", Modifier.size(34.dp).clip(RoundedCornerShape(9.dp)), contentScale = ContentScale.Crop)
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = if (compact) 0.dp else 4.dp)) {
+            Box {
+                Image(painterResource(Res.drawable.dinex_app_icon), "DINEX", Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)), contentScale = ContentScale.Crop)
+                Box(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp).size(10.dp).clip(CircleShape).background(W.forest).padding(2.dp).clip(CircleShape).background(W.lime))
+            }
             if (!compact) {
-                Spacer(Modifier.width(10.dp))
+                Spacer(Modifier.width(11.dp))
                 Column {
-                    Text("DINEX", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 3.sp)
-                    Text("Finanzas personales", color = W.sidebarMuted, fontSize = 11.sp)
+                    Text("DINEX", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 3.2.sp)
+                    Text("Tu dinero, con propósito.", color = W.sidebarMuted, fontSize = 11.sp)
                 }
             }
         }
-        Spacer(Modifier.height(26.dp))
+        Spacer(Modifier.height(22.dp))
+        PaletteLauncher(compact, onPalette)
+        Spacer(Modifier.height(12.dp))
         NewMovementButton(compact, actions)
-        Spacer(Modifier.height(26.dp))
+        Spacer(Modifier.height(22.dp))
         if (!compact) SidebarLabel("PRINCIPAL")
-        WebPage.entries.take(5).forEach { item ->
-            SidebarItem(item.title, item.icon(), page == item, compact) { onSelect(item) }
-        }
-        Spacer(Modifier.height(18.dp))
+        WebPage.entries.take(5).forEach { item -> SidebarItem(item, page == item, compact) { onSelect(item) } }
+        Spacer(Modifier.height(16.dp))
         if (!compact) SidebarLabel("HERRAMIENTAS")
-        SidebarItem(WebPage.ASSISTANT.title, WebPage.ASSISTANT.icon(), page == WebPage.ASSISTANT, compact) { onSelect(WebPage.ASSISTANT) }
-        listOf(WebPage.MARKET, WebPage.TIPS).forEach { item ->
-            SidebarItem(item.title, item.icon(), page == item, compact) { onSelect(item) }
+        listOf(WebPage.ASSISTANT, WebPage.MARKET, WebPage.TIPS).forEach { item -> SidebarItem(item, page == item, compact) { onSelect(item) } }
+        Spacer(Modifier.weight(1f).heightIn(min = 18.dp))
+        if (!compact && tall) {
+            SidebarHealth(health) { onSelect(WebPage.ANALYSIS) }
+            Spacer(Modifier.height(12.dp))
         }
-        Spacer(Modifier.weight(1f))
-        // Usuario
-        val shape = RoundedCornerShape(12.dp)
+        val userShape = RoundedCornerShape(16.dp)
         Row(
-            Modifier.fillMaxWidth().clip(shape).background(W.sidebarActive).clickable(onClickLabel = "Abrir perfil", onClick = actions.onProfile)
-                .pointerHoverIcon(PointerIcon.Hand).padding(if (compact) 8.dp else 10.dp),
+            Modifier.fillMaxWidth().clip(userShape).background(Color.White.copy(alpha = .05f)).border(1.dp, Color.White.copy(alpha = .06f), userShape)
+                .clickable(onClickLabel = "Abrir perfil", onClick = actions.onProfile).pointerHoverIcon(PointerIcon.Hand).padding(if (compact) 6.dp else 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (compact) Arrangement.Center else Arrangement.Start,
         ) {
@@ -345,7 +437,7 @@ private fun WebSidebar(
                     Text(name, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text(email, color = W.sidebarMuted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-                Icon(DinexNavigationIcons.Settings, "Ajustes", tint = W.sidebarMuted, modifier = Modifier.size(18.dp))
+                Icon(DinexNavigationIcons.Settings, "Ajustes", tint = W.sidebarMuted, modifier = Modifier.size(17.dp))
             }
         }
     }
@@ -353,222 +445,495 @@ private fun WebSidebar(
 
 @Composable
 private fun SidebarLabel(text: String) {
-    Text(text, color = W.sidebarMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp,
+    Text(text, color = W.sidebarMuted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp,
         modifier = Modifier.padding(start = 12.dp, bottom = 8.dp))
 }
 
 @Composable
-private fun SidebarItem(label: String, icon: ImageVector, active: Boolean, compact: Boolean, onClick: () -> Unit) {
+private fun PaletteLauncher(compact: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
-    val shape = RoundedCornerShape(10.dp)
-    val fill by animateColorAsState(if (active) W.sidebarActive else if (hovered) W.sidebarActive.copy(alpha = .55f) else W.sidebarActive.copy(alpha = 0f), tween(160), label = "fondo del menú")
-    val nudge by animateFloatAsState(if (hovered && !active && !LocalDinexReducedMotion.current) 3f else 0f, tween(160), label = "desplazamiento del menú")
+    Row(
+        Modifier.then(if (compact) Modifier.size(48.dp) else Modifier.fillMaxWidth().height(40.dp)).clip(shape)
+            .background(Color.White.copy(alpha = if (hovered) .09f else .05f)).border(1.dp, Color.White.copy(alpha = .08f), shape)
+            .hoverable(interaction).clickable(onClickLabel = "Buscar o ir a…", onClick = onClick).pointerHoverIcon(PointerIcon.Hand)
+            .padding(horizontal = if (compact) 0.dp else 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = if (compact) Arrangement.Center else Arrangement.Start,
+    ) {
+        Icon(DinexNavigationIcons.Search, "Buscar", tint = W.sidebarInk.copy(alpha = .75f), modifier = Modifier.size(16.dp))
+        if (!compact) {
+            Spacer(Modifier.width(9.dp))
+            Text("Buscar o ir a…", color = W.sidebarMuted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Kbd("Ctrl K", dark = true)
+        }
+    }
+}
+
+@Composable
+private fun SidebarItem(item: WebPage, active: Boolean, compact: Boolean, onClick: () -> Unit) {
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val shape = RoundedCornerShape(12.dp)
+    val reduced = LocalDinexReducedMotion.current
+    val fill by animateColorAsState(
+        when { active -> W.lime.copy(alpha = .13f); hovered -> Color.White.copy(alpha = .05f); else -> Color.Transparent }, tween(180), label = "fondo del menú",
+    )
+    val nudge by animateFloatAsState(if (hovered && !active && !reduced) 3f else 0f, tween(160), label = "desplazamiento del menú")
+    val bar by animateFloatAsState(if (active) 1f else 0f, tween(if (reduced) 0 else 260), label = "marca del menú")
     Box(Modifier.padding(vertical = 2.dp).graphicsLayer { translationX = nudge * density }) {
         Row(
-            Modifier.then(if (compact) Modifier.size(48.dp) else Modifier.fillMaxWidth().height(42.dp)).clip(shape)
-                .background(fill)
-                .hoverable(interaction).clickable(onClickLabel = label, onClick = onClick).pointerHoverIcon(PointerIcon.Hand)
+            Modifier.then(if (compact) Modifier.size(48.dp) else Modifier.fillMaxWidth().height(42.dp)).clip(shape).background(fill)
+                .hoverable(interaction).clickable(onClickLabel = item.title, onClick = onClick).pointerHoverIcon(PointerIcon.Hand)
                 .padding(horizontal = if (compact) 0.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = if (compact) Arrangement.Center else Arrangement.Start,
         ) {
-            Icon(icon, label, tint = if (active) W.lime else W.sidebarInk.copy(alpha = .8f), modifier = Modifier.size(19.dp))
+            Icon(item.icon(), item.title, tint = if (active) W.lime else W.sidebarInk.copy(alpha = .78f), modifier = Modifier.size(19.dp))
             if (!compact) {
                 Spacer(Modifier.width(12.dp))
-                Text(label, color = if (active) Color.White else W.sidebarInk.copy(alpha = .85f), fontSize = 14.sp,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium)
+                Text(item.title, color = if (active) Color.White else W.sidebarInk.copy(alpha = .85f), fontSize = 14.sp,
+                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium, modifier = Modifier.weight(1f))
+                if (hovered || active) Text(item.shortcut, color = W.sidebarMuted, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
             }
         }
-        if (active) Box(Modifier.align(Alignment.CenterStart).offset(x = if (compact) (-12).dp else (-16).dp).width(3.dp).height(22.dp)
-            .clip(RoundedCornerShape(topEnd = 3.dp, bottomEnd = 3.dp)).background(W.lime))
+        if (bar > 0f) Box(
+            Modifier.align(Alignment.CenterStart).offset(x = if (compact) (-14).dp else (-16).dp).width(4.dp).height(24.dp * bar)
+                .clip(RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)).background(W.lime),
+        )
     }
 }
 
 @Composable
 private fun NewMovementButton(compact: Boolean, actions: WebActions) {
     var open by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
     Box {
         Row(
-            Modifier.then(if (compact) Modifier.size(48.dp) else Modifier.fillMaxWidth().height(44.dp)).clip(RoundedCornerShape(11.dp))
-                .background(W.lime).clickable(onClickLabel = "Nuevo movimiento") { open = true }.pointerHoverIcon(PointerIcon.Hand),
+            Modifier.dinexPress(interaction).then(if (compact) Modifier.size(48.dp) else Modifier.fillMaxWidth().height(46.dp))
+                .clip(RoundedCornerShape(13.dp)).background(Brush.horizontalGradient(listOf(W.lime, Color(0xFFA9E35C))))
+                .clickable(interaction, LocalIndication.current, onClickLabel = "Nuevo movimiento") { open = true }.pointerHoverIcon(PointerIcon.Hand),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
             Icon(DinexNavigationIcons.Add, "Nuevo movimiento", tint = W.forest, modifier = Modifier.size(18.dp))
             if (!compact) {
                 Spacer(Modifier.width(8.dp))
-                Text("Nuevo movimiento", color = W.forest, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Nuevo movimiento", color = W.forest, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
-        DropdownMenu(open, { open = false }, containerColor = W.surface) {
-            MenuEntry("Registrar gasto", DinexNavigationIcons.ArrowDown) { open = false; actions.onExpense() }
-            MenuEntry("Registrar ingreso", DinexNavigationIcons.ArrowUp) { open = false; actions.onIncome() }
-            HorizontalDivider(color = W.line)
-            MenuEntry("Escanear comprobante", DinexNavigationIcons.ScanReceipt) { open = false; actions.onScan() }
-            MenuEntry("Importar Excel o CSV", DinexNavigationIcons.Swap) { open = false; actions.onImport() }
+        DropdownMenu(open, { open = false }, containerColor = W.surface, shape = RoundedCornerShape(16.dp)) {
+            MenuEntry("Registrar gasto", DinexNavigationIcons.ArrowDown, W.negative) { open = false; actions.onExpense() }
+            MenuEntry("Registrar ingreso", DinexNavigationIcons.ArrowUp, W.positive) { open = false; actions.onIncome() }
+            HorizontalDivider(color = W.line, modifier = Modifier.padding(vertical = 4.dp))
+            MenuEntry("Escanear comprobante", DinexNavigationIcons.ScanReceipt, W.ink2) { open = false; actions.onScan() }
+            MenuEntry("Importar Excel o CSV", DinexNavigationIcons.Swap, W.ink2) { open = false; actions.onImport() }
         }
     }
 }
 
 @Composable
-private fun MenuEntry(label: String, icon: ImageVector, onClick: () -> Unit) {
+private fun MenuEntry(label: String, icon: ImageVector, tint: Color, onClick: () -> Unit) {
     DropdownMenuItem(
-        text = { Text(label, color = W.ink, fontSize = 14.sp) },
-        leadingIcon = { Icon(icon, null, tint = W.ink2, modifier = Modifier.size(18.dp)) },
+        text = { Text(label, color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.Medium) },
+        leadingIcon = {
+            Box(Modifier.size(28.dp).clip(RoundedCornerShape(8.dp)).background(tint.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, tint = tint, modifier = Modifier.size(15.dp))
+            }
+        },
         onClick = onClick,
         modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
     )
 }
 
+/** Mini tarjeta con el puntaje de salud financiera (0–100). */
+@Composable
+private fun SidebarHealth(health: FinancialHealth, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(16.dp)
+    val tint = healthColor(health.score)
+    val grow = rememberGrow(health.score, 1200)
+    Row(
+        Modifier.fillMaxWidth().clip(shape).background(Color.White.copy(alpha = .05f)).border(1.dp, Color.White.copy(alpha = .06f), shape)
+            .clickable(onClickLabel = "Ver salud financiera", onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Canvas(Modifier.fillMaxSize()) {
+                val stroke = 5.dp.toPx()
+                val arc = Size(size.width - stroke, size.height - stroke)
+                drawArc(Color.White.copy(alpha = .1f), -90f, 360f, false, Offset(stroke / 2, stroke / 2), arc, style = Stroke(stroke))
+                drawArc(tint, -90f, 360f * health.score / 100f * grow, false, Offset(stroke / 2, stroke / 2), arc, style = Stroke(stroke, cap = StrokeCap.Round))
+            }
+            Text("${(health.score * grow).toInt()}", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text("Salud financiera", color = W.sidebarMuted, fontSize = 11.sp)
+            Text(health.label, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+        Icon(DinexNavigationIcons.Chevron, null, tint = W.sidebarMuted, modifier = Modifier.size(14.dp))
+    }
+}
+
+internal fun healthColor(score: Int): Color = when {
+    score >= 70 -> Color(0xFF5ED49B)
+    score >= 40 -> Color(0xFFF2C46B)
+    else -> Color(0xFFF08B7B)
+}
+
+// ---------------------------------------------------------------- Encabezado
+
 @Composable
 private fun WebTopBar(
     page: WebPage,
+    name: String,
     streak: Int,
     darkMode: Boolean,
-    name: String,
     photo: String,
+    reminders: List<PaymentReminder>,
+    actions: WebActions,
     onToggleTheme: () -> Unit,
-    onProfile: () -> Unit,
+    onNavigate: (WebPage) -> Unit,
 ) {
     Row(
-        Modifier.fillMaxWidth().height(76.dp).background(W.surface).drawBehind {
-            drawLine(W.line, Offset(0f, size.height - 1), Offset(size.width, size.height - 1), 1.dp.toPx())
-        }.padding(horizontal = 32.dp),
+        Modifier.fillMaxWidth().padding(start = 30.dp, end = 26.dp, top = 22.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(page.title, color = W.ink, fontSize = 22.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.3).sp)
-            Text(if (page == WebPage.SUMMARY) "Hola, ${name.substringBefore(' ')} · ${longToday()}" else page.subtitle, color = W.ink2, fontSize = 13.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.size(6.dp).clip(CircleShape).background(W.brand))
+                Spacer(Modifier.width(8.dp))
+                Text(longToday().uppercase(), color = W.ink3, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                if (page == WebPage.SUMMARY) "Hola, ${name.substringBefore(' ').ifBlank { "de nuevo" }}" else page.title,
+                color = W.ink, fontSize = 28.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.8).sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+            )
+            Text(page.subtitle, color = W.ink2, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         val level = streakLevel(streak)
         Row(
-            Modifier.clip(CircleShape).border(1.dp, W.line, CircleShape).padding(start = 6.dp, end = 12.dp, top = 5.dp, bottom = 5.dp),
+            Modifier.clip(CircleShape).background(W.surface).border(1.dp, W.line, CircleShape).padding(start = 5.dp, end = 13.dp, top = 5.dp, bottom = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StreakBadge(level, 24.dp, locked = streak == 0)
+            StreakBadge(level, 26.dp, locked = streak == 0)
             Spacer(Modifier.width(8.dp))
-            Text("$streak ${if (streak == 1) "día" else "días"} de racha", color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            Column {
+                Text("$streak ${if (streak == 1) "día" else "días"}", color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, lineHeight = 14.sp)
+                Text("de racha · ${level.name}", color = W.ink3, fontSize = 10.sp, lineHeight = 12.sp)
+            }
         }
         Spacer(Modifier.width(10.dp))
+        RemindersBell(reminders, actions) { onNavigate(WebPage.BUDGET) }
+        Spacer(Modifier.width(8.dp))
         IconSquare(if (darkMode) DinexNavigationIcons.Sun else DinexNavigationIcons.Moon, if (darkMode) "Modo claro" else "Modo oscuro", onToggleTheme)
         Spacer(Modifier.width(10.dp))
-        ProfilePhoto(name, photo, 38.dp, Modifier.clip(CircleShape).clickable(onClickLabel = "Abrir perfil", onClick = onProfile).pointerHoverIcon(PointerIcon.Hand))
+        ProfilePhoto(name, photo, 40.dp, Modifier.clip(CircleShape).border(2.dp, W.surface, CircleShape)
+            .clickable(onClickLabel = "Abrir perfil", onClick = actions.onProfile).pointerHoverIcon(PointerIcon.Hand))
+    }
+}
+
+@Composable
+private fun RemindersBell(reminders: List<PaymentReminder>, actions: WebActions, onBudget: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        IconSquare(DinexNavigationIcons.Bell, "Próximos pagos") { open = true }
+        if (reminders.isNotEmpty()) Box(
+            Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp).size(18.dp).clip(CircleShape).background(W.negative).border(2.dp, W.canvas, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) { Text("${reminders.size.coerceAtMost(9)}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+        DropdownMenu(open, { open = false }, containerColor = W.surface, shape = RoundedCornerShape(16.dp), modifier = Modifier.width(320.dp)) {
+            Text("Próximos pagos", color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            if (reminders.isEmpty()) Text("No tienes pagos pendientes.", color = W.ink3, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+            reminders.sortedBy { it.date }.take(5).forEach { reminder ->
+                DropdownMenuItem(
+                    text = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f)) {
+                                Text(reminder.title, color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(reminder.date, color = W.ink3, fontSize = 11.sp)
+                            }
+                            Text(moneyGrouped(reminder.amount), color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    leadingIcon = { Icon(DinexNavigationIcons.Bell, null, tint = W.warning, modifier = Modifier.size(16.dp)) },
+                    onClick = { open = false; actions.onResolveReminder(reminder) },
+                    modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+                )
+            }
+            HorizontalDivider(color = W.line, modifier = Modifier.padding(vertical = 4.dp))
+            DropdownMenuItem(
+                text = { Text("Agregar recordatorio", color = W.brand, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) },
+                leadingIcon = { Icon(DinexNavigationIcons.Add, null, tint = W.brand, modifier = Modifier.size(16.dp)) },
+                onClick = { open = false; actions.onAddReminder() },
+                modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+            )
+            DropdownMenuItem(
+                text = { Text("Ver presupuesto", color = W.ink2, fontSize = 13.sp) },
+                leadingIcon = { Icon(DinexNavigationIcons.Plan, null, tint = W.ink3, modifier = Modifier.size(16.dp)) },
+                onClick = { open = false; onBudget() },
+                modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
+            )
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Buscador de comandos (Ctrl K)
+
+internal class WebCommand(val group: String, val label: String, val hint: String, val icon: ImageVector, val keywords: String = "", val run: () -> Unit)
+
+private fun webCommands(darkMode: Boolean, actions: WebActions, toggleTheme: () -> Unit, go: (WebPage) -> Unit): List<WebCommand> =
+    WebPage.entries.map { WebCommand("Ir a", it.title, it.subtitle, it.icon(), "pagina ${it.shortcut}") { go(it) } } + listOf(
+        WebCommand("Acciones", "Registrar gasto", "Anota lo que acabas de pagar", DinexNavigationIcons.ArrowDown, "nuevo compra pagar", actions.onExpense),
+        WebCommand("Acciones", "Registrar ingreso", "Sueldo, ventas o pagos recibidos", DinexNavigationIcons.ArrowUp, "nuevo cobro sueldo", actions.onIncome),
+        WebCommand("Acciones", "Ahorrar en una meta", "Separa dinero para tus metas", DinexNavigationIcons.Target, "meta guardar") { actions.onSave(null) },
+        WebCommand("Acciones", "Agregar recordatorio de pago", "DINEX te avisa antes de pagar", DinexNavigationIcons.Bell, "pago recibo", actions.onAddReminder),
+        WebCommand("Acciones", "Escanear comprobante", "Lee el monto desde una foto", DinexNavigationIcons.ScanReceipt, "foto boleta factura", actions.onScan),
+        WebCommand("Acciones", "Importar Excel o CSV", "Trae movimientos de tu banco", DinexNavigationIcons.Swap, "archivo banco", actions.onImport),
+        WebCommand("Acciones", "Exportar reporte", "PDF, Excel o CSV", DinexNavigationIcons.Send, "descargar pdf excel", actions.onExport),
+        WebCommand("Preferencias", if (darkMode) "Cambiar a modo claro" else "Cambiar a modo oscuro", "Tema de la web", if (darkMode) DinexNavigationIcons.Sun else DinexNavigationIcons.Moon, "tema oscuro claro", toggleTheme),
+        WebCommand("Preferencias", "Abrir mi perfil", "Cuenta, idioma y ajustes", DinexNavigationIcons.Settings, "cuenta ajustes perfil", actions.onProfile),
+    )
+
+private fun String.normalized(): String = lowercase()
+    .replace('á', 'a').replace('é', 'e').replace('í', 'i').replace('ó', 'o').replace('ú', 'u').replace('ñ', 'n')
+
+@Composable
+private fun CommandPalette(commands: List<WebCommand>, onClose: () -> Unit) {
+    var query by remember { mutableStateOf("") }
+    var index by remember { mutableIntStateOf(0) }
+    val filtered = remember(query, commands) {
+        val q = query.trim().normalized()
+        if (q.isEmpty()) commands else commands.filter { cmd -> q.split(' ').all { word -> "${cmd.label} ${cmd.hint} ${cmd.keywords} ${cmd.group}".normalized().contains(word) } }
+    }
+    LaunchedEffect(filtered.size) { index = index.coerceIn(0, (filtered.size - 1).coerceAtLeast(0)) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    val listState = rememberLazyListState()
+    LaunchedEffect(index) { if (filtered.isNotEmpty()) listState.animateScrollToItem(index) }
+    fun run(cmd: WebCommand) { onClose(); cmd.run() }
+
+    Box(
+        Modifier.fillMaxSize().background(Color(0xFF050B08).copy(alpha = .55f))
+            .clickable(remember { MutableInteractionSource() }, null, onClick = onClose),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        val shape = RoundedCornerShape(22.dp)
+        Column(
+            Modifier.padding(top = 90.dp).widthIn(max = 640.dp).fillMaxWidth(.9f)
+                .shadow(40.dp, shape, ambientColor = Color.Black, spotColor = Color.Black).clip(shape).background(W.surface).border(1.dp, W.line, shape)
+                .clickable(remember { MutableInteractionSource() }, null) {},
+        ) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(DinexNavigationIcons.Search, null, tint = W.brand, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(12.dp))
+                Box(Modifier.weight(1f)) {
+                    if (query.isEmpty()) Text("¿Qué quieres hacer? Escribe una página o una acción…", color = W.ink3, fontSize = 16.sp)
+                    BasicTextField(
+                        query, { query = it.take(60); index = 0 }, singleLine = true,
+                        textStyle = TextStyle(color = W.ink, fontSize = 16.sp, fontFamily = MaterialTheme.typography.bodyMedium.fontFamily),
+                        cursorBrush = SolidColor(W.brand),
+                        // En la web, Enter llega como acción del teclado y no como tecla: se atienden las dos.
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Go),
+                        keyboardActions = androidx.compose.foundation.text.KeyboardActions(onGo = { filtered.getOrNull(index)?.let(::run) }),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focus).onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (event.key) {
+                                Key.DirectionDown -> { if (filtered.isNotEmpty()) index = (index + 1) % filtered.size; true }
+                                Key.DirectionUp -> { if (filtered.isNotEmpty()) index = (index - 1 + filtered.size) % filtered.size; true }
+                                Key.Enter, Key.NumPadEnter -> { filtered.getOrNull(index)?.let(::run); true }
+                                Key.Escape -> { onClose(); true }
+                                else -> false
+                            }
+                        },
+                    )
+                }
+                Kbd("Esc")
+            }
+            HorizontalDivider(color = W.line)
+            if (filtered.isEmpty()) {
+                Text("No encontramos “$query”. Prueba con “gasto”, “metas” o “exportar”.", color = W.ink3, fontSize = 14.sp,
+                    modifier = Modifier.padding(horizontal = 22.dp, vertical = 28.dp))
+            } else {
+                LazyColumn(Modifier.heightIn(max = 400.dp), state = listState, contentPadding = PaddingValues(8.dp)) {
+                    itemsIndexed(filtered) { i, cmd ->
+                        if (i == 0 || filtered[i - 1].group != cmd.group) {
+                            Text(cmd.group.uppercase(), color = W.ink3, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp,
+                                modifier = Modifier.padding(start = 12.dp, top = if (i == 0) 6.dp else 12.dp, bottom = 6.dp))
+                        }
+                        val selected = i == index
+                        val bg by animateColorAsState(if (selected) W.brandSoft else Color.Transparent, tween(120), label = "comando")
+                        Row(
+                            Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(bg)
+                                .clickable { run(cmd) }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 12.dp, vertical = 9.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(if (selected) W.brand else W.surfaceAlt), contentAlignment = Alignment.Center) {
+                                Icon(cmd.icon, null, tint = if (selected) Color.White else W.ink2, modifier = Modifier.size(17.dp))
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(cmd.label, color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                                Text(cmd.hint, color = W.ink3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            }
+                            if (selected) Icon(DinexNavigationIcons.Chevron, null, tint = W.brand, modifier = Modifier.size(15.dp))
+                        }
+                    }
+                }
+            }
+            HorizontalDivider(color = W.line)
+            Row(Modifier.fillMaxWidth().background(W.surfaceAlt).padding(horizontal = 20.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) { Kbd("↑"); Spacer(Modifier.width(3.dp)); Kbd("↓"); Spacer(Modifier.width(6.dp)); Text("moverte", color = W.ink3, fontSize = 12.sp) }
+                Row(verticalAlignment = Alignment.CenterVertically) { Kbd("Enter"); Spacer(Modifier.width(6.dp)); Text("abrir", color = W.ink3, fontSize = 12.sp) }
+                Spacer(Modifier.weight(1f))
+                Text("${filtered.size} resultados", color = W.ink3, fontSize = 12.sp)
+            }
+        }
     }
 }
 
 // ---------------------------------------------------------------- Piezas reutilizables
 
+@Composable
+internal fun Kbd(text: String, dark: Boolean = false) {
+    val shape = RoundedCornerShape(6.dp)
+    Text(
+        text, color = if (dark) W.sidebarInk.copy(alpha = .7f) else W.ink2, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+        modifier = Modifier.clip(shape).background(if (dark) Color.White.copy(alpha = .07f) else W.surfaceAlt)
+            .border(1.dp, if (dark) Color.White.copy(alpha = .1f) else W.line, shape).padding(horizontal = 6.dp, vertical = 2.dp),
+    )
+}
+
 /** Contenedor de página: centrado, con ancho máximo para que nada se estire de lado a lado. */
 @Composable
-private fun PageFrame(scroll: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
+internal fun PageFrame(scroll: Boolean = true, content: @Composable ColumnScope.() -> Unit) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
-            Modifier.widthIn(max = 1240.dp).fillMaxWidth().fillMaxHeight()
+            Modifier.widthIn(max = 1280.dp).fillMaxWidth().fillMaxHeight()
                 .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                .padding(horizontal = 32.dp, vertical = 28.dp),
+                .padding(start = 30.dp, end = 26.dp, top = 14.dp, bottom = 30.dp),
             verticalArrangement = Arrangement.spacedBy(20.dp),
             content = content,
         )
     }
 }
 
+/** Tarjeta base: se eleva un poco y su borde se tiñe de verde al pasar el mouse. */
 @Composable
-private fun WCard(modifier: Modifier = Modifier, padding: Dp = 22.dp, content: @Composable ColumnScope.() -> Unit) {
+internal fun WCard(modifier: Modifier = Modifier, padding: Dp = 22.dp, content: @Composable ColumnScope.() -> Unit) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val reduced = LocalDinexReducedMotion.current
-    val lift by animateFloatAsState(if (hovered && !reduced) 1f else 0f, tween(180), label = "tarjeta elevada")
+    val lift by animateFloatAsState(if (hovered && !reduced) 1f else 0f, tween(200), label = "tarjeta elevada")
     Column(
         modifier.dinexEntrance().graphicsLayer { translationY = -lift * 3.dp.toPx() }
-            .shadow((lift * 14).dp, CardShape, ambientColor = W.forest.copy(alpha = .18f), spotColor = W.forest.copy(alpha = .18f))
-            .hoverable(interaction).clip(CardShape).background(W.surface)
-            .border(1.dp, lerp(W.line, W.brand, lift * .35f), CardShape).padding(padding),
+            .shadow((2 + lift * 16).dp, WebCardShape, ambientColor = W.forest.copy(alpha = .12f), spotColor = W.forest.copy(alpha = .12f))
+            .hoverable(interaction).clip(WebCardShape).background(W.surface)
+            .border(1.dp, lerp(W.line, W.brand, lift * .4f), WebCardShape).padding(padding),
         content = content,
     )
 }
 
 @Composable
-private fun CardTitle(title: String, subtitle: String? = null, action: (@Composable () -> Unit)? = null) {
+internal fun CardTitle(title: String, subtitle: String? = null, icon: ImageVector? = null, action: (@Composable () -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        icon?.let {
+            Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(W.brandSoft), contentAlignment = Alignment.Center) {
+                Icon(it, null, tint = W.brand, modifier = Modifier.size(17.dp))
+            }
+            Spacer(Modifier.width(12.dp))
+        }
         Column(Modifier.weight(1f)) {
-            Text(title, color = W.ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-            subtitle?.let { Text(it, color = W.ink3, fontSize = 12.sp) }
+            Text(title, color = W.ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.2).sp)
+            subtitle?.let { Text(it, color = W.ink3, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
         }
         action?.invoke()
     }
 }
 
 @Composable
-private fun LinkButton(text: String, onClick: () -> Unit) {
+internal fun LinkButton(text: String, color: Color = W.brand, onClick: () -> Unit) {
     Row(
-        Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 8.dp, vertical = 6.dp),
+        Modifier.clip(RoundedCornerShape(9.dp)).clickable(onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 9.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(text, color = W.brand, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(text, color = color, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.width(4.dp))
-        Icon(DinexNavigationIcons.Chevron, null, tint = W.brand, modifier = Modifier.size(14.dp))
+        Icon(DinexNavigationIcons.Chevron, null, tint = color, modifier = Modifier.size(14.dp))
     }
 }
 
 @Composable
-private fun WButton(text: String, icon: ImageVector? = null, primary: Boolean = false, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(10.dp)
+internal fun WButton(text: String, icon: ImageVector? = null, primary: Boolean = false, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
     val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
+    val bg = when {
+        primary && hovered -> lerp(W.brand, Color.Black, .12f)
+        primary -> W.brand
+        hovered -> W.hover
+        else -> W.surface
+    }
     Row(
-        Modifier.dinexPress(interaction).height(38.dp).clip(shape).background(if (primary) W.brand else W.surface)
+        Modifier.dinexPress(interaction).height(40.dp).clip(shape).background(bg)
             .then(if (primary) Modifier else Modifier.border(1.dp, W.line, shape))
-            .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 14.dp),
+            .hoverable(interaction).clickable(interaction, LocalIndication.current, onClick = onClick).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 15.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         icon?.let { Icon(it, null, tint = if (primary) Color.White else W.ink2, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(8.dp)) }
-        Text(text, color = if (primary) Color.White else W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text(text, color = if (primary) Color.White else W.ink, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 
 @Composable
-private fun IconSquare(icon: ImageVector, label: String, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(10.dp)
+internal fun IconSquare(icon: ImageVector, label: String, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    val interaction = remember { MutableInteractionSource() }
+    val hovered by interaction.collectIsHoveredAsState()
     Box(
-        Modifier.size(38.dp).clip(shape).border(1.dp, W.line, shape).clickable(onClickLabel = label, onClick = onClick).pointerHoverIcon(PointerIcon.Hand),
+        Modifier.size(40.dp).clip(shape).background(if (hovered) W.hover else W.surface).border(1.dp, W.line, shape)
+            .hoverable(interaction).clickable(onClickLabel = label, onClick = onClick).pointerHoverIcon(PointerIcon.Hand),
         contentAlignment = Alignment.Center,
-    ) { Icon(icon, label, tint = W.ink2, modifier = Modifier.size(18.dp)) }
+    ) { Icon(icon, label, tint = if (hovered) W.brand else W.ink2, modifier = Modifier.size(18.dp)) }
 }
 
+/** Selector de opciones con una pastilla que se desliza a la opción elegida. */
 @Composable
-private fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    Row(Modifier.height(38.dp).clip(RoundedCornerShape(10.dp)).background(W.surfaceAlt).border(1.dp, W.line, RoundedCornerShape(10.dp)).padding(3.dp)) {
+internal fun Segmented(options: List<String>, selected: Int, onSelect: (Int) -> Unit) {
+    Row(Modifier.height(40.dp).clip(RoundedCornerShape(12.dp)).background(W.surfaceAlt).border(1.dp, W.line, RoundedCornerShape(12.dp)).padding(3.dp)) {
         options.forEachIndexed { index, label ->
             val active = index == selected
+            val bg by animateColorAsState(if (active) W.surface else Color.Transparent, tween(180), label = "segmento")
             Box(
-                Modifier.fillMaxHeight().clip(RoundedCornerShape(8.dp)).background(if (active) W.surface else Color.Transparent)
-                    .then(if (active) Modifier.border(1.dp, W.line, RoundedCornerShape(8.dp)) else Modifier)
+                Modifier.fillMaxHeight().then(if (active) Modifier.shadow(2.dp, RoundedCornerShape(9.dp)) else Modifier).clip(RoundedCornerShape(9.dp)).background(bg)
                     .clickable { onSelect(index) }.pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 14.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(label, color = if (active) W.ink else W.ink2, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium) }
+            ) { Text(label, color = if (active) W.ink else W.ink2, fontSize = 13.sp, fontWeight = if (active) FontWeight.Bold else FontWeight.Medium) }
         }
     }
 }
 
 @Composable
-private fun SelectMenu(label: String, value: String, options: List<Pair<String, String>>, onSelect: (String) -> Unit) {
+internal fun SelectMenu(label: String, value: String, options: List<Pair<String, String>>, onSelect: (String) -> Unit) {
     var open by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(10.dp)
+    val shape = RoundedCornerShape(12.dp)
     val current = options.firstOrNull { it.first == value }?.second ?: value
     Box {
         Row(
-            Modifier.height(38.dp).clip(shape).background(W.surface).border(1.dp, W.line, shape).clickable { open = true }
-                .pointerHoverIcon(PointerIcon.Hand).padding(start = 12.dp, end = 8.dp),
+            Modifier.height(40.dp).clip(shape).background(W.surface).border(1.dp, if (open) W.brand else W.line, shape).clickable { open = true }
+                .pointerHoverIcon(PointerIcon.Hand).padding(start = 13.dp, end = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(label, color = W.ink3, fontSize = 13.sp)
             Spacer(Modifier.width(6.dp))
             Text(current, color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 150.dp))
             Spacer(Modifier.width(4.dp))
-            Icon(DinexNavigationIcons.Chevron, null, tint = W.ink3, modifier = Modifier.size(14.dp).rotate(90f))
+            Icon(DinexNavigationIcons.Chevron, null, tint = W.ink3, modifier = Modifier.size(14.dp).rotate(if (open) -90f else 90f))
         }
-        DropdownMenu(open, { open = false }, containerColor = W.surface, modifier = Modifier.heightIn(max = 360.dp)) {
+        DropdownMenu(open, { open = false }, containerColor = W.surface, shape = RoundedCornerShape(14.dp), modifier = Modifier.heightIn(max = 360.dp)) {
             options.forEach { (key, text) ->
                 DropdownMenuItem(
                     text = { Text(text, color = W.ink, fontSize = 14.sp, fontWeight = if (key == value) FontWeight.SemiBold else FontWeight.Normal) },
@@ -582,34 +947,60 @@ private fun SelectMenu(label: String, value: String, options: List<Pair<String, 
 }
 
 @Composable
-private fun ThinBar(progress: Float, color: Color, height: Dp = 6.dp, modifier: Modifier = Modifier) {
-    val animated by animateFloatAsState(progress.coerceIn(0f, 1f), tween(if (LocalDinexReducedMotion.current) 0 else 500), label = "barra")
+internal fun ThinBar(progress: Float, color: Color, height: Dp = 6.dp, modifier: Modifier = Modifier) {
+    val animated by animateFloatAsState(progress.coerceIn(0f, 1f), tween(if (LocalDinexReducedMotion.current) 0 else 700, easing = FastOutSlowInEasing), label = "barra")
     Box(modifier.fillMaxWidth().height(height).clip(CircleShape).background(W.line.copy(alpha = .7f))) {
-        if (progress > 0f) Box(Modifier.fillMaxWidth(max(animated, .015f)).fillMaxHeight().clip(CircleShape).background(color))
+        if (progress > 0f) Box(
+            Modifier.fillMaxWidth(max(animated, .015f)).fillMaxHeight().clip(CircleShape)
+                .background(Brush.horizontalGradient(listOf(color.copy(alpha = .7f), color))),
+        )
     }
 }
 
 @Composable
-private fun CategoryIcon(category: String, income: Boolean, size: Dp = 36.dp) {
+internal fun CategoryIcon(category: String, income: Boolean, size: Dp = 38.dp) {
     val tint = if (income) W.positive else categoryColor(category)
-    Box(Modifier.size(size).clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = if (DinexThemeState.dark) .2f else .12f)), contentAlignment = Alignment.Center) {
+    Box(Modifier.size(size).clip(RoundedCornerShape(size * .32f)).background(tint.copy(alpha = if (DinexThemeState.dark) .2f else .12f)), contentAlignment = Alignment.Center) {
         Icon(if (income) DinexNavigationIcons.ArrowUp else DinexCategoryIcons.forCategory(category), null, tint = tint, modifier = Modifier.size(size * .5f))
     }
 }
 
 @Composable
-private fun EmptyNote(title: String, body: String, action: String? = null, onAction: (() -> Unit)? = null) {
+internal fun EmptyNote(title: String, body: String, action: String? = null, onAction: (() -> Unit)? = null) {
     Column(Modifier.fillMaxWidth().padding(vertical = 26.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, color = W.ink, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
+        Box(Modifier.size(46.dp).clip(CircleShape).background(W.brandSoft), contentAlignment = Alignment.Center) {
+            Icon(DinexNavigationIcons.Sparkle, null, tint = W.brand, modifier = Modifier.size(20.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+        Text(title, color = W.ink, fontSize = 15.sp, fontWeight = FontWeight.Bold)
         Spacer(Modifier.height(4.dp))
         Text(body, color = W.ink3, fontSize = 13.sp, textAlign = TextAlign.Center)
         if (action != null && onAction != null) { Spacer(Modifier.height(14.dp)); WButton(action, primary = true, onClick = onAction) }
     }
 }
 
+/** Chip que muestra cuánto cambió un valor; [goodWhenDown] pinta de verde las bajas (gastos). */
+@Composable
+internal fun DeltaChip(change: Double?, goodWhenDown: Boolean = false, onDark: Boolean = false) {
+    if (change == null) {
+        Text("Sin mes previo", color = if (onDark) W.sidebarMuted else W.ink3, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+        return
+    }
+    val good = if (goodWhenDown) change <= 0 else change >= 0
+    val tint = if (onDark) (if (good) W.mint else W.coral) else (if (good) W.positive else W.negative)
+    Row(
+        Modifier.clip(CircleShape).background(tint.copy(alpha = .14f)).padding(horizontal = 8.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(if (change >= 0) DinexNavigationIcons.ArrowUp else DinexNavigationIcons.ArrowDown, null, tint = tint, modifier = Modifier.size(11.dp))
+        Spacer(Modifier.width(3.dp))
+        Text("${fixed(kotlin.math.abs(change), if (kotlin.math.abs(change) < 10) 1 else 0)}%", color = tint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+    }
+}
+
 /** Va de 0 a 1 al aparecer: hace crecer gráficos y barras. */
 @Composable
-private fun rememberGrow(key: Any? = Unit, durationMillis: Int = 800): Float {
+internal fun rememberGrow(key: Any? = Unit, durationMillis: Int = 900): Float {
     val reduced = LocalDinexReducedMotion.current
     val grow = remember(key) { Animatable(if (reduced) 1f else 0f) }
     LaunchedEffect(key) { grow.animateTo(1f, tween(durationMillis, easing = FastOutSlowInEasing)) }
@@ -622,7 +1013,7 @@ private fun rememberGrow(key: Any? = Unit, durationMillis: Int = 800): Float {
  * se estira para que no queden huecos en blanco.
  */
 @Composable
-private fun Columns(
+internal fun Columns(
     ratio: Float = 1.6f,
     gap: Dp = 20.dp,
     equalHeight: Boolean = true,
@@ -648,302 +1039,25 @@ private fun Columns(
     }
 }
 
-// ---------------------------------------------------------------- Resumen
-
+/** Fila de tarjetas del mismo ancho que pasa a columna cuando no hay espacio. */
 @Composable
-private fun SummaryPage(data: FinancialData, actions: WebActions, onNavigate: (WebPage) -> Unit) {
-    val movements = data.movements
-    val today = civilDateFromEpochDays()
-    val month = movements.filter { it.isInCurrentMonth() }
-    val income = movements.filter { it.income }.sumOf { it.amount }
-    val expense = movements.filterNot { it.income }.sumOf { it.amount }
-    val available = income - expense - data.savings
-    val monthIncome = month.filter { it.income }.sumOf { it.amount }
-    val monthExpense = month.filterNot { it.income }.sumOf { it.amount }
-    PageFrame {
-        Columns(ratio = 1.55f, left = { stretch ->
-            BalanceHero(available, monthIncome, monthExpense, data.savings, month, today, actions, stretch)
-        }, right = { stretch ->
-            TodayCard(movements.filter { !it.income && it.isToday() }.sumOf { it.amount }, data.dailyLimit.toDouble(), data.activeStreak(),
-                data.streakDay == currentDayIndex(), actions, stretch) { onNavigate(WebPage.BUDGET) }
-        })
-        MonthInsights(month.filterNot { it.income }, movements.filter { !it.income && it.monthKey() == today.year * 12 + today.month - 2 }.sumOf { it.amount }, today)
-        Columns(ratio = 1.55f, left = { stretch ->
-            DailySpendingCard(month, today.year, today.month, stretch)
-        }, right = { stretch ->
-            CategoryDonutCard(month.filterNot { it.income }, stretch)
-        })
-        Columns(ratio = 1.55f, left = { stretch ->
-            RecentMovementsCard(movements.sortedWith(compareByDescending<Movement> { it.epochDay() }.thenByDescending { it.id }).take(7), stretch) { onNavigate(WebPage.MOVEMENTS) }
-        }, right = { stretch ->
-            GoalsCompactCard(data.savingGoals(), actions) { onNavigate(WebPage.GOALS) }
-            RemindersCard(data.reminders, actions, stretch)
-        })
-    }
-}
-
-/** Tres datos del mes calculados con tus movimientos: tendencia, proyección y categoría principal. */
-@Composable
-private fun MonthInsights(expenses: List<Movement>, previousMonth: Double, today: DinexDate) {
-    val spent = expenses.sumOf { it.amount }
-    val projected = spent / today.day.coerceAtLeast(1) * daysInMonth(today.year, today.month)
-    val top = expenses.groupBy { it.category }.map { it.key to it.value.sumOf { item -> item.amount } }.maxByOrNull { it.second }
-    val change = if (previousMonth > 0) (projected - previousMonth) / previousMonth * 100 else null
+internal fun TileRow(minWidth: Dp = 760.dp, tiles: List<@Composable (Modifier) -> Unit>) {
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val tiles: List<@Composable (Modifier) -> Unit> = listOf(
-            { InsightTile(DinexNavigationIcons.Analysis, "Proyección del mes", moneyGrouped(rememberCountUp(projected)), "Si sigues a este ritmo", W.brand, it) },
-            { InsightTile(
-                if (change != null && change > 0) DinexNavigationIcons.ArrowUp else DinexNavigationIcons.ArrowDown, "Frente al mes pasado",
-                change?.let { value -> "${if (value > 0) "+" else ""}${fixed(value, 0)}%" } ?: "Sin datos",
-                if (change == null) "Aún no hay un mes anterior" else if (change > 0) "Vas gastando más" else "Vas gastando menos",
-                if (change != null && change > 0) W.negative else W.positive, it,
-            ) },
-            { InsightTile(DinexNavigationIcons.Target, "Categoría principal", top?.first ?: "Sin gastos",
-                top?.let { pair -> "${moneyGrouped(pair.second)} · ${percentLabel(pair.second, spent)} del mes" } ?: "Registra tu primer gasto", W.warning, it) },
-        )
-        if (maxWidth >= 700.dp) Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(20.dp)) { tiles.forEach { tile -> tile(Modifier.weight(1f).fillMaxHeight()) } }
-        else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) { tiles.forEach { tile -> tile(Modifier.fillMaxWidth()) } }
-    }
-}
-
-@Composable
-private fun InsightTile(icon: ImageVector, label: String, value: String, note: String, tint: Color, modifier: Modifier) {
-    WCard(modifier, padding = 18.dp) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(40.dp).clip(RoundedCornerShape(12.dp)).background(tint.copy(alpha = .12f)), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = tint, modifier = Modifier.size(20.dp))
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(label, color = W.ink3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(value, color = W.ink, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(note, color = W.ink2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-@Composable
-private fun BalanceHero(available: Double, monthIncome: Double, monthExpense: Double, savings: Double, month: List<Movement>, today: DinexDate, actions: WebActions, modifier: Modifier = Modifier) {
-    val shape = CardShape
-    Column(
-        modifier.fillMaxWidth().clip(shape).background(Brush.linearGradient(listOf(W.forest, W.forest2))).drawBehind {
-            // Cuadrícula sutil de fondo.
-            val step = 28.dp.toPx()
-            var x = step
-            while (x < size.width) { drawLine(Color.White.copy(alpha = .035f), Offset(x, 0f), Offset(x, size.height), 1f); x += step }
-            var y = step
-            while (y < size.height) { drawLine(Color.White.copy(alpha = .035f), Offset(0f, y), Offset(size.width, y), 1f); y += step }
-        }.padding(26.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("SALDO DISPONIBLE", color = W.lime, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.6.sp, modifier = Modifier.weight(1f))
-            Text("${currentMonthName(today.month)} ${today.year}", color = W.sidebarMuted, fontSize = 12.sp)
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(moneyGrouped(rememberCountUp(available)), color = Color.White, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1).sp)
-        Spacer(Modifier.height(14.dp))
-        // Evolución del saldo en el mes.
-        val net = month.sumOf { if (it.income) it.amount else -it.amount }
-        val base = available + savings - net
-        val points = (1..today.day).map { day -> base + month.filter { it.day <= day }.sumOf { if (it.income) it.amount else -it.amount } }
-        Sparkline(points, Modifier.fillMaxWidth().weight(1f).heightIn(min = 56.dp))
-        Spacer(Modifier.height(18.dp))
-        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
-            HeroStat("Ingresos del mes", "+ ${moneyGrouped(monthIncome)}", Color(0xFF8BE3B4), Modifier.weight(1f))
-            Box(Modifier.width(1.dp).fillMaxHeight().background(Color.White.copy(alpha = .12f)))
-            HeroStat("Gastos del mes", "- ${moneyGrouped(monthExpense)}", Color(0xFFFFA697), Modifier.weight(1f).padding(start = 18.dp))
-            Box(Modifier.width(1.dp).fillMaxHeight().background(Color.White.copy(alpha = .12f)))
-            HeroStat("Ahorrado", moneyGrouped(savings), W.lime, Modifier.weight(1f).padding(start = 18.dp))
-        }
-        Spacer(Modifier.height(22.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterHorizontally)) {
-            Row(
-                Modifier.height(42.dp).clip(RoundedCornerShape(10.dp)).background(W.lime).clickable(onClick = actions.onExpense)
-                    .pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(DinexNavigationIcons.ArrowDown, null, tint = W.forest, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Registrar gasto", color = W.forest, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-            Row(
-                Modifier.height(42.dp).clip(RoundedCornerShape(10.dp)).border(1.dp, Color.White.copy(alpha = .25f), RoundedCornerShape(10.dp))
-                    .clickable(onClick = actions.onIncome).pointerHoverIcon(PointerIcon.Hand).padding(horizontal = 16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(DinexNavigationIcons.ArrowUp, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Registrar ingreso", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeroStat(label: String, value: String, tint: Color, modifier: Modifier) {
-    Column(modifier) {
-        Text(label, color = W.sidebarMuted, fontSize = 12.sp)
-        Spacer(Modifier.height(4.dp))
-        Text(value, color = tint, fontSize = 17.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun Sparkline(points: List<Double>, modifier: Modifier) {
-    val grow = rememberGrow(points.size, 1100)
-    Canvas(modifier) {
-        if (points.size < 2) {
-            drawLine(W.lime.copy(alpha = .6f), Offset(0f, size.height / 2), Offset(size.width, size.height / 2), 2.dp.toPx(), StrokeCap.Round)
-            return@Canvas
-        }
-        val lo = points.min(); val hi = points.max(); val range = (hi - lo).takeIf { it > 0 } ?: 1.0
-        fun at(i: Int) = Offset(size.width * i / (points.size - 1), size.height - ((points[i] - lo) / range * (size.height * .85f)).toFloat() - size.height * .075f)
-        val line = Path().apply { moveTo(at(0).x, at(0).y); for (i in 1 until points.size) lineTo(at(i).x, at(i).y) }
-        val area = Path().apply { addPath(line); lineTo(size.width, size.height); lineTo(0f, size.height); close() }
-        clipRect(right = size.width * grow) {
-            drawPath(area, Brush.verticalGradient(listOf(W.lime.copy(alpha = .28f), Color.Transparent)))
-            drawPath(line, W.lime, style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
-        }
-        if (grow >= 1f) drawCircle(W.lime, 4.dp.toPx(), at(points.lastIndex))
-    }
-}
-
-@Composable
-private fun TodayCard(spent: Double, limit: Double, streak: Int, savedToday: Boolean, actions: WebActions, modifier: Modifier = Modifier, onBudget: () -> Unit) {
-    WCard(modifier.fillMaxWidth()) {
-        CardTitle("Gasto de hoy", "Límite diario ${moneyGrouped(limit)}") { LinkButton("Ajustar", onBudget) }
-        Spacer(Modifier.height(16.dp))
-        val progress = if (limit > 0) (spent / limit).toFloat() else 0f
-        val over = spent > limit
-        val ring by animateFloatAsState(progress.coerceIn(0f, 1f), tween(if (LocalDinexReducedMotion.current) 0 else 700), label = "anillo")
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(132.dp), contentAlignment = Alignment.Center) {
-                val track = W.line; val color = if (over) W.negative else W.brand
-                Canvas(Modifier.fillMaxSize()) {
-                    val stroke = 12.dp.toPx(); val inset = stroke / 2
-                    drawArc(track, -220f, 260f, false, Offset(inset, inset), Size(size.width - stroke, size.height - stroke), style = Stroke(stroke, cap = StrokeCap.Round))
-                    if (ring > 0f) drawArc(color, -220f, 260f * ring, false, Offset(inset, inset), Size(size.width - stroke, size.height - stroke), style = Stroke(stroke, cap = StrokeCap.Round))
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(moneyGrouped(spent), color = W.ink, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
-                    Text("${(progress * 100).toInt()}% del límite", color = W.ink3, fontSize = 11.sp)
-                }
-            }
-            Spacer(Modifier.width(18.dp))
-            Column(Modifier.weight(1f)) {
-                Text(if (over) "Superaste tu límite" else "Te quedan", color = W.ink3, fontSize = 12.sp)
-                Text(moneyGrouped(kotlin.math.abs(limit - spent)), color = if (over) W.negative else W.positive, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-                Spacer(Modifier.height(10.dp))
-                Text(
-                    if (over) "Revisa tus gastos de hoy antes de seguir." else "Puedes gastar esto hoy sin salirte de tu plan.",
-                    color = W.ink2, fontSize = 12.sp, lineHeight = 17.sp,
-                )
-            }
-        }
-        Spacer(Modifier.weight(1f).heightIn(min = 16.dp))
-        HorizontalDivider(color = W.line)
-        Spacer(Modifier.height(14.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            StreakBadge(streakLevel(streak), 34.dp, locked = streak == 0)
-            Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
-                Text("Racha de ahorro", color = W.ink3, fontSize = 12.sp)
-                Text("$streak ${if (streak == 1) "día" else "días"} · Nivel ${streakLevel(streak).name}", color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-            }
-            if (savedToday) Text("Hoy ya ahorraste", color = W.positive, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-            else WButton("Ahorrar hoy", primary = true) { actions.onSave(null) }
-        }
-    }
-}
-
-@Composable
-private fun DailySpendingCard(month: List<Movement>, year: Int, monthNumber: Int, modifier: Modifier = Modifier) {
-    val days = daysInMonth(year, monthNumber)
-    val today = civilDateFromEpochDays().day
-    val values = (1..days).map { d -> month.filter { !it.income && it.day == d }.sumOf { it.amount } }
-    val total = values.sum()
-    val average = if (today > 0) values.take(today).sum() / today else 0.0
-    var hover by remember { mutableStateOf<Int?>(null) }
-    val grow = rememberGrow(monthNumber)
-    WCard(modifier.fillMaxWidth()) {
-        CardTitle("Gasto diario", "${currentMonthName(monthNumber)} · total ${moneyGrouped(total)} · promedio ${moneyGrouped(average)} por día")
-        Spacer(Modifier.height(18.dp))
-        val measurer = rememberTextMeasurer()
-        val labelStyle = TextStyle(color = W.ink3, fontSize = 10.sp, fontFamily = MaterialTheme.typography.bodySmall.fontFamily)
-        val brand = W.brand; val faded = W.line; val ink = W.ink; val lime = W.lime; val ink3 = W.ink3
-        Box(Modifier.fillMaxWidth().weight(1f).heightIn(min = 200.dp)) {
-            Canvas(
-                Modifier.fillMaxSize().pointerInput(days) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val x = event.changes.first().position.x
-                            val left = 44.dp.toPx()
-                            hover = if (event.type == PointerEventType.Exit || x < left) null
-                            else (((x - left) / ((size.width - left) / days)).toInt() + 1).coerceIn(1, days)
-                        }
-                    }
-                },
-            ) {
-                val left = 44.dp.toPx(); val bottom = size.height - 22.dp.toPx(); val top = 8.dp.toPx()
-                val maxValue = max(values.maxOrNull() ?: 0.0, 1.0)
-                val nice = niceTop(maxValue)
-                for (i in 0..4) {
-                    val y = bottom - (bottom - top) * i / 4
-                    drawLine(faded.copy(alpha = if (i == 0) 1f else .6f), Offset(left, y), Offset(size.width, y), 1f)
-                    val label = measurer.measure(shortMoney(nice * i / 4), labelStyle)
-                    drawText(label, topLeft = Offset(left - label.size.width - 8.dp.toPx(), y - label.size.height / 2))
-                }
-                val slot = (size.width - left) / days
-                val barW = min(slot * .62f, 18.dp.toPx())
-                values.forEachIndexed { index, value ->
-                    val day = index + 1
-                    val x = left + slot * index + (slot - barW) / 2
-                    val h = ((bottom - top) * value / nice).toFloat() * grow
-                    val color = when {
-                        day > today -> faded.copy(alpha = .5f)
-                        day == today -> lime
-                        hover == day -> ink
-                        else -> brand
-                    }
-                    if (day > today) drawRoundRect(color, Offset(x, bottom - 3.dp.toPx()), Size(barW, 3.dp.toPx()), CornerRadius(2.dp.toPx()))
-                    else if (h > 0) drawRoundRect(color, Offset(x, bottom - h), Size(barW, h), CornerRadius(3.dp.toPx()))
-                    if (day == 1 || day % 5 == 0 || day == days) {
-                        val label = measurer.measure("$day", labelStyle)
-                        drawText(label, topLeft = Offset(left + slot * index + slot / 2 - label.size.width / 2, bottom + 6.dp.toPx()))
-                    }
-                }
-                if (average > 0) {
-                    val y = bottom - ((bottom - top) * average / nice).toFloat()
-                    drawLine(ink3, Offset(left, y), Offset(size.width, y), 1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6f, 6f)))
-                }
-            }
-            hover?.let { day ->
-                Box(Modifier.align(Alignment.TopEnd).clip(RoundedCornerShape(8.dp)).background(W.forest).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                    Text("$day ${reportMonthShort(monthNumber)} · ${moneyGrouped(values[day - 1])}", color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        if (maxWidth >= minWidth) Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+            tiles.forEach { tile -> tile(Modifier.weight(1f).fillMaxHeight()) }
+        } else Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            tiles.chunked(2).forEach { pair ->
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    pair.forEach { tile -> tile(Modifier.weight(1f).fillMaxHeight()) }
+                    if (pair.size == 1) Spacer(Modifier.weight(1f))
                 }
             }
         }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Legend(W.brand, "Días anteriores"); Legend(W.lime, "Hoy"); Legend(W.ink3, "Promedio", dashed = true)
-        }
     }
 }
 
-/** Tope del eje con 4 divisiones de números redondos (0, 20, 40, 60, 80…). */
-private fun niceTop(value: Double): Double {
-    val raw = value / 4
-    var magnitude = 1.0
-    while (magnitude * 10 <= raw) magnitude *= 10
-    while (magnitude > raw && magnitude > 1.0) magnitude /= 10
-    val step = listOf(1.0, 2.0, 2.5, 5.0, 10.0).map { it * magnitude }.first { it >= raw }
-    return step * 4
-}
-
 @Composable
-private fun Legend(color: Color, label: String, dashed: Boolean = false) {
+internal fun Legend(color: Color, label: String, dashed: Boolean = false) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(width = if (dashed) 14.dp else 10.dp, height = if (dashed) 2.dp else 10.dp).clip(RoundedCornerShape(3.dp)).background(color))
         Spacer(Modifier.width(6.dp))
@@ -951,908 +1065,47 @@ private fun Legend(color: Color, label: String, dashed: Boolean = false) {
     }
 }
 
+/** Valor grande con etiqueta, para franjas de resumen. */
 @Composable
-private fun CategoryDonutCard(expenses: List<Movement>, modifier: Modifier = Modifier) {
-    val total = expenses.sumOf { it.amount }
-    val groups = expenses.groupBy { it.category }.map { (name, list) -> name to list.sumOf { it.amount } }.sortedByDescending { it.second }
-    WCard(modifier.fillMaxWidth()) {
-        CardTitle("Gastos por categoría", "Este mes")
-        Spacer(Modifier.height(18.dp))
-        if (groups.isEmpty()) { EmptyNote("Sin gastos este mes", "Cuando registres un gasto verás aquí en qué se va tu dinero."); return@WCard }
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(150.dp), contentAlignment = Alignment.Center) {
-                val colors = groups.mapIndexed { i, g -> categoryColor(g.first, i) }
-                val surface = W.surface
-                val grow = rememberGrow(groups.size, 900)
-                Canvas(Modifier.fillMaxSize()) {
-                    val stroke = 22.dp.toPx(); var start = -90f
-                    groups.forEachIndexed { i, (_, value) ->
-                        val sweep = (value / total * 360).toFloat() * grow
-                        drawArc(colors[i], start, sweep, false, Offset(stroke / 2, stroke / 2), Size(size.width - stroke, size.height - stroke), style = Stroke(stroke))
-                        if (groups.size > 1) drawArc(surface, start + sweep - .8f, 1.6f, false, Offset(stroke / 2, stroke / 2), Size(size.width - stroke, size.height - stroke), style = Stroke(stroke + 2))
-                        start += sweep
-                    }
-                }
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Total", color = W.ink3, fontSize = 11.sp)
-                    Text(moneyGrouped(total), color = W.ink, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                }
-            }
-        }
-        Spacer(Modifier.height(18.dp))
-        groups.take(6).forEachIndexed { i, (name, value) ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(9.dp).clip(CircleShape).background(categoryColor(name, i)))
-                Spacer(Modifier.width(10.dp))
-                Text(name, color = W.ink, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(percentLabel(value, total), color = W.ink3, fontSize = 12.sp, modifier = Modifier.width(44.dp), textAlign = TextAlign.End)
-                Text(moneyGrouped(value), color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(96.dp), textAlign = TextAlign.End)
-            }
-        }
+internal fun StripStat(label: String, value: String, tint: Color, modifier: Modifier, extra: (@Composable () -> Unit)? = null) {
+    Column(modifier.padding(horizontal = 20.dp, vertical = 15.dp)) {
+        Text(label, color = W.ink3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(3.dp))
+        Text(value, color = tint, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1, overflow = TextOverflow.Ellipsis, letterSpacing = (-0.3).sp)
+        extra?.let { Spacer(Modifier.height(5.dp)); it() }
     }
 }
 
 @Composable
-private fun RecentMovementsCard(items: List<Movement>, modifier: Modifier = Modifier, onAll: () -> Unit) {
-    WCard(modifier.fillMaxWidth(), padding = 0.dp) {
-        Box(Modifier.padding(start = 22.dp, end = 14.dp, top = 18.dp, bottom = 8.dp)) {
-            CardTitle("Últimos movimientos", "Los más recientes primero") { LinkButton("Ver todos", onAll) }
-        }
-        if (items.isEmpty()) Box(Modifier.padding(horizontal = 22.dp)) { EmptyNote("Todavía no hay movimientos", "Registra tu primer gasto o ingreso.") }
-        items.forEachIndexed { index, item ->
-            if (index > 0) HorizontalDivider(color = W.line, modifier = Modifier.padding(horizontal = 22.dp))
-            Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                CategoryIcon(item.category, item.income)
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(item.title, color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text("${item.category} · ${item.method}", color = W.ink3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Text(item.reportDate(), color = W.ink3, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 12.dp))
-                Text((if (item.income) "+ " else "- ") + moneyGrouped(item.amount), color = if (item.income) W.positive else W.ink,
-                    fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.widthIn(min = 100.dp), textAlign = TextAlign.End)
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-    }
+internal fun StripDivider() { Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 14.dp).background(W.line)) }
+
+/** Franja horizontal de datos dentro de una tarjeta. */
+@Composable
+internal fun StatStrip(content: @Composable RowScope.() -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().dinexEntrance().clip(WebCardShape).background(W.surface).border(1.dp, W.line, WebCardShape).height(IntrinsicSize.Min),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
 }
 
 @Composable
-private fun GoalsCompactCard(goals: List<SavingsGoal>, actions: WebActions, onAll: () -> Unit) {
-    WCard(Modifier.fillMaxWidth()) {
-        CardTitle("Metas de ahorro", "${moneyGrouped(goals.sumOf { it.saved })} ahorrados") { LinkButton("Ver metas", onAll) }
-        Spacer(Modifier.height(10.dp))
-        if (goals.isEmpty()) { EmptyNote("Aún no tienes metas", "Dale un propósito a tu ahorro.", "Crear meta") { actions.onSave(null) }; return@WCard }
-        goals.sortedByDescending { if (it.target > 0) it.saved / it.target else 0.0 }.take(3).forEach { goal ->
-            val progress = if (goal.target > 0) (goal.saved / goal.target).toFloat() else 0f
-            Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { actions.onOpenGoal(goal.id) }.pointerHoverIcon(PointerIcon.Hand).padding(vertical = 10.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(painterResource(goalTheme(goal.name).main), null, Modifier.size(26.dp), contentScale = ContentScale.Fit)
-                    Spacer(Modifier.width(10.dp))
-                    Text(displayGoalName(goal.name), color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(percentLabel(goal.saved, goal.target), color = W.ink2, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Spacer(Modifier.height(8.dp))
-                ThinBar(progress, W.brand, 5.dp)
-                Spacer(Modifier.height(5.dp))
-                Text("${moneyGrouped(goal.saved)} de ${moneyGrouped(goal.target)}", color = W.ink3, fontSize = 12.sp)
-            }
-        }
-        Spacer(Modifier.height(6.dp))
-        WButton("Ahorrar", DinexNavigationIcons.Add, primary = true) { actions.onSave(null) }
-    }
+internal fun TableHead(text: String, modifier: Modifier, align: TextAlign = TextAlign.Start) {
+    Text(text.uppercase(), color = W.ink3, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .9.sp, modifier = modifier, textAlign = align)
 }
 
+/** Anillo de progreso simple (metas, presupuestos). */
 @Composable
-private fun RemindersCard(reminders: List<PaymentReminder>, actions: WebActions, modifier: Modifier = Modifier) {
-    WCard(modifier.fillMaxWidth()) {
-        CardTitle("Próximos pagos", if (reminders.isEmpty()) "Sin pagos pendientes" else countLabel(reminders.size, "pendiente", "pendientes")) {
-            IconSquare(DinexNavigationIcons.Add, "Agregar recordatorio", actions.onAddReminder)
+internal fun RingProgress(progress: Float, color: Color, size: Dp, stroke: Dp = 8.dp, track: Color = W.line, content: @Composable BoxScope.() -> Unit = {}) {
+    val grow = rememberGrow(progress, 1000)
+    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
+        Canvas(Modifier.fillMaxSize()) {
+            val s = stroke.toPx()
+            val arc = Size(this.size.width - s, this.size.height - s)
+            drawArc(track, -90f, 360f, false, Offset(s / 2, s / 2), arc, style = Stroke(s))
+            val sweep = 360f * progress.coerceIn(0f, 1f) * grow
+            if (sweep > 0f) drawArc(color, -90f, sweep, false, Offset(s / 2, s / 2), arc, style = Stroke(s, cap = StrokeCap.Round))
         }
-        if (reminders.isEmpty()) {
-            Column(Modifier.fillMaxWidth().weight(1f).heightIn(min = 96.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Icon(DinexNavigationIcons.Bell, null, tint = W.ink3, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.height(8.dp))
-                Text("Agrega tus pagos fijos y DINEX te los recordará.", color = W.ink3, fontSize = 12.sp, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(12.dp))
-                WButton("Agregar recordatorio", DinexNavigationIcons.Add, onClick = actions.onAddReminder)
-            }
-        } else Spacer(Modifier.height(10.dp))
-        reminders.sortedBy { it.date }.take(4).forEach { reminder ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(W.surfaceAlt).border(1.dp, W.line, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                    Icon(DinexNavigationIcons.Bell, null, tint = W.warning, modifier = Modifier.size(16.dp))
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(reminder.title, color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Text(reminder.date, color = W.ink3, fontSize = 12.sp)
-                }
-                Text(moneyGrouped(reminder.amount), color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.width(8.dp))
-                LinkButton("Pagar") { actions.onResolveReminder(reminder) }
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------- Movimientos
-
-@Composable
-private fun MovementsWebPage(movements: List<Movement>, actions: WebActions) {
-    var query by rememberSaveable { mutableStateOf("") }
-    var type by rememberSaveable { mutableIntStateOf(0) }
-    var category by rememberSaveable { mutableStateOf("") }
-    var method by rememberSaveable { mutableStateOf("") }
-    var monthFilter by rememberSaveable { mutableIntStateOf(-1) }
-    val months = remember(movements) { movements.map { it.monthKey() }.distinct().sortedDescending() }
-    val visible = remember(movements, query, type, category, method, monthFilter) {
-        val q = query.trim().lowercase()
-        movements.filter { m ->
-            (type == 0 || (type == 1 && !m.income) || (type == 2 && m.income)) &&
-                (category.isEmpty() || m.category == category) && (method.isEmpty() || m.method == method) &&
-                (monthFilter < 0 || m.monthKey() == monthFilter) &&
-                (q.isEmpty() || m.title.lowercase().contains(q) || m.category.lowercase().contains(q) || m.method.lowercase().contains(q) || m.location.lowercase().contains(q))
-        }.sortedWith(compareByDescending<Movement> { it.epochDay() }.thenByDescending { it.id })
-    }
-    val income = visible.filter { it.income }.sumOf { it.amount }
-    val expense = visible.filterNot { it.income }.sumOf { it.amount }
-    PageFrame(scroll = false) {
-        // Barra de herramientas: búsqueda y acciones arriba, filtros debajo.
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SearchField(query, { query = it }, Modifier.weight(1f).widthIn(max = 420.dp))
-            Spacer(Modifier.weight(.01f))
-            WButton("Importar", DinexNavigationIcons.Swap, onClick = actions.onImport)
-            WButton("Exportar", DinexNavigationIcons.Send, primary = true, onClick = actions.onExport)
-        }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            Segmented(listOf("Todos", "Gastos", "Ingresos"), type) { type = it }
-            SelectMenu("Categoría", category, listOf("" to "Todas") + movements.map { it.category }.distinct().sorted().map { it to it }) { category = it }
-            SelectMenu("Medio", method, listOf("" to "Todos") + movements.map { it.method }.distinct().sorted().map { it to it }) { method = it }
-            SelectMenu("Mes", monthFilter.toString(), listOf("-1" to "Todos") + months.map { it.toString() to monthKeyLabel(it) }) { monthFilter = it.toInt() }
-            if (query.isNotEmpty() || type != 0 || category.isNotEmpty() || method.isNotEmpty() || monthFilter >= 0) {
-                LinkButton("Limpiar filtros") { query = ""; type = 0; category = ""; method = ""; monthFilter = -1 }
-            }
-        }
-        // Resumen de lo filtrado
-        Row(
-            Modifier.fillMaxWidth().clip(CardShape).background(W.surface).border(1.dp, W.line, CardShape).height(IntrinsicSize.Min),
-        ) {
-            StripStat("Movimientos", "${visible.size}", W.ink, Modifier.weight(1f))
-            StripDivider()
-            StripStat("Entradas", "+ ${moneyGrouped(income)}", W.positive, Modifier.weight(1f))
-            StripDivider()
-            StripStat("Salidas", "- ${moneyGrouped(expense)}", W.negative, Modifier.weight(1f))
-            StripDivider()
-            StripStat("Neto", moneyGrouped(income - expense), if (income - expense < 0) W.negative else W.ink, Modifier.weight(1f))
-        }
-        // Tabla
-        Column(Modifier.fillMaxWidth().weight(1f).clip(CardShape).background(W.surface).border(1.dp, W.line, CardShape)) {
-            Row(Modifier.fillMaxWidth().background(W.surfaceAlt).padding(horizontal = 20.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                TableHead("Descripción", Modifier.weight(2.4f))
-                TableHead("Categoría", Modifier.weight(1.3f))
-                TableHead("Medio", Modifier.weight(1f))
-                TableHead("Fecha", Modifier.weight(1f))
-                TableHead("Monto", Modifier.weight(1.1f), TextAlign.End)
-                Spacer(Modifier.width(44.dp))
-            }
-            HorizontalDivider(color = W.line)
-            if (visible.isEmpty()) {
-                EmptyNote(
-                    if (movements.isEmpty()) "Todavía no hay movimientos" else "Sin resultados",
-                    if (movements.isEmpty()) "Registra tu primer gasto o importa un archivo de tu banco." else "Ningún movimiento coincide con los filtros.",
-                    if (movements.isEmpty()) "Registrar gasto" else null, if (movements.isEmpty()) actions.onExpense else null,
-                )
-            } else {
-                LazyColumn(Modifier.fillMaxSize()) {
-                    items(visible, key = { "${it.id}-${it.epochDay()}-${it.title}" }) { item ->
-                        Box(if (LocalDinexReducedMotion.current) Modifier else Modifier.animateItem()) { MovementTableRow(item) { actions.onDeleteMovement(item) } }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SearchField(value: String, onChange: (String) -> Unit, modifier: Modifier) {
-    val shape = RoundedCornerShape(10.dp)
-    Row(modifier.height(38.dp).clip(shape).background(W.surface).border(1.dp, W.line, shape).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-        Icon(DinexNavigationIcons.Search, null, tint = W.ink3, modifier = Modifier.size(16.dp))
-        Spacer(Modifier.width(8.dp))
-        Box(Modifier.weight(1f)) {
-            if (value.isEmpty()) Text("Buscar movimiento…", color = W.ink3, fontSize = 13.sp)
-            BasicTextField(value, onChange, singleLine = true, textStyle = TextStyle(color = W.ink, fontSize = 13.sp, fontFamily = MaterialTheme.typography.bodyMedium.fontFamily),
-                cursorBrush = SolidColor(W.brand), modifier = Modifier.fillMaxWidth())
-        }
-        if (value.isNotEmpty()) Icon(DinexNavigationIcons.Close, "Limpiar búsqueda", tint = W.ink3, modifier = Modifier.size(16.dp).clickable { onChange("") })
-    }
-}
-
-@Composable
-private fun StripStat(label: String, value: String, tint: Color, modifier: Modifier) {
-    Column(modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
-        Text(label, color = W.ink3, fontSize = 12.sp)
-        Spacer(Modifier.height(2.dp))
-        Text(value, color = tint, fontSize = 18.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-@Composable
-private fun StripDivider() { Box(Modifier.width(1.dp).fillMaxHeight().padding(vertical = 12.dp).background(W.line)) }
-
-@Composable
-private fun TableHead(text: String, modifier: Modifier, align: TextAlign = TextAlign.Start) {
-    Text(text.uppercase(), color = W.ink3, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = .8.sp, modifier = modifier, textAlign = align)
-}
-
-@Composable
-private fun MovementTableRow(item: Movement, onDelete: () -> Unit) {
-    val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    Column {
-        Row(
-            Modifier.fillMaxWidth().background(if (hovered) W.hover else Color.Transparent).hoverable(interaction).padding(horizontal = 20.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(Modifier.weight(2.4f), verticalAlignment = Alignment.CenterVertically) {
-                CategoryIcon(item.category, item.income, 34.dp)
-                Spacer(Modifier.width(12.dp))
-                Column {
-                    Text(item.title, color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (item.location.isNotBlank()) Text(item.location, color = W.ink3, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Box(Modifier.weight(1.3f)) {
-                Row(Modifier.clip(CircleShape).background(W.surfaceAlt).border(1.dp, W.line, CircleShape).padding(horizontal = 10.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(7.dp).clip(CircleShape).background(if (item.income) W.positive else categoryColor(item.category)))
-                    Spacer(Modifier.width(6.dp))
-                    Text(item.category, color = W.ink2, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            Text(item.method, color = W.ink2, fontSize = 13.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("${item.day} ${reportMonthShort(item.month)} ${item.year}", color = W.ink2, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            Text((if (item.income) "+ " else "- ") + moneyGrouped(item.amount), color = if (item.income) W.positive else W.ink, fontSize = 14.sp,
-                fontWeight = FontWeight.Bold, modifier = Modifier.weight(1.1f), textAlign = TextAlign.End)
-            Box(Modifier.width(44.dp), contentAlignment = Alignment.CenterEnd) {
-                Box(
-                    Modifier.size(30.dp).clip(RoundedCornerShape(8.dp)).clickable(onClickLabel = "Eliminar ${item.title}", onClick = onDelete).pointerHoverIcon(PointerIcon.Hand),
-                    contentAlignment = Alignment.Center,
-                ) { Icon(DinexNavigationIcons.Close, "Eliminar", tint = if (hovered) W.negative else W.ink3.copy(alpha = .5f), modifier = Modifier.size(15.dp)) }
-            }
-        }
-        HorizontalDivider(color = W.line.copy(alpha = .6f), modifier = Modifier.padding(horizontal = 20.dp))
-    }
-}
-
-// ---------------------------------------------------------------- Presupuesto
-
-@Composable
-private fun BudgetWebPage(model: DinexViewModel, data: FinancialData, actions: WebActions) {
-    val month = data.movements.filter { it.isInCurrentMonth() }
-    val suggestions = remember(data.movements) { suggestedCategoryBudgets(month, data.movements) }
-    var editor by remember { mutableStateOf(false) }
-    val spentToday = data.movements.filter { !it.income && it.isToday() }.sumOf { it.amount }
-    PageFrame {
-        Columns(ratio = 1f, left = { stretch ->
-            WCard(Modifier.fillMaxWidth()) {
-                CardTitle("Límite diario", "Lo máximo que quieres gastar en un día")
-                Spacer(Modifier.height(16.dp))
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(moneyGrouped(data.dailyLimit.toDouble()), color = W.ink, fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.5).sp)
-                    Spacer(Modifier.width(8.dp))
-                    Text("por día", color = W.ink3, fontSize = 13.sp, modifier = Modifier.padding(bottom = 7.dp))
-                }
-                Slider(
-                    value = data.dailyLimit, onValueChange = { model.setDailyLimit((it / 5f).toInt() * 5f) }, valueRange = 20f..120f,
-                    colors = SliderDefaults.colors(thumbColor = W.brand, activeTrackColor = W.brand, inactiveTrackColor = W.line),
-                    modifier = Modifier.pointerHoverIcon(PointerIcon.Hand),
-                )
-                Row { Text("S/ 20", color = W.ink3, fontSize = 12.sp, modifier = Modifier.weight(1f)); Text("S/ 120", color = W.ink3, fontSize = 12.sp) }
-                Spacer(Modifier.height(18.dp))
-                HorizontalDivider(color = W.line)
-                Spacer(Modifier.height(16.dp))
-                Row {
-                    Text("Hoy llevas", color = W.ink2, fontSize = 13.sp, modifier = Modifier.weight(1f))
-                    Text("${moneyGrouped(spentToday)} de ${moneyGrouped(data.dailyLimit.toDouble())}", color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                }
-                Spacer(Modifier.height(8.dp))
-                ThinBar((spentToday / data.dailyLimit).toFloat(), if (spentToday > data.dailyLimit) W.negative else W.brand, 8.dp)
-                Spacer(Modifier.height(10.dp))
-                Text("Al mes son ${moneyGrouped(data.dailyLimit * 30.0)} como máximo.", color = W.ink3, fontSize = 12.sp)
-            }
-            RemindersCard(data.reminders, actions, stretch)
-        }, right = { stretch ->
-            WCard(stretch.fillMaxWidth()) {
-                CardTitle("Presupuesto por categoría", "${currentMonthName()} · sugerido según tus ingresos e historial") {
-                    WButton("Editar límites", DinexNavigationIcons.Settings) { editor = true }
-                }
-                Spacer(Modifier.height(14.dp))
-                categories.forEach { info ->
-                    val limit = data.categoryBudgets[info.name] ?: suggestions[info.name] ?: 0.0
-                    val spent = month.filter { !it.income && it.budgetCategory() == info.name }.sumOf { it.amount }
-                    val over = limit > 0 && spent > limit
-                    Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CategoryIcon(info.name, false, 32.dp)
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(info.name, color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    when { limit <= 0 -> "Sin límite"; over -> "Te pasaste por ${moneyGrouped(spent - limit)}"; else -> "Quedan ${moneyGrouped(limit - spent)}" },
-                                    color = if (over) W.negative else W.ink3, fontSize = 12.sp,
-                                )
-                            }
-                            Text("${moneyGrouped(spent)} / ${moneyGrouped(limit)}", color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                        }
-                        Spacer(Modifier.height(9.dp))
-                        ThinBar(if (limit > 0) (spent / limit).toFloat() else 0f, if (over) W.negative else info.color, 6.dp)
-                    }
-                }
-                if (data.categoryBudgets.isNotEmpty()) {
-                    Spacer(Modifier.height(6.dp))
-                    LinkButton("Volver a los límites sugeridos") { model.resetCategoryBudgets() }
-                }
-            }
-        })
-    }
-    if (editor) CategoryBudgetEditorDialog(suggestions, data.categoryBudgets, onDismiss = { editor = false },
-        onSave = { if (model.setCategoryBudgets(it)) editor = false }, onReset = { model.resetCategoryBudgets(); editor = false })
-}
-
-// ---------------------------------------------------------------- Metas
-
-@Composable
-private fun GoalsWebPage(data: FinancialData, actions: WebActions) {
-    val goals = data.savingGoals()
-    val saved = goals.sumOf { it.saved }
-    val target = goals.sumOf { it.target }
-    PageFrame {
-        Row(
-            Modifier.fillMaxWidth().clip(CardShape).background(W.surface).border(1.dp, W.line, CardShape).height(IntrinsicSize.Min),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            StripStat("Total ahorrado", moneyGrouped(saved), W.brand, Modifier.weight(1f))
-            StripDivider()
-            StripStat("Meta total", moneyGrouped(target), W.ink, Modifier.weight(1f))
-            StripDivider()
-            StripStat("Avance general", percentLabel(saved, target), W.ink, Modifier.weight(1f))
-            StripDivider()
-            Box(Modifier.weight(1f).padding(horizontal = 20.dp), contentAlignment = Alignment.CenterEnd) {
-                WButton("Ahorrar en una meta", DinexNavigationIcons.Add, primary = true) { actions.onSave(null) }
-            }
-        }
-        if (goals.isEmpty()) {
-            WCard(Modifier.fillMaxWidth()) { EmptyNote("Aún no tienes metas", "Crea una meta para darle un propósito a tu ahorro.", "Crear mi primera meta") { actions.onSave(null) } }
-        } else {
-            BoxWithConstraints(Modifier.fillMaxWidth()) {
-                val columns = when { maxWidth >= 1050.dp -> 3; maxWidth >= 680.dp -> 2; else -> 1 }
-                Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    goals.chunked(columns).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                            row.forEach { goal -> GoalCard(goal, actions, Modifier.weight(1f)) }
-                            repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GoalCard(goal: SavingsGoal, actions: WebActions, modifier: Modifier) {
-    val theme = goalTheme(goal.name)
-    val progress = if (goal.target > 0) (goal.saved / goal.target).toFloat() else 0f
-    WCard(modifier) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(52.dp).clip(RoundedCornerShape(14.dp)).background(theme.top.copy(alpha = if (DinexThemeState.dark) .22f else .14f)), contentAlignment = Alignment.Center) {
-                Image(painterResource(theme.main), null, Modifier.size(38.dp), contentScale = ContentScale.Fit)
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(displayGoalName(goal.name), color = W.ink, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(if (progress >= 1f) "Meta cumplida" else "Faltan ${moneyGrouped((goal.target - goal.saved).coerceAtLeast(0.0))}",
-                    color = if (progress >= 1f) W.positive else W.ink3, fontSize = 12.sp)
-            }
-            Text(percentLabel(goal.saved, goal.target), color = W.brand, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-        }
-        Spacer(Modifier.height(18.dp))
-        ThinBar(progress, W.brand, 8.dp)
-        Spacer(Modifier.height(10.dp))
-        Row {
-            Text(moneyGrouped(goal.saved), color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-            Text("de ${moneyGrouped(goal.target)}", color = W.ink3, fontSize = 13.sp)
-        }
-        Spacer(Modifier.height(18.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            WButton("Ahorrar", DinexNavigationIcons.Add, primary = true) { actions.onSave(goal.id) }
-            WButton("Ver detalle") { actions.onOpenGoal(goal.id) }
-        }
-    }
-}
-
-// ---------------------------------------------------------------- Análisis
-
-@Composable
-private fun AnalysisWebPage(movements: List<Movement>, actions: WebActions) {
-    val months = remember(movements) { (movements.map { it.monthKey() } + civilDateFromEpochDays().let { it.year * 12 + it.month - 1 }).distinct().sortedDescending() }
-    var selected by rememberSaveable { mutableIntStateOf(months.first()) }
-    val inMonth = movements.filter { it.monthKey() == selected }
-    val expenses = inMonth.filterNot { it.income }
-    val income = inMonth.filter { it.income }.sumOf { it.amount }
-    val expense = expenses.sumOf { it.amount }
-    val previous = movements.filter { it.monthKey() == selected - 1 && !it.income }.sumOf { it.amount }
-    PageFrame {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            SelectMenu("Mes", selected.toString(), months.map { it.toString() to monthKeyLabel(it) }) { selected = it.toInt() }
-            Spacer(Modifier.weight(1f))
-            WButton("Exportar reporte", DinexNavigationIcons.Send, primary = true, onClick = actions.onExport)
-        }
-        Row(Modifier.fillMaxWidth().clip(CardShape).background(W.surface).border(1.dp, W.line, CardShape).height(IntrinsicSize.Min)) {
-            StripStat("Ingresos", "+ ${moneyGrouped(income)}", W.positive, Modifier.weight(1f))
-            StripDivider()
-            StripStat("Gastos", "- ${moneyGrouped(expense)}", W.negative, Modifier.weight(1f))
-            StripDivider()
-            StripStat("Ahorro del mes", percentLabel((income - expense).coerceAtLeast(0.0), income), W.ink, Modifier.weight(1f))
-            StripDivider()
-            StripStat("Vs. mes anterior", when {
-                previous <= 0 -> "Sin datos"
-                expense >= previous -> "+${percentLabel(expense - previous, previous)} en gastos"
-                else -> "-${percentLabel(previous - expense, previous)} en gastos"
-            }, if (previous > 0 && expense > previous) W.negative else W.ink, Modifier.weight(1f))
-        }
-        Columns(ratio = 1.4f, left = { stretch ->
-            MonthlyComparisonCard(movements, selected, stretch)
-        }, right = { stretch ->
-            WeekdayCard(expenses, stretch)
-        })
-        Columns(ratio = 1f, equalHeight = false, left = {
-            CategoryTableCard(expenses)
-        }, right = {
-            WCard(Modifier.fillMaxWidth()) {
-                CardTitle("Dónde gastas", "Gastos registrados con ubicación")
-                Spacer(Modifier.height(14.dp))
-                val places = remember(movements) { spendingPlaces(movements) }
-                if (places.isEmpty()) EmptyNote("Sin ubicaciones", "Registra gastos con ubicación desde el celular para ver tu mapa de calor.")
-                else Box(Modifier.fillMaxWidth().height(300.dp).clip(RoundedCornerShape(12.dp))) { SpendingHeatmap(places, Modifier.fillMaxSize()) }
-            }
-        })
-    }
-}
-
-@Composable
-private fun MonthlyComparisonCard(movements: List<Movement>, selected: Int, modifier: Modifier = Modifier) {
-    val keys = (selected - 5..selected).toList()
-    val series = keys.map { key ->
-        val list = movements.filter { it.monthKey() == key }
-        list.filter { it.income }.sumOf { it.amount } to list.filterNot { it.income }.sumOf { it.amount }
-    }
-    WCard(modifier.fillMaxWidth()) {
-        CardTitle("Ingresos y gastos", "Últimos 6 meses")
-        Spacer(Modifier.height(18.dp))
-        val measurer = rememberTextMeasurer()
-        val labelStyle = TextStyle(color = W.ink3, fontSize = 10.sp, fontFamily = MaterialTheme.typography.bodySmall.fontFamily)
-        val positive = W.brand; val negative = W.negative; val line = W.line
-        val grow = rememberGrow(selected)
-        Canvas(Modifier.fillMaxWidth().weight(1f).heightIn(min = 220.dp)) {
-            val left = 48.dp.toPx(); val bottom = size.height - 22.dp.toPx(); val top = 6.dp.toPx()
-            val top0 = niceTop(max(series.maxOf { max(it.first, it.second) }, 1.0))
-            for (i in 0..4) {
-                val y = bottom - (bottom - top) * i / 4
-                drawLine(line, Offset(left, y), Offset(size.width, y), 1f)
-                val label = measurer.measure(shortMoney(top0 * i / 4), labelStyle)
-                drawText(label, topLeft = Offset(left - label.size.width - 8.dp.toPx(), y - label.size.height / 2))
-            }
-            val slot = (size.width - left) / keys.size
-            val barW = min(slot * .26f, 22.dp.toPx())
-            series.forEachIndexed { i, (inc, exp) ->
-                val cx = left + slot * i + slot / 2
-                listOf(inc to positive, exp to negative).forEachIndexed { j, (value, color) ->
-                    val h = ((bottom - top) * value / top0).toFloat() * grow
-                    if (h > 0) drawRoundRect(color.copy(alpha = if (keys[i] == selected) 1f else .55f), Offset(if (j == 0) cx - barW - 2 else cx + 2, bottom - h), Size(barW, h), CornerRadius(3.dp.toPx()))
-                }
-                val label = measurer.measure(monthKeyShort(keys[i]), labelStyle)
-                drawText(label, topLeft = Offset(cx - label.size.width / 2, bottom + 6.dp.toPx()))
-            }
-        }
-        Spacer(Modifier.height(10.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) { Legend(W.brand, "Ingresos"); Legend(W.negative, "Gastos") }
-    }
-}
-
-@Composable
-private fun WeekdayCard(expenses: List<Movement>, modifier: Modifier = Modifier) {
-    val names = listOf("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
-    val totals = DoubleArray(7)
-    expenses.forEach { totals[((it.epochDay() % 7) + 7 + 3) % 7] += it.amount }
-    val top = totals.maxOrNull()?.takeIf { it > 0 } ?: 1.0
-    val busiest = totals.indices.maxByOrNull { totals[it] } ?: 0
-    WCard(modifier.fillMaxWidth()) {
-        CardTitle("Por día de la semana", if (expenses.isEmpty()) "Sin gastos en el mes" else "Gastas más los ${weekdayName(busiest + 4).lowercase()}")
-        Spacer(Modifier.height(16.dp))
-        names.forEachIndexed { i, name ->
-            Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(name, color = W.ink2, fontSize = 12.sp, modifier = Modifier.width(36.dp))
-                ThinBar((totals[i] / top).toFloat(), if (i == busiest && totals[i] > 0) W.brand else W.brand.copy(alpha = .45f), 10.dp, Modifier.weight(1f))
-                Text(moneyGrouped(totals[i]), color = W.ink, fontSize = 12.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.width(92.dp), textAlign = TextAlign.End)
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryTableCard(expenses: List<Movement>) {
-    val total = expenses.sumOf { it.amount }
-    val groups = expenses.groupBy { it.category }.map { (name, list) -> Triple(name, list.sumOf { it.amount }, list.size) }.sortedByDescending { it.second }
-    WCard(Modifier.fillMaxWidth(), padding = 0.dp) {
-        Box(Modifier.padding(start = 22.dp, end = 22.dp, top = 18.dp, bottom = 12.dp)) { CardTitle("Detalle por categoría", "${groups.size} categorías con gastos") }
-        Row(Modifier.fillMaxWidth().background(W.surfaceAlt).padding(horizontal = 22.dp, vertical = 9.dp)) {
-            TableHead("Categoría", Modifier.weight(1.6f)); TableHead("Movs.", Modifier.weight(.6f), TextAlign.End)
-            TableHead("Participación", Modifier.weight(1.6f).padding(start = 18.dp)); TableHead("Total", Modifier.weight(1f), TextAlign.End)
-        }
-        if (groups.isEmpty()) Box(Modifier.padding(horizontal = 22.dp)) { EmptyNote("Sin gastos", "Elige otro mes o registra un gasto.") }
-        groups.forEachIndexed { i, (name, value, count) ->
-            Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-                Row(Modifier.weight(1.6f), verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(9.dp).clip(CircleShape).background(categoryColor(name, i)))
-                    Spacer(Modifier.width(10.dp))
-                    Text(name, color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-                Text("$count", color = W.ink2, fontSize = 13.sp, modifier = Modifier.weight(.6f), textAlign = TextAlign.End)
-                Row(Modifier.weight(1.6f).padding(start = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    ThinBar((value / total).toFloat(), categoryColor(name, i), 6.dp, Modifier.weight(1f))
-                    Text(percentLabel(value, total), color = W.ink3, fontSize = 12.sp, modifier = Modifier.width(48.dp), textAlign = TextAlign.End)
-                }
-                Text(moneyGrouped(value), color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-            }
-            HorizontalDivider(color = W.line.copy(alpha = .6f), modifier = Modifier.padding(horizontal = 22.dp))
-        }
-        Spacer(Modifier.height(8.dp))
-    }
-}
-
-// ---------------------------------------------------------------- Acceso (panel de marca en la web)
-
-/** Panel izquierdo de la pantalla de acceso en la web: titular y una vista previa del producto. */
-@Composable
-internal fun WebAuthShowcase(modifier: Modifier = Modifier) {
-    BoxWithConstraints(
-        modifier.background(Brush.linearGradient(listOf(Color(0xFF0B1912), W.forest, W.forest2))).drawBehind {
-            val step = 34.dp.toPx()
-            var x = step
-            while (x < size.width) { drawLine(Color.White.copy(alpha = .04f), Offset(x, 0f), Offset(x, size.height), 1f); x += step }
-            var y = step
-            while (y < size.height) { drawLine(Color.White.copy(alpha = .04f), Offset(0f, y), Offset(size.width, y), 1f); y += step }
-            drawCircle(Brush.radialGradient(listOf(W.lime.copy(alpha = .16f), Color.Transparent), Offset(size.width * .85f, size.height * .62f), size.minDimension * .55f),
-                size.minDimension * .55f, Offset(size.width * .85f, size.height * .62f))
-        },
-    ) {
-        val tall = maxHeight >= 760.dp
-        Column(Modifier.fillMaxSize().padding(horizontal = 56.dp, vertical = 44.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Image(painterResource(Res.drawable.dinex_app_icon), "DINEX", Modifier.size(40.dp).clip(RoundedCornerShape(11.dp)), contentScale = ContentScale.Crop)
-                Spacer(Modifier.width(12.dp))
-                Text("DINEX", color = Color.White, fontSize = 19.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 3.sp)
-                Spacer(Modifier.width(6.dp))
-                Box(Modifier.size(7.dp).clip(CircleShape).background(W.lime))
-            }
-            Spacer(Modifier.weight(1f))
-            Text(
-                androidx.compose.ui.text.buildAnnotatedString {
-                    append("Tu dinero,\ncon un ")
-                    pushStyle(androidx.compose.ui.text.SpanStyle(color = W.lime)); append("plan claro."); pop()
-                },
-                color = Color.White, fontSize = 46.sp, lineHeight = 52.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-1.2).sp,
-            )
-            Spacer(Modifier.height(16.dp))
-            Text(
-                "Registra tus gastos en segundos, ahorra para tus metas y entiende a dónde va cada sol. En el celular y en la web, siempre sincronizado.",
-                color = Color.White.copy(alpha = .72f), fontSize = 15.sp, lineHeight = 23.sp, modifier = Modifier.widthIn(max = 480.dp),
-            )
-            if (tall) {
-                Spacer(Modifier.height(36.dp))
-                ShowcasePreview()
-            }
-            Spacer(Modifier.weight(1f))
-            Row(horizontalArrangement = Arrangement.spacedBy(22.dp), verticalAlignment = Alignment.CenterVertically) {
-                listOf(DinexNavigationIcons.Shield to "Datos cifrados", DinexNavigationIcons.Refresh to "Android y web", DinexNavigationIcons.Sparkle to "Consejos con IA")
-                    .forEach { (icon, label) ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(icon, null, tint = W.lime, modifier = Modifier.size(15.dp))
-                            Spacer(Modifier.width(7.dp))
-                            Text(label, color = Color.White.copy(alpha = .7f), fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                        }
-                    }
-            }
-        }
-    }
-}
-
-/** Composición "flotante" con piezas reales del producto: saldo, meta y medallas. */
-@Composable
-private fun ShowcasePreview() {
-    val glass = Color.White.copy(alpha = .07f)
-    val edge = Color.White.copy(alpha = .14f)
-    Box(Modifier.widthIn(max = 520.dp).fillMaxWidth().height(250.dp)) {
-        // Tarjeta principal: saldo y su evolución.
-        Column(
-            Modifier.fillMaxWidth(.82f).clip(RoundedCornerShape(18.dp)).background(glass).border(1.dp, edge, RoundedCornerShape(18.dp)).padding(22.dp),
-        ) {
-            Text("SALDO DISPONIBLE", color = W.lime, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
-            Spacer(Modifier.height(6.dp))
-            Text("S/ 2,480.50", color = Color.White, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.6).sp)
-            Spacer(Modifier.height(10.dp))
-            Sparkline(listOf(1820.0, 1790.0, 1930.0, 1880.0, 2040.0, 1995.0, 2150.0, 2110.0, 2290.0, 2260.0, 2480.0), Modifier.fillMaxWidth().height(54.dp))
-            Spacer(Modifier.height(12.dp))
-            Row {
-                Column(Modifier.weight(1f)) {
-                    Text("Ingresos", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
-                    Text("+ S/ 3,200.00", color = Color(0xFF8BE3B4), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                }
-                Column(Modifier.weight(1f)) {
-                    Text("Gastos", color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
-                    Text("- S/ 719.50", color = Color(0xFFFFA697), fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
-        // Tarjeta flotante: una meta en progreso.
-        Column(
-            Modifier.align(Alignment.BottomEnd).offset(y = 10.dp).width(220.dp).clip(RoundedCornerShape(16.dp)).background(Color.White)
-                .padding(16.dp),
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(30.dp).clip(RoundedCornerShape(9.dp)).background(Color(0xFFE1F0E6)), contentAlignment = Alignment.Center) {
-                    Icon(DinexNavigationIcons.Target, null, tint = Color(0xFF0D6A43), modifier = Modifier.size(16.dp))
-                }
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text("Meta: Laptop", color = Color(0xFF101B15), fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                    Text("S/ 1,984 de S/ 3,200", color = Color(0xFF8A978E), fontSize = 11.sp)
-                }
-                Text("62%", color = Color(0xFF0D6A43), fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-            }
-            Spacer(Modifier.height(10.dp))
-            Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(Color(0xFFE2E7E1))) {
-                Box(Modifier.fillMaxWidth(.62f).fillMaxHeight().clip(CircleShape).background(Color(0xFF0D6A43)))
-            }
-        }
-        // Medallas de racha.
-        Row(Modifier.align(Alignment.TopEnd).offset(y = (-14).dp), horizontalArrangement = Arrangement.spacedBy((-10).dp)) {
-            listOf(2, 4, 14).forEach { index -> StreakBadge(streakLevels[index], 54.dp) }
-        }
-    }
-}
-
-// ---------------------------------------------------------------- Dinex IA (web)
-
-/** Chat de Dinex IA para la web: conversación a la izquierda y contexto y consultas a la derecha. */
-@Composable
-internal fun WebAssistantPage(assistant: GeminiAssistant, model: AssistantViewModel, data: FinancialData) {
-    val chat by model.state.collectAsState()
-    val messages = chat.messages
-    val loading = chat.loading
-    val remaining = chat.queriesLeft
-    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
-    var draft by remember { mutableStateOf("") }
-    LaunchedEffect(model) { model.refreshQuota() }
-    LaunchedEffect(messages.size, loading) { if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1 + if (loading) 1 else 0) }
-    val movements = data.movements
-    val streak = data.activeStreak()
-
-    fun send(question: String) {
-        if (loading) return
-        model.send(question, assistant, data)
-        if (question == draft) draft = ""
-    }
-
-    PageFrame(scroll = false) {
-        BoxWithConstraints(Modifier.fillMaxWidth().weight(1f)) {
-            val side = maxWidth >= 980.dp
-            Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
-                // Conversación
-                Column(Modifier.weight(1f).fillMaxHeight().clip(CardShape).background(W.surface).border(1.dp, W.line, CardShape)) {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 22.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                        AssistantAvatar(38.dp)
-                        Spacer(Modifier.width(12.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("Dinex IA", color = W.ink, fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Box(Modifier.size(7.dp).clip(CircleShape).background(W.positive))
-                                Spacer(Modifier.width(6.dp))
-                                Text("En línea · responde con tus datos de DINEX", color = W.ink3, fontSize = 12.sp)
-                            }
-                        }
-                        QuotaPill(remaining)
-                    }
-                    HorizontalDivider(color = W.line)
-                    Box(Modifier.weight(1f).fillMaxWidth()) {
-                        if (messages.none { it.user } && !loading) {
-                            AssistantWelcome(remaining > 0) { send(it) }
-                        } else {
-                            LazyColumn(
-                                Modifier.fillMaxSize(), state = listState,
-                                contentPadding = PaddingValues(horizontal = 22.dp, vertical = 20.dp),
-                                verticalArrangement = Arrangement.spacedBy(14.dp),
-                            ) {
-                                items(messages) { ChatRow(it) }
-                                if (loading) item { ThinkingRow() }
-                            }
-                        }
-                    }
-                    HorizontalDivider(color = W.line)
-                    ChatInput(draft, { if (it.length <= 500) draft = it }, enabled = remaining > 0 && !loading, onSend = { send(draft) })
-                }
-                // Contexto
-                if (side) Column(Modifier.width(300.dp).fillMaxHeight().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    val income = movements.filter { it.income }.sumOf { it.amount }
-                    val expense = movements.filterNot { it.income }.sumOf { it.amount }
-                    val monthExpense = movements.filter { !it.income && it.isInCurrentMonth() }.sumOf { it.amount }
-                    WCard(Modifier.fillMaxWidth()) {
-                        CardTitle("Lo que Dinex IA sabe", "Solo tu resumen de DINEX")
-                        Spacer(Modifier.height(12.dp))
-                        ContextLine("Saldo disponible", moneyGrouped(income - expense - data.savings), W.ink)
-                        ContextLine("Gastos del mes", moneyGrouped(monthExpense), W.negative)
-                        ContextLine("Ahorrado", moneyGrouped(data.savings), W.brand)
-                        ContextLine("Racha", "$streak ${if (streak == 1) "día" else "días"}", W.ink)
-                        ContextLine("Límite diario", moneyGrouped(data.dailyLimit.toDouble()), W.ink)
-                    }
-                    WCard(Modifier.fillMaxWidth()) {
-                        CardTitle("Consultas de hoy", "Se renuevan cada día")
-                        Spacer(Modifier.height(14.dp))
-                        Row(verticalAlignment = Alignment.Bottom) {
-                            Text("$remaining", color = W.ink, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-                            Text(" de $DAILY_AI_QUERIES disponibles", color = W.ink3, fontSize = 13.sp, modifier = Modifier.padding(bottom = 6.dp))
-                        }
-                        Spacer(Modifier.height(10.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            repeat(DAILY_AI_QUERIES) { i -> Box(Modifier.weight(1f).height(6.dp).clip(CircleShape).background(if (i < remaining) W.brand else W.line)) }
-                        }
-                    }
-                    WCard(Modifier.fillMaxWidth()) {
-                        Row(verticalAlignment = Alignment.Top) {
-                            Icon(DinexNavigationIcons.Shield, null, tint = W.brand, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(10.dp))
-                            Text("Dinex IA no accede a tus bancos ni pide claves. Puede equivocarse: revisa cualquier decisión importante.",
-                                color = W.ink2, fontSize = 12.sp, lineHeight = 18.sp)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun AssistantAvatar(size: Dp) {
-    Box(Modifier.size(size).clip(RoundedCornerShape(size * .3f)).background(Brush.linearGradient(listOf(W.forest, W.forest2))), contentAlignment = Alignment.Center) {
-        Icon(DinexNavigationIcons.Sparkle, null, tint = W.lime, modifier = Modifier.size(size * .5f))
-    }
-}
-
-@Composable
-private fun QuotaPill(remaining: Int) {
-    Row(Modifier.clip(CircleShape).border(1.dp, W.line, CircleShape).padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        repeat(DAILY_AI_QUERIES) { i ->
-            Box(Modifier.padding(end = 3.dp).size(width = 12.dp, height = 4.dp).clip(CircleShape).background(if (i < remaining) W.brand else W.line))
-        }
-        Spacer(Modifier.width(6.dp))
-        Text(if (remaining > 0) "$remaining de $DAILY_AI_QUERIES hoy" else "Sin consultas hoy", color = if (remaining > 0) W.ink2 else W.negative, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
-@Composable
-private fun AssistantWelcome(enabled: Boolean, onAsk: (String) -> Unit) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        AssistantAvatar(64.dp)
-        Spacer(Modifier.height(18.dp))
-        Text("¿En qué te ayudo hoy?", color = W.ink, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = (-0.4).sp)
-        Spacer(Modifier.height(6.dp))
-        Text("Pregunta sobre tus gastos, una compra o tu plan de ahorro. Respondo con tus números reales.",
-            color = W.ink2, fontSize = 14.sp, textAlign = TextAlign.Center, modifier = Modifier.widthIn(max = 460.dp))
-        Spacer(Modifier.height(26.dp))
-        val prompts = listOf(
-            Triple(DinexNavigationIcons.Analysis, "¿En qué gasto más?", "Compara tus categorías del mes"),
-            Triple(DinexNavigationIcons.Plan, "Hazme un plan semanal", "Tres pasos medibles para esta semana"),
-            Triple(DinexNavigationIcons.Wallet, "¿Puedo gastar S/ 80?", "Calcula cómo queda tu saldo"),
-            Triple(DinexNavigationIcons.Target, "¿Cómo voy con mi ahorro?", "Avance de tus metas y racha"),
-        )
-        Column(Modifier.widthIn(max = 560.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            prompts.chunked(2).forEach { row ->
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    row.forEach { (icon, title, hint) ->
-                        val shape = RoundedCornerShape(14.dp)
-                        Row(
-                            Modifier.weight(1f).clip(shape).background(W.surfaceAlt).border(1.dp, W.line, shape)
-                                .clickable(enabled = enabled) { onAsk(title) }.pointerHoverIcon(PointerIcon.Hand).padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(icon, null, tint = W.brand, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(12.dp))
-                            Column {
-                                Text(title, color = W.ink, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                                Text(hint, color = W.ink3, fontSize = 12.sp)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        if (!enabled) {
-            Spacer(Modifier.height(18.dp))
-            Text("Usaste tus $DAILY_AI_QUERIES consultas de hoy. Vuelve mañana.", color = W.negative, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        }
-    }
-}
-
-@Composable
-private fun ChatRow(message: ChatMessage) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = if (message.user) Arrangement.End else Arrangement.Start, verticalAlignment = Alignment.Top) {
-        if (!message.user) { AssistantAvatar(30.dp); Spacer(Modifier.width(10.dp)) }
-        val shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = if (message.user) 16.dp else 4.dp, bottomEnd = if (message.user) 4.dp else 16.dp)
-        androidx.compose.foundation.text.selection.SelectionContainer {
-            Text(
-                message.text,
-                color = when { message.user -> Color.White; message.error -> W.negative; else -> W.ink },
-                fontSize = 14.sp, lineHeight = 22.sp,
-                modifier = Modifier.widthIn(max = 560.dp).clip(shape)
-                    .background(when { message.user -> W.brand; message.error -> W.negative.copy(alpha = .08f); else -> W.surfaceAlt })
-                    .then(if (message.user) Modifier else Modifier.border(1.dp, W.line, shape))
-                    .padding(horizontal = 16.dp, vertical = 11.dp),
-            )
-        }
-    }
-}
-
-@Composable
-private fun ThinkingRow() {
-    val transition = androidx.compose.animation.core.rememberInfiniteTransition(label = "pensando")
-    val phase by transition.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(1100)), label = "puntos")
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        AssistantAvatar(30.dp)
-        Spacer(Modifier.width(10.dp))
-        Row(Modifier.clip(RoundedCornerShape(16.dp)).background(W.surfaceAlt).border(1.dp, W.line, RoundedCornerShape(16.dp)).padding(horizontal = 16.dp, vertical = 14.dp)) {
-            repeat(3) { i ->
-                val alpha = ((kotlin.math.sin((phase * 2 * PI) - i * .9) + 1) / 2).toFloat() * .7f + .3f
-                Box(Modifier.padding(end = 5.dp).size(7.dp).clip(CircleShape).background(W.brand.copy(alpha = alpha)))
-            }
-            Spacer(Modifier.width(4.dp))
-            Text("Revisando tus números…", color = W.ink3, fontSize = 13.sp)
-        }
-    }
-}
-
-@Composable
-private fun ChatInput(value: String, onChange: (String) -> Unit, enabled: Boolean, onSend: () -> Unit) {
-    Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-        val shape = RoundedCornerShape(14.dp)
-        Box(Modifier.weight(1f).heightIn(min = 48.dp).clip(shape).background(W.surfaceAlt).border(1.dp, W.line, shape).padding(horizontal = 16.dp, vertical = 14.dp)) {
-            if (value.isEmpty()) Text(if (enabled) "Escribe tu pregunta y presiona Enter…" else "Vuelve mañana para preguntar", color = W.ink3, fontSize = 14.sp)
-            BasicTextField(
-                value, onChange, enabled = enabled, maxLines = 4,
-                textStyle = TextStyle(color = W.ink, fontSize = 14.sp, fontFamily = MaterialTheme.typography.bodyMedium.fontFamily),
-                cursorBrush = SolidColor(W.brand),
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Send),
-                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onSend = { onSend() }),
-                modifier = Modifier.fillMaxWidth().onPreviewKeyEvent { event ->
-                    if (event.type == androidx.compose.ui.input.key.KeyEventType.KeyDown && event.key == androidx.compose.ui.input.key.Key.Enter && !event.isShiftPressed) { onSend(); true } else false
-                },
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        val active = enabled && value.isNotBlank()
-        Box(
-            Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)).background(if (active) W.brand else W.line)
-                .clickable(enabled = active, onClickLabel = "Enviar", onClick = onSend).pointerHoverIcon(PointerIcon.Hand),
-            contentAlignment = Alignment.Center,
-        ) { Icon(DinexNavigationIcons.Send, "Enviar", tint = if (active) Color.White else W.ink3, modifier = Modifier.size(20.dp)) }
-    }
-}
-
-@Composable
-private fun ContextLine(label: String, value: String, tint: Color) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, color = W.ink2, fontSize = 13.sp, modifier = Modifier.weight(1f))
-        Text(value, color = tint, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        content()
     }
 }
