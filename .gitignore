@@ -33,3 +33,4 @@ output-metadata.json
 google-services.json
 **/Secrets.xcconfig
 **/*.secret.xcconfig
+keystore.properties

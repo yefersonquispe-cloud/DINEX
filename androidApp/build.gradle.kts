@@ -10,6 +10,16 @@ val dinexLocalProperties = Properties().apply {
 val geminiKeyInApk = dinexLocalProperties.getProperty("GEMINI_KEY_IN_APK", "false").trim().equals("true", ignoreCase = true)
 val geminiTestKey = if (geminiKeyInApk) dinexLocalProperties.getProperty("GEMINI_API_KEY", "").trim() else ""
 
+// Firma para Google Play: los datos de la clave de carga van en keystore.properties (no se sube a Git).
+// Sin ese archivo, la versión release se genera sin firmar.
+val dinexKeystoreProperties = Properties().apply {
+    val propertiesFile = rootProject.file("keystore.properties")
+    if (propertiesFile.exists()) propertiesFile.inputStream().use(::load)
+}
+val hasUploadKey = listOf("storeFile", "storePassword", "keyAlias", "keyPassword").all {
+    !dinexKeystoreProperties.getProperty(it).isNullOrBlank()
+}
+
 // Firebase AI Logic: la configuración de Android sale de google-services.json (no se sube a Git).
 // La clave de Gemini ya no se incluye en el APK; Firebase la guarda en su servidor.
 fun firebaseAndroidConfig(packageName: String): Map<String, String> {
@@ -81,16 +91,28 @@ android {
     }
     // Generate device-specific APKs so Android 11 phones do not need to
     // download native ML Kit binaries for unrelated CPU architectures.
+    // En el AAB no se usa: Google Play ya entrega a cada teléfono solo lo de su procesador,
+    // y Gradle no permite generar un bundle con APKs divididos.
+    val buildingBundle = gradle.startParameter.taskNames.any { it.contains("bundle", ignoreCase = true) }
     splits {
         abi {
-            isEnable = true
+            isEnable = !buildingBundle
             reset()
             include("arm64-v8a", "armeabi-v7a")
             isUniversalApk = false
         }
     }
+    signingConfigs {
+        if (hasUploadKey) create("upload") {
+            storeFile = file(dinexKeystoreProperties.getProperty("storeFile"))
+            storePassword = dinexKeystoreProperties.getProperty("storePassword")
+            keyAlias = dinexKeystoreProperties.getProperty("keyAlias")
+            keyPassword = dinexKeystoreProperties.getProperty("keyPassword")
+        }
+    }
     buildTypes {
         release {
+            if (hasUploadKey) signingConfig = signingConfigs.getByName("upload")
             // R8 quita el código sin uso y achica la app para que cargue más rápido.
             isMinifyEnabled = true
             isShrinkResources = true
