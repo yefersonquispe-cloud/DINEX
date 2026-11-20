@@ -606,6 +606,79 @@ private val DinexTranslations: Map<String, Pair<String, String>> = mapOf(
         ("Track your spending, create goals and let Dinex guide you with a clear view of your money." to
             "Tukusqaykita qhaway, munasqakunata ruway, Dinex-taq qullqiykita sut'ita rikuchisunki."),
     "Tus finanzas, en soles y a tu ritmo." to ("Your finances, in soles and at your pace." to "Qullqiyki, solpi, puriynikiman hina."),
+    // Eliminar mi cuenta.
+    "Tu sesión expiró. Vuelve a iniciar sesión." to
+        ("Your session expired. Please sign in again." to "Sesionniyki tukurqun. Huktawan yaykuy."),
+    "Vas a eliminar la cuenta {0} y sus datos. Es permanente: no podremos recuperarla." to
+        ("You are about to delete the account {0} and its data. It's permanent: we won't be able to recover it." to "{0} cuentata willakuyninkunatawan chinkachinki. Wiñaypaqmi: manañam kutichiyta atisunchu."),
+    "Se borrará" to
+        ("Will be deleted" to "Chinkachisqa kanqa"),
+    "Tu cuenta de acceso y la posibilidad de volver a entrar con ella." to
+        ("Your login account and the ability to sign in with it again." to "Yaykunaykipaq cuentayki, manañataq chaywan yaykuyta atinkichu."),
+    "Tus ingresos y gastos, con su lugar en el mapa, tus presupuestos, metas de ahorro y recordatorios." to
+        ("Your income and expenses with their place on the map, your budgets, savings goals and reminders." to "Yaykumuq qullqiyki, tukusqaykipas mapapi maypi kasqanwan, presupuestoykikuna, waqaychay munasqaykikuna, yuyarichiykunapas."),
+    "Los reportes que enviaste sobre respuestas de Dinex IA y tu conteo de consultas." to
+        ("The reports you sent about Dinex AI answers and your question count." to "Dinex IA kutichiyninkunamanta apachisqayki willakuykuna, tapukusqayki yupaypas."),
+    "En este teléfono: tus datos guardados, tu foto de perfil, los avisos de pago detectados, las fotos temporales de comprobantes y Oye Dinex." to
+        ("On this phone: your saved data, your profile photo, detected payment alerts, temporary receipt photos and Hey Dinex." to "Kay celularpi: waqaychasqa willakuyniykikuna, fotoyki, tarisqa qullqi willakuykuna, comprobantekunapa pisi pachalla fotonkuna, Oye Dinex-pas."),
+    "Lo que no podemos borrar desde aquí" to
+        ("What we can't delete from here" to "Kaymanta mana chinkachiyta atisqanchik"),
+    "La copia en otros teléfonos o navegadores donde usaste tu cuenta: se borra cuando DINEX se conecte a internet en ellos." to
+        ("The copy on other phones or browsers where you used your account: it's deleted when DINEX connects to the internet on them." to "Huk celularkunapi utaq navegadorkunapi cuentaykita llamk'achisqaykipi copia: DINEX internetman chaykunapi tinkuptin chinkachisqa kanqa."),
+    "Los archivos que exportaste (PDF, Excel o CSV): están donde los guardaste." to
+        ("Files you exported (PDF, Excel or CSV): they stay where you saved them." to "Hurqusqayki archivokuna (PDF, Excel utaq CSV): waqaychasqayki chiqapim kachkan."),
+    "Las consultas ya enviadas a Google Gemini, que siguen las condiciones de Google." to
+        ("Questions already sent to Google Gemini, which follow Google's terms." to "Google Gemini-man ña apachisqa tapukuykuna, Google-pa kamachiyninkunaman hina."),
+    "Si quieres conservar tus movimientos, primero exporta un reporte desde Movimientos." to
+        ("If you want to keep your transactions, first export a report from Transactions." to "Kuyuyniykikunata waqaychayta munaspaqa, ñawpaqta Kuyuykunamanta huk willakuyta hurquy."),
+    "Entiendo que esta acción es permanente y no se puede deshacer." to
+        ("I understand this action is permanent and can't be undone." to "Yachanim kayqa wiñaypaq kasqanta, manataq kutichiy atikunchu."),
+    "Reintentar" to
+        ("Try again" to "Huktawan ruway"),
+    "Revisando cómo confirmar que eres tú…" to
+        ("Checking how to confirm it's you…" to "Qampuni kasqaykita imaynata takyachinapaq qhawachkan…"),
+    "Para tu seguridad, confirma que eres tú." to
+        ("For your security, confirm it's you." to "Allin kanaykipaq, qampuni kasqaykita takyachiy."),
+    "Tu contraseña de DINEX" to
+        ("Your DINEX password" to "DINEX pakasqa simiyki"),
+    "Eliminar mi cuenta para siempre" to
+        ("Delete my account forever" to "Cuentayta wiñaypaq chinkachiy"),
+    "o" to
+        ("or" to "utaq"),
+    "Confirmar con Google y eliminar" to
+        ("Confirm with Google and delete" to "Google-wan takyachiy, chinkachiytaq"),
+    "No pudimos confirmar tu identidad desde aquí. Escribe a dinex401@gmail.com para eliminar tu cuenta." to
+        ("We couldn't confirm your identity from here. Write to dinex401@gmail.com to delete your account." to "Kaymanta mana takyachiyta atirqanchikchu qampuni kasqaykita. Cuentayki chinkachinapaq dinex401@gmail.com-man qillqamuway."),
+    "No, quiero conservar mi cuenta" to
+        ("No, I want to keep my account" to "Manam, cuentayta waqaychayta munani"),
+    "¿Dudas? Escríbenos a dinex401@gmail.com." to
+        ("Questions? Write to us at dinex401@gmail.com." to "¿Tapukuyniyki kanchu? dinex401@gmail.com-man qillqamuway."),
+    "Tu cuenta no se eliminó." to
+        ("Your account was not deleted." to "Cuentaykiqa manam chinkachisqachu."),
+    "La contraseña no es correcta." to
+        ("The password is not correct." to "Pakasqa simiqa manam allinchu."),
+    "Tu sesión expiró. Cierra sesión, vuelve a entrar y repite la eliminación." to
+        ("Your session expired. Log out, sign in again and repeat the deletion." to "Sesionniyki tukurqun. Lluqsiy, huktawan yaykuy, chinkachiytataq kutipay."),
+    "Necesitas internet para eliminar tu cuenta." to
+        ("You need internet to delete your account." to "Cuentayki chinkachinapaqqa internet kanan."),
+    "Firebase pidió confirmar tu identidad otra vez. Vuelve a intentarlo." to
+        ("Firebase asked to confirm your identity again. Please try again." to "Firebase huktawan qampuni kasqaykita takyachiyta mañakun. Huktawan ruway."),
+    "No hay conexión a internet. Revisa tu conexión e inténtalo otra vez." to
+        ("No internet connection. Check your connection and try again." to "Mana internet kanchu. Tinkuyniykita qhaway, huktawan ruway."),
+    "Confirma con Google para eliminar tu cuenta." to
+        ("Confirm with Google to delete your account." to "Cuentayki chinkachinapaq Google-wan takyachiy."),
+    "Escribe tu contraseña o confirma con Google." to
+        ("Enter your password or confirm with Google." to "Pakasqa simiykita qillqay utaq Google-wan takyachiy."),
+    "Esa no es la cuenta que quieres eliminar. Usa la misma cuenta con la que entraste." to
+        ("That's not the account you want to delete. Use the same account you signed in with." to "Manam chayqa chinkachiy munasqayki cuentachu. Yaykusqayki kikin cuentallata llamk'achiy."),
+    "Firebase no permitió borrar tus datos. Inténtalo más tarde o escribe a dinex401@gmail.com." to
+        ("Firebase didn't allow deleting your data. Try later or write to dinex401@gmail.com." to "Firebase mana willakuyniykikunata chinkachiyta saqirqanchu. Qhipaman ruway utaq dinex401@gmail.com-man qillqamuway."),
+    "No pudimos terminar de borrar tus reportes de Dinex IA. Escribe a dinex401@gmail.com." to
+        ("We couldn't finish deleting your Dinex AI reports. Write to dinex401@gmail.com." to "Dinex IA willakuyniykikunata mana tukuyta chinkachiyta atirqanchikchu. dinex401@gmail.com-man qillqamuway."),
+    "Tu cuenta y tus datos fueron eliminados." to
+        ("Your account and your data were deleted." to "Cuentayki willakuyniykikunapas chinkachisqañam."),
+    "Esta cuenta fue eliminada. Borramos también sus datos de este equipo." to
+        ("This account was deleted. We also removed its data from this device." to "Kay cuentaqa chinkachisqañam. Kay equipomantapas willakuyninkunata chinkachirqanchikmi."),
 )
 
 private val DinexEnglish: Map<String, String> = DinexTranslations.mapValues { it.value.first }

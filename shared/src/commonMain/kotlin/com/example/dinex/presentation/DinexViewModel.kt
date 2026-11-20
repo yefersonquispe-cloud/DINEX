@@ -438,7 +438,7 @@ internal class DinexViewModel(
             }
             else -> throw ReauthException("Escribe tu contraseña o confirma con Google.")
         }
-        if (fresh.uid != current.uid) throw ReauthException("Esa no es la cuenta que quieres eliminar. Usa la misma cuenta con la que entraste ($email).")
+        if (fresh.uid != current.uid) throw ReauthException("Esa no es la cuenta que quieres eliminar. Usa la misma cuenta con la que entraste.")
         return fresh
     }
 

@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -15,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -97,13 +99,18 @@ internal fun DeleteAccountDialog(
 
                     Surface(shape = RoundedCornerShape(RadiusLg), color = Card, border = BorderStroke(1.dp, Border)) {
                         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Checkbox(understood, { understood = it; error = null }, enabled = !busy)
+                            // Toda la fila (casilla y texto) marca o desmarca la confirmación.
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                    .toggleable(value = understood, enabled = !busy, role = Role.Checkbox) { understood = it; error = null },
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Checkbox(understood, onCheckedChange = null, enabled = !busy, modifier = Modifier.padding(12.dp))
                                 Text(t("Entiendo que esta acción es permanente y no se puede deshacer."), color = Night, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                             }
                             when {
                                 loadError != null -> {
-                                    Text(loadError.orEmpty(), color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Text(translatedError(loadError.orEmpty()), color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                                     OutlinedButton(onClick = { loadAttempt++ }, enabled = !busy) { Text(t("Reintentar")) }
                                 }
                                 methods == null -> Row(verticalAlignment = Alignment.CenterVertically) {
@@ -154,7 +161,7 @@ internal fun DeleteAccountDialog(
                                     )
                                 }
                             }
-                            error?.let { Text(it, color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
+                            error?.let { Text(translatedError(it), color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold) }
                             if (busy) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Red, trackColor = Red.copy(alpha = .15f))
                         }
                     }
@@ -170,6 +177,12 @@ internal fun DeleteAccountDialog(
             }
         }
     }
+}
+
+/** Los mensajes llegan en español; aquí se traducen, también el aviso final "Tu cuenta no se eliminó." */
+private fun translatedError(message: String): String {
+    val suffix = " Tu cuenta no se eliminó."
+    return if (message.endsWith(suffix)) t(message.removeSuffix(suffix)) + " " + t(suffix.trim()) else t(message)
 }
 
 @Composable

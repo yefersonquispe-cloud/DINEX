@@ -259,7 +259,7 @@ internal fun AuthFlow(
                         notice?.let {
                             Spacer(Modifier.height(12.dp))
                             Surface(shape = RoundedCornerShape(13.dp), color = Green.copy(alpha = .12f), border = androidx.compose.foundation.BorderStroke(1.dp, Green.copy(alpha = .38f))) {
-                                Text(it, color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth().padding(11.dp))
+                                Text(t(it), color = GreenDark, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.fillMaxWidth().padding(11.dp))
                             }
                         }
                         Spacer(Modifier.height(16.dp))
