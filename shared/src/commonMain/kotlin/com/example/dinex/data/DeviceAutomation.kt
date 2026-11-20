@@ -43,6 +43,11 @@ interface DeviceAutomation {
     fun requestMicrophonePermission() = Unit
     fun reconnectNotifications() = Unit
     fun acknowledgeNotifications(items: List<CapturedTransaction>) = Unit
+    /**
+     * Al eliminar la cuenta: borra lo que el equipo guarda fuera del perfil (avisos de pago
+     * detectados, la frase pendiente de "Oye Dinex" y las fotos temporales de comprobantes).
+     */
+    fun clearAccountData() = Unit
     fun setHotwordEnabled(enabled: Boolean): String? = "Esta función solo está disponible en Android."
     fun consumePendingVoiceCommand(): String? = null
     fun requestLocationPermission()

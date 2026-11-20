@@ -78,6 +78,8 @@ fun App(onThemeChanged: (Boolean) -> Unit = {}, onDataChanged: () -> Unit = {}, 
 
 @Composable
 internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
+    // Para confirmar con Google antes de eliminar la cuenta.
+    val googleIdentity = rememberGoogleIdentity()
     val data = state.data
     val movements = data.movements
     val reminders = data.reminders
@@ -425,7 +427,18 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         onAutomation = { profileOpen = false; automationDialog = true },
         onOpenGuide = { profileOpen = false; welcomeGuideOpen = true },
         onOpenLegal = { legalTab = it },
-        onDeleteAccount = { done -> model.deleteAccount { error -> if (error == null) automation.setHotwordEnabled(false); done(error) } },
+        onLoadDeleteMethods = model::loadDeleteMethods,
+        onDeleteAccount = { password, useGoogle, done ->
+            model.deleteAccount(password, if (useGoogle) googleIdentity else null) { error ->
+                if (error == null) {
+                    // La cuenta ya no existe: se apaga Oye Dinex y se borra lo que el equipo guarda aparte.
+                    automation.setHotwordEnabled(false)
+                    automation.clearAccountData()
+                }
+                done(error)
+            }
+        },
+        googleAvailable = googleIdentity.available,
         onLanguage = model::setLanguage,
     )
     premiumLoading?.let { PremiumLoadingDialog(it) }

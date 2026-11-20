@@ -425,7 +425,7 @@ private fun GoogleSignInButton(busy: Boolean, onClick: () -> Unit) {
 
 /** Ojito para mostrar u ocultar la contraseña. */
 @Composable
-private fun PasswordEye(visible: Boolean, onToggle: () -> Unit) {
+internal fun PasswordEye(visible: Boolean, onToggle: () -> Unit) {
     IconButton(onClick = onToggle) {
         Icon(
             if (visible) DinexNavigationIcons.EyeOff else DinexNavigationIcons.Eye,

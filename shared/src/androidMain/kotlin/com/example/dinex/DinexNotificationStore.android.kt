@@ -47,6 +47,15 @@ object DinexNotificationStore {
         writeLocalValue(SEEN, (seen + ids).distinct().takeLast(1000).joinToString("\n"))
     }
 
+    /** Borra los avisos de pago detectados y su historial (al eliminar la cuenta). */
+    @Synchronized
+    fun clear(context: Context) {
+        configureDinexStorage(context)
+        writeLocalValue(KEY, null)
+        writeLocalValue(SEEN, null)
+        context.getSharedPreferences("dinex_notification_capture", Context.MODE_PRIVATE).edit().clear().apply()
+    }
+
     private fun migrateLegacyInbox(context: Context) {
         if (readLocalValue("notification_migration") != null) return
         val old = context.getSharedPreferences("dinex_notification_capture", Context.MODE_PRIVATE).getStringSet("items", emptySet()).orEmpty()

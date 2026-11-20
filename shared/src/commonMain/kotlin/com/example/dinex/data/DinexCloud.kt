@@ -73,6 +73,10 @@ internal data class AiReport(
     val createdAt: Long,
 )
 
+/** Reportes de IA que se piden y borran por vuelta, y vueltas máximas (hasta 10 000 reportes). */
+private const val AI_REPORT_PAGE = 200
+private const val MAX_AI_REPORT_PAGES = 50
+
 internal class DinexCloud(
     private val apiKey: String = FirebaseConfig.API_KEY,
     private val projectId: String = FirebaseConfig.PROJECT_ID,
@@ -143,7 +147,11 @@ internal class DinexCloud(
         )
     }
 
-    suspend fun upload(session: CloudSession, profile: CloudProfile) {
+    /**
+     * Sube el perfil. Con [mustExist] solo actualiza un documento que ya existe: así un equipo con
+     * una sesión vieja no vuelve a crear los datos de una cuenta que se eliminó desde otro lugar.
+     */
+    suspend fun upload(session: CloudSession, profile: CloudProfile, mustExist: Boolean = false) {
         val body = "{\"fields\":{" +
             "\"name\":{\"stringValue\":${jsonString(profile.name)}}," +
             "\"email\":{\"stringValue\":${jsonString(profile.email)}}," +
@@ -153,7 +161,8 @@ internal class DinexCloud(
             "}}"
         // Solo se reemplazan estos campos; así no se borra el conteo de Dinex IA guardado aparte.
         val fields = listOf("name", "email", "profile", "updatedAt") + if (profile.terms != null) listOf("termsVersion", "termsAcceptedAt") else emptyList()
-        parseObject(http("PATCH", documentUrl(session.uid) + updateMask(fields), body, session.idToken))
+        val precondition = if (mustExist) "&currentDocument.exists=true" else ""
+        parseObject(http("PATCH", documentUrl(session.uid) + updateMask(fields) + precondition, body, session.idToken))
     }
 
     /** Lee solo el conteo de Dinex IA (sin bajar todo el perfil). */
@@ -192,12 +201,71 @@ internal class DinexCloud(
         parseObject(http("POST", url, body, session.idToken))
     }
 
-    /** Derecho de cancelación: borra el documento en Firestore y luego la cuenta de Firebase. */
+    /**
+     * Derecho de cancelación. Primero se borra todo lo que necesita el UID (reportes de IA y el
+     * documento users/{uid}) y solo al final la cuenta de Firebase Authentication: si algo falla
+     * antes, la cuenta sigue existiendo y se puede volver a intentar sin dejar datos huérfanos.
+     * [session] debe ser reciente (recién autenticada) para que Firebase acepte borrar la cuenta.
+     */
     suspend fun deleteAccount(session: CloudSession) {
+        deleteAiReports(session)
+        deleteProfile(session)
+        deleteAuthUser(session)
+    }
+
+    /** Borra el documento users/{uid}. Si ya no existe, no es un error. */
+    suspend fun deleteProfile(session: CloudSession) {
         val removed = http("DELETE", documentUrl(session.uid), null, session.idToken)
         if (removed.status != 404) parseObject(removed)
+    }
+
+    /** Borra la cuenta de Firebase Authentication. Va siempre al final. */
+    suspend fun deleteAuthUser(session: CloudSession) {
         parseObject(http("POST", "$identity:delete?key=$apiKey", jsonObject("idToken" to session.idToken), null))
     }
+
+    /**
+     * Borra los reportes de Dinex IA de esta cuenta. Las reglas solo dejan ver y borrar los
+     * reportes cuyo campo uid es el de la persona, así que nunca toca los de otra cuenta.
+     * Devuelve cuántos se borraron.
+     */
+    suspend fun deleteAiReports(session: CloudSession): Int {
+        val prefix = "projects/$projectId/databases/(default)/documents/aiReports/"
+        val query = "{\"structuredQuery\":{" +
+            "\"from\":[{\"collectionId\":\"aiReports\"}]," +
+            "\"where\":{\"fieldFilter\":{\"field\":{\"fieldPath\":\"uid\"},\"op\":\"EQUAL\",\"value\":{\"stringValue\":${jsonString(session.uid)}}}}," +
+            "\"select\":{\"fields\":[{\"fieldPath\":\"__name__\"}]}," +
+            "\"limit\":$AI_REPORT_PAGE}}"
+        var deleted = 0
+        repeat(MAX_AI_REPORT_PAGES) {
+            val response = http("POST", "$documentsUrl:runQuery", query, session.idToken)
+            if (response.status !in 200..299) parseObject(response)
+            val rows = runCatching { parseJson(response.body) as? List<*> }.getOrNull()
+                ?: throw CloudAuthException("INVALID_RESPONSE")
+            val names = rows.mapNotNull { ((it as? Map<*, *>)?.get("document") as? Map<*, *>)?.get("name") as? String }
+            names.forEach { name ->
+                // Solo documentos de aiReports de este proyecto, nunca otra ruta.
+                if (!name.startsWith(prefix) || '/' in name.removePrefix(prefix)) throw CloudAuthException("INVALID_RESPONSE")
+                val removed = http("DELETE", "https://firestore.googleapis.com/v1/$name", null, session.idToken)
+                if (removed.status != 404) parseObject(removed)
+            }
+            deleted += names.size
+            if (names.size < AI_REPORT_PAGE) return deleted
+        }
+        throw CloudAuthException("TOO_MANY_REPORTS")
+    }
+
+    /** Métodos con los que la persona puede volver a confirmar su identidad ("password", "google.com"). */
+    suspend fun signInMethods(session: CloudSession): Set<String> {
+        val json = parseObject(http("POST", "$identity:lookup?key=$apiKey", jsonObject("idToken" to session.idToken), null))
+        val user = (json["users"] as? List<*>)?.firstOrNull() as? Map<*, *> ?: throw CloudAuthException("USER_NOT_FOUND")
+        val methods = (user["providerUserInfo"] as? List<*>).orEmpty()
+            .mapNotNull { (it as? Map<*, *>)?.get("providerId") as? String }.toMutableSet()
+        if (user["passwordHash"] != null) methods += "password"
+        return methods
+    }
+
+    private val documentsUrl get() = "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents"
 
     private fun documentUrl(uid: String) =
         "https://firestore.googleapis.com/v1/projects/$projectId/databases/(default)/documents/users/$uid"
@@ -220,7 +288,10 @@ internal class DinexCloud(
         if (response.status !in 200..299) {
             val error = json.obj("error")
             // securetoken devuelve "error" como texto; identitytoolkit y Firestore como objeto.
-            val code = error?.text("message") ?: json.text("error") ?: error?.text("status") ?: "HTTP_${response.status}"
+            // Firebase Auth manda un código ("INVALID_PASSWORD"); Firestore, una frase y el código en "status".
+            val message = error?.text("message")?.substringBefore(" ")?.substringBefore(":")
+            val firebaseCode = message?.takeIf { it.isNotBlank() && it.all { c -> c.isUpperCase() || c.isDigit() || c == '_' } }
+            val code = firebaseCode ?: error?.text("status") ?: message ?: json.text("error") ?: "HTTP_${response.status}"
             throw CloudAuthException(code.substringBefore(" ").substringBefore(":"))
         }
         return json
@@ -240,6 +311,8 @@ internal fun cloudErrorMessage(code: String): String = when (code) {
     "GOOGLE_POPUP_ERROR" -> "No se pudo abrir la ventana de Google. Permite ventanas emergentes e inténtalo otra vez."
     "GOOGLE_CREDENTIAL_INVALID", "INVALID_IDP_RESPONSE", "INVALID_ID_TOKEN" -> "No pudimos verificar tu cuenta de Google. Inténtalo otra vez."
     "FEDERATED_USER_ID_ALREADY_LINKED", "NEED_CONFIRMATION" -> "Este correo ya tiene una cuenta. Inicia sesión con el método que usaste antes."
+    "PERMISSION_DENIED" -> "Firebase no permitió borrar tus datos. Inténtalo más tarde o escribe a dinex401@gmail.com."
+    "TOO_MANY_REPORTS" -> "No pudimos terminar de borrar tus reportes de Dinex IA. Escribe a dinex401@gmail.com."
     else -> "No pudimos conectar con tu cuenta. Inténtalo otra vez."
 }
 

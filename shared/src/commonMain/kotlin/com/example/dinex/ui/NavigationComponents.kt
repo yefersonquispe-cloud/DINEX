@@ -440,12 +440,12 @@ internal fun ProfileDialog(
     onAutomation: () -> Unit,
     onOpenGuide: () -> Unit,
     onOpenLegal: (Int) -> Unit,
-    onDeleteAccount: (onDone: (String?) -> Unit) -> Unit,
+    onLoadDeleteMethods: (onDone: (methods: Set<String>?, error: String?) -> Unit) -> Unit,
+    onDeleteAccount: (password: String?, useGoogle: Boolean, onDone: (String?) -> Unit) -> Unit,
+    googleAvailable: Boolean,
     onLanguage: (DinexLanguage) -> Unit = {},
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
-    var deleting by remember { mutableStateOf(false) }
-    var deleteError by remember { mutableStateOf<String?>(null) }
     val income = movements.filter { it.income }.sumOf { it.amount }
     val expenses = movements.filterNot { it.income }.sumOf { it.amount }
     val level = streakLevel(streak)
@@ -579,7 +579,7 @@ internal fun ProfileDialog(
                     ProfileSection("Cuenta") {
                         ProfileLinkRow(DinexNavigationIcons.Back, "Cerrar sesión", "Tus datos quedan guardados en la nube", onLogout)
                         ProfileRowDivider()
-                        ProfileLinkRow(DinexNavigationIcons.Close, "Eliminar mi cuenta", "Borra tu cuenta y todos tus datos", { deleteError = null; confirmDelete = true }, danger = true)
+                        ProfileLinkRow(DinexNavigationIcons.Close, "Eliminar mi cuenta", "Borra tu cuenta y todos tus datos", { confirmDelete = true }, danger = true)
                     }
                     Text(t("DINEX · Tu dinero, con propósito."), color = Gray, fontSize = 11.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(18.dp))
@@ -587,27 +587,12 @@ internal fun ProfileDialog(
             }
         }
     }
-    if (confirmDelete) AlertDialog(
-        onDismissRequest = { if (!deleting) confirmDelete = false },
-        title = { Text(t("¿Eliminar tu cuenta?"), fontWeight = FontWeight.Black) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(t("Se borrarán tu cuenta, tus movimientos, metas y recordatorios de la nube y de este equipo. No se puede deshacer."))
-                Text(t("Si quieres guardar una copia, primero exporta tu reporte desde Movimientos."), color = Gray, fontSize = 12.sp)
-                deleteError?.let { Text(it, color = Red, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = !deleting,
-                onClick = {
-                    deleting = true
-                    onDeleteAccount { error -> deleting = false; deleteError = error; if (error == null) confirmDelete = false }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = Red, contentColor = Color.White),
-            ) { Text(if (deleting) t("Eliminando…") else t("Eliminar para siempre")) }
-        },
-        dismissButton = { TextButton(enabled = !deleting, onClick = { confirmDelete = false }) { Text(t("Cancelar")) } },
+    if (confirmDelete) DeleteAccountDialog(
+        email = email,
+        googleAvailable = googleAvailable,
+        onLoadMethods = onLoadDeleteMethods,
+        onDelete = onDeleteAccount,
+        onDismiss = { confirmDelete = false },
     )
 }
 

@@ -155,6 +155,13 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
 
     override fun acknowledgeNotifications(items: List<CapturedTransaction>) = DinexNotificationStore.acknowledge(context, items)
 
+    override fun clearAccountData() {
+        DinexNotificationStore.clear(context)
+        // La frase dictada que esperaba y la pausa de "Oye Dinex" (el servicio ya se apagó).
+        hotwordPrefs.edit().remove("pending_command").remove("listen_paused").apply()
+        java.io.File(context.cacheDir, "dinex_receipts").deleteRecursively()
+    }
+
     override fun startVoice(onResult: (String) -> Unit, onError: (String) -> Unit) {
         if (!voiceAvailable) return onError("Este teléfono no tiene reconocimiento de voz disponible.")
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {

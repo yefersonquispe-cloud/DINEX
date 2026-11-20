@@ -330,7 +330,8 @@ internal class DinexViewModel(
         val google = pendingGoogle
         pendingGoogle = null
         mutableState.value = value.copy(googleTermsRequired = false)
-        if (google?.isNewUser == true) runCatching { cloud?.deleteAccount(google.session) }
+        // Recién creada: aún no tiene datos en Firestore, solo se borra la cuenta.
+        if (google?.isNewUser == true) runCatching { cloud?.deleteAuthUser(google.session) }
         "No creamos tu cuenta porque no aceptaste los Términos."
     }
 
@@ -340,32 +341,139 @@ internal class DinexViewModel(
         runCatching { cloud.upload(google.session, localCloudProfile(google.session.email, value.activeAccount?.name.orEmpty(), epochMillis())) }
     }
 
-    /** Derecho de cancelación (ARCO): borra la cuenta en Firebase y todos sus datos de este equipo. */
-    fun deleteAccount(onDone: (String?) -> Unit) {
-        val email = value.email ?: return
+    /**
+     * Cómo puede la persona confirmar su identidad antes de eliminar la cuenta:
+     * "password", "google.com" o ambos. Una cuenta solo de este equipo devuelve un conjunto vacío.
+     */
+    fun loadDeleteMethods(onDone: (methods: Set<String>?, error: String?) -> Unit) {
         val cloud = cloud
+        if (cloud == null || cloudSession == null) { onDone(emptySet(), null); return }
         viewModelScope.launch {
-            val error = try {
-                if (cloud != null) validSession()?.let { cloud.deleteAccount(it) }
-                null
+            val result = try {
+                val session = validSession() ?: throw CloudAuthException("TOKEN_EXPIRED")
+                cloud.signInMethods(session) to null
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: CloudAuthException) {
-                if (error.code == "CREDENTIAL_TOO_OLD_LOGIN_AGAIN") {
-                    // La cuenta sigue activa: se repone la copia que se borró antes de este aviso.
-                    runCatching { validSession()?.let { cloud?.upload(it, localCloudProfile(email, value.activeAccount?.name.orEmpty(), epochMillis())) } }
-                    "Por seguridad, cierra sesión, vuelve a entrar y repite la eliminación."
-                } else cloudErrorMessage(error.code)
+                if (sessionRevoked(error.code)) null to "Tu sesión expiró. Cierra sesión, vuelve a entrar y repite la eliminación."
+                else null to cloudErrorMessage(error.code)
             } catch (_: Throwable) {
-                "Necesitas internet para eliminar tu cuenta."
+                null to "Necesitas internet para eliminar tu cuenta."
+            }
+            onDone(result.first, result.second)
+        }
+    }
+
+    /**
+     * Derecho de cancelación (ARCO). Pasos:
+     * 1. Confirma que es la misma persona: contraseña ([password]) o Google ([google]). Así Firebase
+     *    acepta borrar la cuenta (exige un inicio de sesión reciente) antes de tocar ningún dato.
+     * 2. Borra los reportes de Dinex IA y el documento users/{uid}.
+     * 3. Recién entonces borra la cuenta de Firebase Authentication.
+     * 4. Borra todo lo que este equipo guarda de la cuenta.
+     * Si algo falla antes del paso 3, la cuenta sigue activa y se repone su copia en la nube.
+     */
+    fun deleteAccount(password: String?, google: GoogleIdentity?, onDone: (String?) -> Unit) {
+        val email = value.email ?: return
+        val cloud = cloud
+        val current = cloudSession
+        viewModelScope.launch {
+            if (cloud == null || current == null) {
+                // Cuenta antigua guardada solo en este equipo: no hay nada en la nube.
+                forgetDeletedAccount(email)
+                onDone(null)
+                return@launch
+            }
+            var fresh: CloudSession? = null
+            var cloudDataTouched = false
+            val error = try {
+                fresh = reauthenticate(cloud, current, email, password, google)
+                syncJob?.cancel()
+                cloudDataTouched = true
+                cloud.deleteAiReports(fresh)
+                cloud.deleteProfile(fresh)
+                cloud.deleteAuthUser(fresh)
+                null
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: ReauthException) {
+                error.message
+            } catch (error: CloudAuthException) {
+                when (error.code) {
+                    "INVALID_LOGIN_CREDENTIALS", "INVALID_PASSWORD" -> "La contraseña no es correcta."
+                    "CREDENTIAL_TOO_OLD_LOGIN_AGAIN" -> "Firebase pidió confirmar tu identidad otra vez. Vuelve a intentarlo."
+                    else -> cloudErrorMessage(error.code)
+                } + if (cloudDataTouched) " Tu cuenta no se eliminó." else ""
+            } catch (_: Throwable) {
+                "No hay conexión a internet. Revisa tu conexión e inténtalo otra vez." + if (cloudDataTouched) " Tu cuenta no se eliminó." else ""
             }
             if (error == null) {
-                syncJob?.cancel()
-                repository.forgetAccount(email)
-                logout()
-                mutableState.value = value.copy(accounts = repository.accounts(), authNotice = "Tu cuenta y tus datos fueron eliminados.")
+                forgetDeletedAccount(email)
+            } else {
+                fresh?.let { session ->
+                    cloudSession = session
+                    repository.setCloudSession(session)
+                    // La cuenta sigue activa: se repone su copia en la nube con lo que hay en este equipo.
+                    if (cloudDataTouched) runCatching { cloud.upload(session, localCloudProfile(email, value.activeAccount?.name.orEmpty(), epochMillis())) }
+                }
             }
             onDone(error)
+        }
+    }
+
+    private class ReauthException(message: String) : Exception(message)
+
+    /** Vuelve a iniciar sesión con la misma cuenta para obtener un permiso reciente de Firebase. */
+    private suspend fun reauthenticate(cloud: DinexCloud, current: CloudSession, email: String, password: String?, google: GoogleIdentity?): CloudSession {
+        val fresh = when {
+            !password.isNullOrBlank() -> cloud.signIn(email, password)
+            google != null -> {
+                val token = google.requestToken() ?: throw ReauthException("Confirma con Google para eliminar tu cuenta.")
+                val result = cloud.signInWithGoogle(token)
+                if (result.isNewUser) {
+                    // Eligió otra cuenta de Google y Firebase la acaba de crear: se borra de inmediato.
+                    runCatching { cloud.deleteAuthUser(result.session) }
+                }
+                result.session
+            }
+            else -> throw ReauthException("Escribe tu contraseña o confirma con Google.")
+        }
+        if (fresh.uid != current.uid) throw ReauthException("Esa no es la cuenta que quieres eliminar. Usa la misma cuenta con la que entraste ($email).")
+        return fresh
+    }
+
+    /** Borra de este equipo todo lo de la cuenta eliminada y cierra la sesión. */
+    private fun forgetDeletedAccount(email: String) {
+        syncJob?.cancel()
+        repository.forgetAccount(email)
+        logout()
+        mutableState.value = value.copy(accounts = repository.accounts(), authNotice = "Tu cuenta y tus datos fueron eliminados.")
+    }
+
+    /**
+     * El documento de la cuenta no está en la nube. Si además Firebase ya no renueva la sesión,
+     * la cuenta se eliminó (desde otro equipo o la web): se informa como USER_NOT_FOUND.
+     */
+    private suspend fun confirmAccountExists(cloud: DinexCloud, session: CloudSession) {
+        try {
+            cloud.refresh(session)
+        } catch (error: CloudAuthException) {
+            throw if (sessionRevoked(error.code)) CloudAuthException("USER_NOT_FOUND") else error
+        }
+    }
+
+    /**
+     * La sesión guardada ya no sirve. Si Firebase dice que la cuenta no existe (se eliminó desde
+     * otro equipo o la web), también se borra la copia de sus datos que quedó en este equipo.
+     */
+    private fun endRevokedSession(email: String, code: String) {
+        if (code == "USER_NOT_FOUND") {
+            repository.forgetAccount(email)
+            logout()
+            mutableState.value = value.copy(accounts = repository.accounts(), authNotice = "Esta cuenta fue eliminada. Borramos también sus datos de este equipo.")
+        } else {
+            logout()
+            mutableState.value = value.copy(authNotice = "Tu sesión expiró. Vuelve a iniciar sesión.")
         }
     }
 
@@ -425,7 +533,10 @@ internal class DinexViewModel(
             if (value.email == email) mutableState.value = value.copy(data = merged)
         } else {
             val stamp = if (localAt > 1) localAt else epochMillis()
-            cloud.upload(session, localCloudProfile(email, name, stamp))
+            // Sin documento en la nube: antes de crearlo se confirma que la cuenta sigue existiendo
+            // (si se eliminó desde otro equipo, Firebase responde USER_NOT_FOUND).
+            if (remote == null) confirmAccountExists(cloud, session)
+            cloud.upload(session, localCloudProfile(email, name, stamp), mustExist = remote != null)
         }
     }
 
@@ -437,10 +548,7 @@ internal class DinexViewModel(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: CloudAuthException) {
-            if (sessionRevoked(error.code)) {
-                logout()
-                mutableState.value = value.copy(authNotice = "Tu sesión expiró. Vuelve a iniciar sesión.")
-            }
+            if (sessionRevoked(error.code)) endRevokedSession(email, error.code)
         } catch (_: Throwable) {
             // Sin internet: se sigue usando lo guardado en el equipo y se sube en el próximo cambio.
         }
@@ -467,14 +575,19 @@ internal class DinexViewModel(
             val email = value.email ?: return@launch
             try {
                 val session = validSession() ?: return@launch
-                cloud.upload(session, localCloudProfile(email, value.activeAccount?.name.orEmpty(), repository.profileUpdatedAt(email)))
+                val profile = localCloudProfile(email, value.activeAccount?.name.orEmpty(), repository.profileUpdatedAt(email))
+                try {
+                    cloud.upload(session, profile, mustExist = true)
+                } catch (missing: CloudAuthException) {
+                    if (missing.code != "NOT_FOUND") throw missing
+                    // El documento no existe: solo se vuelve a crear si la cuenta sigue activa.
+                    confirmAccountExists(cloud, session)
+                    cloud.upload(session, profile)
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: CloudAuthException) {
-                if (sessionRevoked(error.code)) {
-                    logout()
-                    mutableState.value = value.copy(authNotice = "Tu sesión expiró. Vuelve a iniciar sesión.")
-                }
+                if (sessionRevoked(error.code)) endRevokedSession(email, error.code)
             } catch (_: Throwable) {
                 // Sin internet: el cambio queda guardado en el equipo y se sube después.
             }
@@ -491,7 +604,7 @@ internal class DinexViewModel(
         if (pending && cloud != null && session != null && email != null) {
             // Termina de subir el último cambio antes de cerrar la sesión.
             val profile = localCloudProfile(email, value.activeAccount?.name.orEmpty(), repository.profileUpdatedAt(email))
-            viewModelScope.launch { runCatching { cloud.upload(if (session.fresh()) session else cloud.refresh(session), profile) } }
+            viewModelScope.launch { runCatching { cloud.upload(if (session.fresh()) session else cloud.refresh(session), profile, mustExist = true) } }
         }
         cloudSession = null
         repository.setCloudSession(null)

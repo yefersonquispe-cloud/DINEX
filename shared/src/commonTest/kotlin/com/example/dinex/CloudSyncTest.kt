@@ -175,19 +175,32 @@ class CloudSyncTest {
         var offline = false
         var resetError = false
         var deleteError: String? = null
+        /** La cuenta se eliminó desde otro equipo: el documento ya no existe y la sesión no se renueva. */
+        var deletedElsewhere = false
+        /** Cuenta de Google que elige la persona al confirmar (otra cuenta = otro uid). */
+        var googleUid = "uid-1"
+        /** Rutas que devuelve la búsqueda de reportes de IA. */
+        var reportNames = listOf("projects/dinex-63ed4/databases/(default)/documents/aiReports/r1")
         var remoteAt = 5L
         var remote = FinancialData(onboardingCompleted = true)
         val requests = mutableListOf<Pair<String, String>>()
         val store = MemoryStore()
         private val account = """"localId":"uid-1","email":"ana@gmail.com","idToken":"t","refreshToken":"r","expiresIn":"3600""""
-        val cloud = DinexCloud(http = { method, url, body, _ ->
+        val cloud = DinexCloud(projectId = "dinex-63ed4", http = { method, url, body, _ ->
             if (offline) throw IllegalStateException("sin internet")
             requests += method to url + " " + body.orEmpty()
             when {
+                "signInWithPassword" in url && "Mala" in body.orEmpty() -> CloudResponse(400, """{"error":{"message":"INVALID_LOGIN_CREDENTIALS"}}""")
                 "signInWithPassword" in url -> CloudResponse(200, "{$account}")
-                "signInWithIdp" in url -> CloudResponse(200, """{$account,"displayName":"$googleName","isNewUser":${!profileExists}}""")
+                "signInWithIdp" in url -> CloudResponse(200, """{${account.replace("uid-1", googleUid)},"displayName":"$googleName","isNewUser":${!profileExists}}""")
+                "securetoken" in url && deletedElsewhere -> CloudResponse(400, """{"error":"INVALID_REFRESH_TOKEN"}""")
+                "securetoken" in url -> CloudResponse(200, """{"user_id":"uid-1","id_token":"t2","refresh_token":"r","expires_in":"3600"}""")
+                "accounts:lookup" in url -> CloudResponse(200, """{"users":[{"localId":"uid-1","passwordHash":"x","providerUserInfo":[{"providerId":"password"},{"providerId":"google.com"}]}]}""")
+                ":runQuery" in url -> CloudResponse(200, reportNames.joinToString(",", "[", "]") { """{"document":{"name":"$it"}}""" }.takeIf { reportNames.isNotEmpty() } ?: """[{"readTime":"2026-11-19T00:00:00Z"}]""")
                 "sendOobCode" in url && resetError -> CloudResponse(400, """{"error":{"message":"EMAIL_NOT_FOUND"}}""")
-                ":delete" in url && deleteError != null -> CloudResponse(400, """{"error":{"message":"$deleteError"}}""")
+                "accounts:delete" in url && deleteError != null -> CloudResponse(400, """{"error":{"message":"$deleteError"}}""")
+                deletedElsewhere && (method == "GET" || "currentDocument.exists" in url) ->
+                    CloudResponse(404, """{"error":{"code":404,"message":"No document to update","status":"NOT_FOUND"}}""")
                 method == "GET" && !profileExists -> CloudResponse(404, "{}")
                 method == "GET" -> CloudResponse(200, """{"fields":{"name":{"stringValue":"Ana"},"email":{"stringValue":"ana@gmail.com"},"profile":{"stringValue":${jsonString(cloudProfileText(remote))}},"updatedAt":{"integerValue":"$remoteAt"}}}""")
                 else -> CloudResponse(200, "{}")
@@ -236,15 +249,101 @@ class CloudSyncTest {
         assertEquals("Desde la web", fixture.model.state.value.data.movements.single().title)
     }
 
-    @Test fun cloudCopyReturnsWhenFirebaseAsksToLoginBeforeDeleting() = googleTest {
-        val fixture = CloudFixture().apply { deleteError = "CREDENTIAL_TOO_OLD_LOGIN_AGAIN" }
+    private fun CloudFixture.indexOf(method: String, part: String) = requests.indexOfFirst { it.first == method && part in it.second }
+
+    @Test fun deletingTheAccountConfirmsIdentityAndDeletesReportsProfileAndAccountInOrder() = googleTest {
+        val fixture = CloudFixture()
         fixture.model.signIn("ana@gmail.com", "Clave123!")
+        fixture.requests.clear()
+        var result: String? = "pendiente"
+        fixture.model.deleteAccount("Clave123!", null) { result = it }
+        assertNull(result)
+        val reauth = fixture.indexOf("POST", "signInWithPassword")
+        val report = fixture.indexOf("DELETE", "aiReports/r1")
+        val profile = fixture.indexOf("DELETE", "documents/users/uid-1")
+        val account = fixture.indexOf("POST", "accounts:delete")
+        assertTrue(reauth in 0 until report && report < profile && profile < account, "Orden: ${fixture.requests.map { it.first }}")
+        assertTrue(fixture.requests[fixture.indexOf("POST", ":runQuery")].second.contains("\"stringValue\":\"uid-1\""))
+        assertNull(fixture.model.state.value.email)
+        val local = DinexRepository(fixture.store, migrateLegacy = false)
+        assertTrue(local.accounts().none { it.email == "ana@gmail.com" })
+        assertNull(local.cloudSession())
+        assertEquals(FinancialData(), local.profile("ana@gmail.com"))
+    }
+
+    @Test fun wrongPasswordDeletesNothing() = googleTest {
+        val fixture = CloudFixture()
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        fixture.requests.clear()
         var result: String? = null
-        fixture.model.deleteAccount { result = it }
-        assertTrue(result.orEmpty().contains("vuelve a entrar"))
+        fixture.model.deleteAccount("Mala", null) { result = it }
+        assertEquals("La contraseña no es correcta.", result)
+        assertTrue(fixture.requests.none { it.first == "DELETE" || "accounts:delete" in it.second })
         assertEquals("ana@gmail.com", fixture.model.state.value.email)
-        val removed = fixture.requests.indexOfLast { it.first == "DELETE" }
-        assertTrue(fixture.requests.indexOfLast { it.first == "PATCH" } > removed)
+    }
+
+    @Test fun withoutInternetNothingIsDeleted() = googleTest {
+        val fixture = CloudFixture()
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        fixture.offline = true
+        var result: String? = null
+        fixture.model.deleteAccount("Clave123!", null) { result = it }
+        assertTrue(result.orEmpty().contains("internet"))
+        assertEquals("ana@gmail.com", fixture.model.state.value.email)
+        assertTrue(DinexRepository(fixture.store, migrateLegacy = false).accounts().any { it.email == "ana@gmail.com" })
+    }
+
+    @Test fun ifTheAccountCannotBeDeletedItsCloudCopyReturns() = googleTest {
+        val fixture = CloudFixture().apply { deleteError = "INTERNAL_ERROR" }
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        fixture.requests.clear()
+        var result: String? = null
+        fixture.model.deleteAccount("Clave123!", null) { result = it }
+        assertTrue(result.orEmpty().contains("Tu cuenta no se eliminó"))
+        assertEquals("ana@gmail.com", fixture.model.state.value.email)
+        assertTrue(fixture.indexOf("PATCH", "documents/users/uid-1") > fixture.indexOf("DELETE", "documents/users/uid-1"))
+    }
+
+    @Test fun confirmingWithAnotherGoogleAccountDeletesNothing() = googleTest {
+        val fixture = CloudFixture().apply { googleUid = "uid-2" }
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        fixture.requests.clear()
+        var result: String? = null
+        fixture.model.deleteAccount(null, FakeGoogle) { result = it }
+        assertTrue(result.orEmpty().contains("Esa no es la cuenta"))
+        assertTrue(fixture.requests.none { it.first == "DELETE" })
+        assertEquals("ana@gmail.com", fixture.model.state.value.email)
+    }
+
+    @Test fun reportsOutsideTheAiReportsCollectionAreNeverDeleted() = googleTest {
+        val fixture = CloudFixture().apply { reportNames = listOf("projects/dinex-63ed4/databases/(default)/documents/users/uid-2") }
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        fixture.requests.clear()
+        var result: String? = null
+        fixture.model.deleteAccount("Clave123!", null) { result = it }
+        assertTrue(result != null)
+        assertTrue(fixture.requests.none { it.first == "DELETE" && "users/uid-2" in it.second })
+        assertTrue(fixture.requests.none { "accounts:delete" in it.second })
+    }
+
+    @Test fun deleteMethodsComeFromFirebase() = googleTest {
+        val fixture = CloudFixture()
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        var methods: Set<String>? = null
+        fixture.model.loadDeleteMethods { found, _ -> methods = found }
+        assertEquals(setOf("password", "google.com"), methods)
+    }
+
+    @Test fun anotherDeviceForgetsAnAccountDeletedElsewhere() = googleTest {
+        val fixture = CloudFixture()
+        fixture.model.signIn("ana@gmail.com", "Clave123!")
+        fixture.deletedElsewhere = true
+        fixture.requests.clear()
+        fixture.model.refreshProfile()
+        // No vuelve a crear el documento en la nube y borra la copia de este equipo.
+        assertTrue(fixture.requests.none { it.first == "PATCH" && "currentDocument.exists" !in it.second })
+        assertNull(fixture.model.state.value.email)
+        assertTrue(DinexRepository(fixture.store, migrateLegacy = false).accounts().none { it.email == "ana@gmail.com" })
     }
 
     @Test fun veryLongGoogleNamesFitTheCloudRules() = googleTest {

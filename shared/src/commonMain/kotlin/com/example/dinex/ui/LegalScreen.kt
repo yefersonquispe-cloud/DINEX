@@ -53,7 +53,7 @@ internal object DinexLegal {
     const val UPDATED = "13 de noviembre de 2026"
 
     /** Correo para ejercer derechos ARCO. Si está vacío, solo se muestran las opciones de la app. */
-    const val CONTACT_EMAIL = ""
+    const val CONTACT_EMAIL = "dinex401@gmail.com"
 
     private val contactLine = if (CONTACT_EMAIL.isNotBlank()) " También puede escribir a $CONTACT_EMAIL." else ""
 
