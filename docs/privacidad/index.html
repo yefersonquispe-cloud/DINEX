@@ -249,7 +249,7 @@
       <p>Gemini <strong>no recibe</strong> tu nombre, tu correo, tu identificador de cuenta ni la ubicación de tus gastos. La conversación con Dinex IA no se guarda en la nube de DINEX ni en el almacenamiento del teléfono: solo se mantiene en memoria mientras la app está abierta.</p>
       <div class="note"><p><strong>Importante:</strong> DINEX usa actualmente el nivel sin costo de la API de Gemini. Según las condiciones de Google para ese nivel, Google puede usar las consultas y respuestas para mejorar sus productos, y revisores humanos pueden leerlas después de desvincularlas de la cuenta y del proyecto. Por eso, <strong>no escribas en Dinex IA</strong> datos que no quieras compartir, como claves, números de tarjeta o de documento. Más información en las <a href="https://ai.google.dev/gemini-api/terms" rel="noopener">condiciones de la API de Gemini</a>.</p></div>
       <h3>Contenido generado por IA</h3>
-      <p>Las respuestas de Dinex IA las genera un modelo de inteligencia artificial y pueden contener errores. Cada respuesta tiene un botón <strong>Reportar</strong> (ofensiva, peligrosa, incorrecta u otra). Al reportarla se guardan en Firestore tu identificador de cuenta, el motivo, tu comentario opcional, la respuesta, tu pregunta, el motor usado y la fecha. Solo el responsable de DINEX puede leer estos reportes, desde la consola de Firebase.</p>
+      <p>Las respuestas de Dinex IA las genera un modelo de inteligencia artificial y pueden contener errores. Cada respuesta tiene un botón <strong>Reportar</strong> (ofensiva, peligrosa, incorrecta u otra). Al reportarla se guardan en Firestore tu identificador de cuenta, el motivo, tu comentario opcional, la respuesta, tu pregunta, el motor usado y la fecha. Solo pueden leerlos tu propia cuenta (para poder borrarlos) y el responsable de DINEX, desde la consola de Firebase. Se eliminan cuando eliminas tu cuenta.</p>
       <p>Puedes usar Dinex IA hasta 3 veces al día.</p>
     </section>
 
@@ -337,7 +337,7 @@
       <ul>
         <li><strong>En tu teléfono:</strong> tus finanzas, preferencias, foto de perfil, ilustraciones de metas, la sesión de Firebase (sin la contraseña), los avisos de pago detectados y las fotos temporales de comprobantes se guardan en el almacenamiento privado de la app.</li>
         <li><strong>En Cloud Firestore:</strong> tu cuenta y tu perfil financiero se conservan mientras tu cuenta esté activa y se borran cuando la eliminas.</li>
-        <li><strong>Reportes de respuestas de IA:</strong> se conservan para revisar la seguridad del asistente. Hoy no tienen un plazo de borrado automático y no se eliminan al borrar tu cuenta. Puedes pedir que se eliminen escribiendo al correo de contacto.</li>
+        <li><strong>Reportes de respuestas de IA:</strong> se conservan para revisar la seguridad del asistente mientras tu cuenta esté activa, y se borran cuando la eliminas.</li>
         <li><strong>En Google Gemini:</strong> las consultas enviadas a la nube se conservan según las condiciones de Google para la API de Gemini.</li>
         <li><strong>Archivos que exportas</strong> (PDF, Excel o CSV) se guardan donde tú elijas y quedan bajo tu control.</li>
       </ul>
@@ -347,7 +347,7 @@
       <h2><span class="n">13</span>Seguridad de los datos</h2>
       <ul>
         <li>Toda la comunicación de la app con servicios en línea usa conexiones cifradas <strong>HTTPS</strong>.</li>
-        <li>Las reglas de seguridad de Cloud Firestore permiten que cada cuenta lea y modifique <strong>solo su propio documento</strong>. Los reportes de IA no se pueden leer desde la app.</li>
+        <li>Las reglas de seguridad de Cloud Firestore permiten que cada cuenta lea y modifique <strong>solo su propio documento</strong>, y que vea y borre solo sus propios reportes de IA.</li>
         <li>Tu contraseña la administra Firebase Authentication. DINEX no la guarda.</li>
         <li>Las consultas a Gemini mediante Firebase AI Logic están protegidas con Firebase App Check.</li>
         <li>Los datos del teléfono están en el almacenamiento privado de la app, aislado por Android. DINEX no les aplica un cifrado adicional propio.</li>
@@ -385,23 +385,25 @@
       <h3>Cómo eliminar tu cuenta</h3>
       <ol>
         <li>Abre DINEX e inicia sesión.</li>
-        <li>Toca tu foto o inicial para abrir <strong>Mi perfil</strong>.</li>
-        <li>Toca <strong>Eliminar mi cuenta</strong> y confirma. Si Firebase lo pide, vuelve a iniciar sesión y repite el paso.</li>
+        <li>Toca tu foto o inicial para abrir <strong>Mi perfil</strong> y toca <strong>Eliminar mi cuenta</strong>.</li>
+        <li>Marca que entiendes que la eliminación es permanente.</li>
+        <li>Confirma que eres tú con tu contraseña o con Google. Firebase exige este paso para eliminar una cuenta.</li>
       </ol>
-      <p>También puedes hacerlo desde la versión web, en Mi perfil → Eliminar mi cuenta, o pedirlo escribiendo al correo de contacto.</p>
+      <p>También puedes hacerlo desde la versión web, en Mi perfil → Eliminar mi cuenta, o pedirlo escribiendo a <a href="mailto:dinex401@gmail.com">dinex401@gmail.com</a> desde el correo de tu cuenta. Todos los pasos están en la <a href="../eliminar-cuenta/">página de eliminación de cuentas</a>.</p>
       <h3>Qué se elimina</h3>
       <ul>
+        <li>Los reportes de respuestas de IA que enviaste.</li>
         <li>Tu documento en Cloud Firestore: nombre, correo, perfil financiero, constancia de aceptación y conteo de IA.</li>
-        <li>Tu cuenta en Firebase Authentication.</li>
-        <li>En el teléfono desde el que eliminas la cuenta: tu perfil financiero, foto de perfil, aceptación de términos y conteo de IA.</li>
+        <li>Al final, tu cuenta en Firebase Authentication. Si algo falla antes, la cuenta no se elimina y puedes volver a intentarlo.</li>
+        <li>En el teléfono desde el que eliminas la cuenta: tu perfil financiero, foto de perfil, sesión, aceptación de términos, conteo de IA, avisos de pago detectados, fotos temporales de comprobantes y la configuración de “Oye DINEX”.</li>
+        <li>En otros teléfonos o navegadores donde usaste tu cuenta: su copia se borra la próxima vez que DINEX se conecte a internet en ellos.</li>
       </ul>
-      <h3>Qué no se elimina automáticamente</h3>
+      <h3>Qué no se elimina</h3>
       <ul>
-        <li>Los reportes de respuestas de IA que hayas enviado (puedes pedir su eliminación por correo).</li>
-        <li>En el teléfono: los avisos de pago detectados que no importaste, las preferencias de “Oye DINEX” y las fotos temporales de comprobantes. Se borran si limpias los datos de DINEX en los ajustes de Android o desinstalas la app.</li>
-        <li>Las copias guardadas en otros teléfonos donde usaste tu cuenta, hasta que borres los datos de DINEX o la desinstales en ellos.</li>
+        <li>Los archivos que exportaste (PDF, Excel o CSV), que están donde los guardaste.</li>
         <li>Las consultas ya enviadas a Google Gemini, que siguen las condiciones de Google.</li>
         <li>Tu cuenta de Google, si entraste con Google: pertenece a Google y no se ve afectada.</li>
+        <li>Las copias que Google mantiene por un tiempo en sus sistemas: según Google, unos 2 meses en sistemas activos y hasta unos 6 meses en copias de seguridad.</li>
       </ul>
       <p>La eliminación es inmediata y no se puede deshacer.</p>
     </section>

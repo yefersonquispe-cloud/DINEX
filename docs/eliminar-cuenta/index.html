@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eliminar cuenta · DINEX</title>
+<meta name="description" content="Página oficial para eliminar tu cuenta de DINEX y tus datos: cómo hacerlo desde la app o por correo, qué se borra, qué se conserva y en qué plazos.">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/png" href="../privacidad/dinex-mascota.png">
+<style>
+  :root {
+    --bg: #f7faf7; --fg: #183326; --soft: #365442; --muted: #536a5a;
+    --accent: #176b43; --accent-strong: #115b38; --mint: #e5f3e9;
+    --card: #ffffff; --raised: #f0f7f1; --line: #d4e4d8;
+    --warn-bg: #fff4e5; --warn-line: #e8c58f; --warn-fg: #6b4310;
+    --hero-fg: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101a15; --fg: #f3f8f3; --soft: #c0d6c5; --muted: #b9c8bc;
+      --accent: #9ce3b5; --accent-strong: #115b38; --mint: #203d2c;
+      --card: #19271f; --raised: #23382b; --line: #385641;
+      --warn-bg: #3a2d17; --warn-line: #7a5a26; --warn-fg: #f2d9ad;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--card); padding: 8px 12px; border-radius: 8px; }
+  .skip:focus { left: 16px; z-index: 10; }
+
+  header.hero {
+    background: radial-gradient(120% 140% at 85% 0%, #2f8a5a 0%, #176b43 45%, #0f4d30 100%);
+    color: var(--hero-fg);
+  }
+  .hero-inner { max-width: 1120px; margin: 0 auto; padding: 32px 16px 36px; display: flex; gap: 20px; align-items: center; }
+  .hero img { width: 84px; height: 84px; border-radius: 24px; background: rgba(255,255,255,.14); padding: 6px; flex: none; }
+  @media (max-width: 560px) {
+    .hero-inner { flex-direction: column; align-items: flex-start; gap: 14px; padding-top: 24px; }
+    .hero img { width: 64px; height: 64px; border-radius: 18px; }
+  }
+  .brand { font-size: .82rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .85; margin: 0; }
+  .hero h1 { margin: 4px 0 6px; font-size: clamp(1.6rem, 4.5vw, 2.3rem); line-height: 1.2; }
+  .hero p { margin: 0; opacity: .92; max-width: 60ch; }
+  .meta { margin-top: 12px !important; font-size: .9rem; opacity: .85; }
+
+  .layout { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 960px) { .layout { grid-template-columns: 270px minmax(0, 1fr); } }
+
+  nav.toc { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 4px 16px; align-self: start; }
+  @media (min-width: 960px) { nav.toc { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; } }
+  nav.toc summary { cursor: pointer; font-weight: 700; padding: 12px 0; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  nav.toc summary::-webkit-details-marker { display: none; }
+  nav.toc summary::after { content: "▾"; color: var(--muted); }
+  nav.toc details[open] summary::after { content: "▴"; }
+  nav.toc ol { margin: 0 0 12px; padding-left: 22px; }
+  nav.toc li { margin: 4px 0; color: var(--muted); font-size: .94rem; }
+  nav.toc a { color: var(--soft); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+
+  main { min-width: 0; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 22px 20px; margin: 0 0 18px; }
+  @media (min-width: 600px) { section { padding: 26px 28px; } }
+  h2 { margin: 0 0 12px; font-size: 1.28rem; line-height: 1.3; color: var(--fg); display: flex; gap: 10px; align-items: baseline; }
+  h2 .n { flex: none; min-width: 2em; height: 2em; display: inline-grid; place-items: center; border-radius: 999px; background: var(--mint); color: var(--accent); font-size: .8rem; font-weight: 800; }
+  h3 { font-size: 1.02rem; margin: 20px 0 6px; }
+  p, li { color: var(--soft); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 6px 0; }
+  strong { color: var(--fg); }
+
+  .summary { background: var(--mint); border-color: transparent; }
+  .summary ul { list-style: none; padding: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 700px) { .summary ul { grid-template-columns: 1fr 1fr; } }
+  .summary li { margin: 0; background: var(--card); border-radius: 14px; padding: 12px 14px; border: 1px solid var(--line); }
+
+  .note { background: var(--raised); border-left: 4px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin: 14px 0; }
+  .note p { margin: 0; }
+  .pending { background: var(--warn-bg); border: 1px dashed var(--warn-line); color: var(--warn-fg); border-radius: 8px; padding: 1px 6px; font-weight: 700; }
+
+  .table-wrap { overflow-x: auto; margin: 12px 0; border: 1px solid var(--line); border-radius: 14px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .93rem; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--soft); }
+  th { background: var(--raised); color: var(--fg); font-weight: 700; }
+  tr:last-child td { border-bottom: 0; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; }
+  .chips li { margin: 0; background: var(--raised); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: .9rem; }
+
+  .top { display: inline-block; margin-top: 8px; font-size: .88rem; }
+  footer { max-width: 1120px; margin: 0 auto; padding: 0 16px 40px; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="hero">
+  <div class="hero-inner">
+    <img src="../privacidad/dinex-mascota.png" alt="Mascota de DINEX" width="84" height="84">
+    <div>
+      <p class="brand">DINEX · Página oficial</p>
+      <h1>Eliminar tu cuenta de DINEX</h1>
+      <p>Cómo eliminar tu cuenta de la app DINEX y los datos personales asociados a ella, con o sin la app.</p>
+      <p class="meta">Responsable: Yeferson Rodrigo Quispe Alcasihuincha, desarrollador de DINEX · Actualizado el 19 de noviembre de 2026</p>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" aria-label="Índice">
+    <details open>
+      <summary>Índice</summary>
+      <ol>
+        <li><a href="#app">Desde la app</a></li>
+        <li><a href="#correo">Sin la app (por correo)</a></li>
+        <li><a href="#elimina">Qué se elimina</a></li>
+        <li><a href="#conserva">Qué puede conservarse</a></li>
+        <li><a href="#plazos">Plazos</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <main id="contenido">
+    <section class="summary" aria-labelledby="resumen">
+      <h2 id="resumen">En resumen</h2>
+      <ul>
+        <li><strong>Desde la app es inmediato:</strong> Mi perfil → Eliminar mi cuenta.</li>
+        <li><strong>Sin la app:</strong> escríbenos a <a href="mailto:dinex401@gmail.com">dinex401@gmail.com</a> desde el correo de tu cuenta.</li>
+        <li><strong>Se borra:</strong> tu cuenta, tus movimientos, presupuestos, metas, recordatorios y reportes de Dinex IA.</li>
+        <li><strong>Es permanente:</strong> una vez eliminada, no podemos recuperar tu cuenta.</li>
+      </ul>
+    </section>
+
+    <section id="app">
+      <h2><span class="n">1</span>Eliminar tu cuenta desde la app</h2>
+      <ol>
+        <li>Abre DINEX en tu teléfono Android e inicia sesión.</li>
+        <li>Toca tu foto o inicial (arriba a la derecha) para abrir <strong>Mi perfil</strong>.</li>
+        <li>Baja hasta <strong>Cuenta</strong> y toca <strong>Eliminar mi cuenta</strong>.</li>
+        <li>Lee qué se borrará y marca <strong>“Entiendo que esta acción es permanente”</strong>.</li>
+        <li>Confirma que eres tú: escribe tu contraseña o toca <strong>Confirmar con Google</strong>, según cómo creaste tu cuenta.</li>
+      </ol>
+      <p>DINEX borra tus datos en la nube y en ese teléfono, y al final elimina tu cuenta. Si se corta el internet o algo falla, la cuenta no se elimina y puedes volver a intentarlo.</p>
+      <p>También puedes hacerlo desde la versión web de DINEX, en Mi perfil → Eliminar mi cuenta.</p>
+    </section>
+
+    <section id="correo">
+      <h2><span class="n">2</span>Solicitar la eliminación sin la app</h2>
+      <p>Si ya no tienes la app o no puedes entrar, envía un correo a <a href="mailto:dinex401@gmail.com?subject=Eliminar%20mi%20cuenta%20de%20DINEX">dinex401@gmail.com</a> con:</p>
+      <ul>
+        <li>Asunto: <strong>Eliminar mi cuenta de DINEX</strong>.</li>
+        <li>Escríbenos <strong>desde el mismo correo de tu cuenta</strong> de DINEX. Así confirmamos que la cuenta es tuya.</li>
+        <li>No envíes contraseñas, números de tarjeta ni documentos. Nunca te los pediremos.</li>
+      </ul>
+      <p>Te responderemos para confirmar la solicitud y eliminaremos la cuenta y los mismos datos que se borran desde la app.</p>
+    </section>
+
+    <section id="elimina">
+      <h2><span class="n">3</span>Qué datos se eliminan</h2>
+      <h3>En la nube (Firebase de Google)</h3>
+      <ul>
+        <li>Tu cuenta de acceso en Firebase Authentication: correo, nombre y método de inicio de sesión.</li>
+        <li>Tu perfil financiero en Cloud Firestore: ingresos y gastos (con su categoría, medio de pago y lugar), presupuestos, metas de ahorro, ahorro acumulado, racha y recordatorios de pago.</li>
+        <li>La constancia de aceptación de los Términos y el conteo diario de consultas a Dinex IA.</li>
+        <li>Los reportes que enviaste sobre respuestas de Dinex IA.</li>
+      </ul>
+      <h3>En el teléfono donde eliminas la cuenta</h3>
+      <ul>
+        <li>Tus datos financieros guardados, tu foto de perfil y tu sesión.</li>
+        <li>Los avisos de pago detectados que no importaste y las fotos temporales de comprobantes.</li>
+        <li>La configuración de “Oye DINEX”, que además se apaga.</li>
+      </ul>
+      <h3>En otros teléfonos o navegadores</h3>
+      <p>Si usaste tu cuenta en otro equipo, la copia guardada allí se borra la próxima vez que DINEX se conecte a internet en ese equipo.</p>
+    </section>
+
+    <section id="conserva">
+      <h2><span class="n">4</span>Qué puede conservarse</h2>
+      <ul>
+        <li><strong>Obligaciones legales:</strong> DINEX no conserva tus datos por obligaciones legales después de eliminar tu cuenta.</li>
+        <li><strong>Copias de seguridad de Google:</strong> Google, que aloja la nube de DINEX, puede tardar en borrar los datos de sus sistemas y copias de seguridad, según su política de eliminación (ver “Plazos”).</li>
+        <li><strong>Consultas enviadas a Google Gemini:</strong> las preguntas que hiciste a Dinex IA en la nube siguen las condiciones de Google para la API de Gemini.</li>
+        <li><strong>Archivos que exportaste</strong> (PDF, Excel o CSV) y capturas que hayas compartido: están donde tú los guardaste y DINEX no puede borrarlos.</li>
+        <li><strong>Tu cuenta de Google</strong>, si entraste con Google: pertenece a Google y no se ve afectada.</li>
+      </ul>
+    </section>
+
+    <section id="plazos">
+      <h2><span class="n">5</span>Plazos de eliminación</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Qué</th><th>Cuándo</th></tr></thead>
+          <tbody>
+            <tr><td>Eliminación desde la app</td><td>Inmediata, al confirmar.</td></tr>
+            <tr><td>Solicitud por correo</td><td>Te respondemos y eliminamos la cuenta en un máximo de 10 días hábiles.</td></tr>
+            <tr><td>Copia en otros equipos</td><td>La próxima vez que DINEX se conecte a internet en ellos.</td></tr>
+            <tr><td>Sistemas activos y copias de seguridad de Google</td><td>Según Google, unos 2 meses en sistemas activos y hasta unos 6 meses en copias de seguridad (<a href="https://docs.cloud.google.com/docs/security/deletion" rel="noopener">política de eliminación de Google Cloud</a>).</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="contacto">
+      <h2><span class="n">6</span>Contacto</h2>
+      <p>Responsable: <strong>Yeferson Rodrigo Quispe Alcasihuincha</strong>, desarrollador de DINEX.</p>
+      <p>Correo: <a href="mailto:dinex401@gmail.com">dinex401@gmail.com</a></p>
+      <p>Más información en la <a href="../privacidad/">Política de privacidad de DINEX</a>.</p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <p>DINEX · Tu dinero, con propósito. · Página oficial de eliminación de cuentas.</p>
+</footer>
+</body>
+</html>
