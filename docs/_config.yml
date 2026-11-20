@@ -1,0 +1,10 @@
+# GitHub Pages publica solo la política de privacidad (docs/privacidad/).
+# Las guías internas en Markdown de esta carpeta no se publican como páginas.
+exclude:
+  - "*.md"
+  - ANDROID_AUTOMATION.md
+  - AUDITORIA_GOOGLE_PLAY.md
+  - DESIGN_SYSTEM.md
+  - GOOGLE_PLAY.md
+  - IMPORT_EXPORT.md
+  - PROJECT_MAP.md

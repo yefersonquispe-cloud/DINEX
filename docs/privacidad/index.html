@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidad · DINEX</title>
+<meta name="description" content="Política de privacidad de DINEX, la app para registrar ingresos, gastos, presupuestos y metas de ahorro. Qué datos usa, dónde se guardan y cómo eliminarlos.">
+<meta name="robots" content="index, follow">
+<link rel="icon" type="image/png" href="dinex-mascota.png">
+<style>
+  :root {
+    --bg: #f7faf7; --fg: #183326; --soft: #365442; --muted: #536a5a;
+    --accent: #176b43; --accent-strong: #115b38; --mint: #e5f3e9;
+    --card: #ffffff; --raised: #f0f7f1; --line: #d4e4d8;
+    --warn-bg: #fff4e5; --warn-line: #e8c58f; --warn-fg: #6b4310;
+    --hero-fg: #ffffff;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101a15; --fg: #f3f8f3; --soft: #c0d6c5; --muted: #b9c8bc;
+      --accent: #9ce3b5; --accent-strong: #115b38; --mint: #203d2c;
+      --card: #19271f; --raised: #23382b; --line: #385641;
+      --warn-bg: #3a2d17; --warn-line: #7a5a26; --warn-fg: #f2d9ad;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font: 16px/1.65 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  a { color: var(--accent); text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--card); padding: 8px 12px; border-radius: 8px; }
+  .skip:focus { left: 16px; z-index: 10; }
+
+  header.hero {
+    background: radial-gradient(120% 140% at 85% 0%, #2f8a5a 0%, #176b43 45%, #0f4d30 100%);
+    color: var(--hero-fg);
+  }
+  .hero-inner { max-width: 1120px; margin: 0 auto; padding: 32px 16px 36px; display: flex; gap: 20px; align-items: center; }
+  .hero img { width: 84px; height: 84px; border-radius: 24px; background: rgba(255,255,255,.14); padding: 6px; flex: none; }
+  @media (max-width: 560px) {
+    .hero-inner { flex-direction: column; align-items: flex-start; gap: 14px; padding-top: 24px; }
+    .hero img { width: 64px; height: 64px; border-radius: 18px; }
+  }
+  .brand { font-size: .82rem; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; opacity: .85; margin: 0; }
+  .hero h1 { margin: 4px 0 6px; font-size: clamp(1.6rem, 4.5vw, 2.3rem); line-height: 1.2; }
+  .hero p { margin: 0; opacity: .92; max-width: 60ch; }
+  .meta { margin-top: 12px !important; font-size: .9rem; opacity: .85; }
+
+  .layout { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; display: grid; gap: 28px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 960px) { .layout { grid-template-columns: 270px minmax(0, 1fr); } }
+
+  nav.toc { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 4px 16px; align-self: start; }
+  @media (min-width: 960px) { nav.toc { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow: auto; } }
+  nav.toc summary { cursor: pointer; font-weight: 700; padding: 12px 0; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  nav.toc summary::-webkit-details-marker { display: none; }
+  nav.toc summary::after { content: "▾"; color: var(--muted); }
+  nav.toc details[open] summary::after { content: "▴"; }
+  nav.toc ol { margin: 0 0 12px; padding-left: 22px; }
+  nav.toc li { margin: 4px 0; color: var(--muted); font-size: .94rem; }
+  nav.toc a { color: var(--soft); text-decoration: none; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+
+  main { min-width: 0; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 22px 20px; margin: 0 0 18px; }
+  @media (min-width: 600px) { section { padding: 26px 28px; } }
+  h2 { margin: 0 0 12px; font-size: 1.28rem; line-height: 1.3; color: var(--fg); display: flex; gap: 10px; align-items: baseline; }
+  h2 .n { flex: none; min-width: 2em; height: 2em; display: inline-grid; place-items: center; border-radius: 999px; background: var(--mint); color: var(--accent); font-size: .8rem; font-weight: 800; }
+  h3 { font-size: 1.02rem; margin: 20px 0 6px; }
+  p, li { color: var(--soft); }
+  ul, ol { padding-left: 22px; }
+  li { margin: 6px 0; }
+  strong { color: var(--fg); }
+
+  .summary { background: var(--mint); border-color: transparent; }
+  .summary ul { list-style: none; padding: 0; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 700px) { .summary ul { grid-template-columns: 1fr 1fr; } }
+  .summary li { margin: 0; background: var(--card); border-radius: 14px; padding: 12px 14px; border: 1px solid var(--line); }
+
+  .note { background: var(--raised); border-left: 4px solid var(--accent); border-radius: 12px; padding: 12px 14px; margin: 14px 0; }
+  .note p { margin: 0; }
+  .pending { background: var(--warn-bg); border: 1px dashed var(--warn-line); color: var(--warn-fg); border-radius: 8px; padding: 1px 6px; font-weight: 700; }
+
+  .table-wrap { overflow-x: auto; margin: 12px 0; border: 1px solid var(--line); border-radius: 14px; }
+  table { border-collapse: collapse; width: 100%; min-width: 640px; font-size: .93rem; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--soft); }
+  th { background: var(--raised); color: var(--fg); font-weight: 700; }
+  tr:last-child td { border-bottom: 0; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; list-style: none; }
+  .chips li { margin: 0; background: var(--raised); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: .9rem; }
+
+  .top { display: inline-block; margin-top: 8px; font-size: .88rem; }
+  footer { max-width: 1120px; margin: 0 auto; padding: 0 16px 40px; color: var(--muted); font-size: .9rem; }
+</style>
+</head>
+<body>
+<a class="skip" href="#contenido">Saltar al contenido</a>
+
+<header class="hero">
+  <div class="hero-inner">
+    <img src="dinex-mascota.png" alt="Mascota de DINEX" width="84" height="84">
+    <div>
+      <p class="brand">DINEX · Tu dinero, con propósito.</p>
+      <h1>Política de privacidad</h1>
+      <p>Cómo la app DINEX para Android usa, guarda y protege tu información financiera y personal.</p>
+      <p class="meta">Última actualización: 19 de noviembre de 2026 · Aplica a la app DINEX para Android (versión 1.6). La versión web usa la misma cuenta y la misma nube.</p>
+    </div>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="toc" aria-label="Índice de la política">
+    <details open>
+      <summary>Índice</summary>
+      <ol>
+        <li><a href="#introduccion">Introducción</a></li>
+        <li><a href="#responsable">Responsable</a></li>
+        <li><a href="#informacion">Información que recopilamos</a></li>
+        <li><a href="#finalidad">Finalidad del tratamiento</a></li>
+        <li><a href="#firebase">Firebase y servicios de Google</a></li>
+        <li><a href="#gemini">Dinex IA (Gemini)</a></li>
+        <li><a href="#microfono">Micrófono y voz</a></li>
+        <li><a href="#notificaciones">Notificaciones y registro automático</a></li>
+        <li><a href="#fotos">Fotos y comprobantes</a></li>
+        <li><a href="#ubicacion">Ubicación</a></li>
+        <li><a href="#terceros">Servicios de terceros</a></li>
+        <li><a href="#conservacion">Almacenamiento y conservación</a></li>
+        <li><a href="#seguridad">Seguridad</a></li>
+        <li><a href="#comparticion">Compartición de información</a></li>
+        <li><a href="#derechos">Tus derechos</a></li>
+        <li><a href="#eliminacion">Eliminar tu cuenta y tus datos</a></li>
+        <li><a href="#menores">Menores de edad</a></li>
+        <li><a href="#cambios">Cambios en esta política</a></li>
+        <li><a href="#contacto">Contacto</a></li>
+      </ol>
+    </details>
+  </nav>
+
+  <main id="contenido">
+    <section class="summary" aria-labelledby="resumen">
+      <h2 id="resumen">Resumen rápido</h2>
+      <ul>
+        <li><strong>No vendemos tus datos</strong> ni los usamos para publicidad. DINEX no tiene anuncios.</li>
+        <li><strong>No nos conectamos a tus cuentas bancarias</strong>, no movemos dinero y no pedimos claves de bancos ni de tarjetas.</li>
+        <li><strong>Tus finanzas se guardan</strong> en tu teléfono y en Cloud Firestore (Google), en Santiago de Chile.</li>
+        <li><strong>Dinex IA</strong> envía un resumen de tus finanzas a Google Gemini cuando la consulta no se responde en tu teléfono.</li>
+        <li><strong>Micrófono, ubicación, burbuja y lectura de avisos de pago</strong> son opcionales y se activan solo si tú lo permites.</li>
+        <li><strong>Puedes eliminar tu cuenta</strong> desde la app, en Perfil → Eliminar mi cuenta.</li>
+      </ul>
+    </section>
+
+    <section id="introduccion">
+      <h2><span class="n">1</span>Introducción y descripción de DINEX</h2>
+      <p>DINEX es una aplicación de finanzas personales que te ayuda a registrar ingresos y gastos, organizar presupuestos, seguir metas de ahorro, programar recordatorios de pago y recibir orientación de un asistente con inteligencia artificial (Dinex IA). Puedes registrar movimientos a mano, con tu voz, con la foto de un comprobante o a partir de los avisos de pago que recibes en tu teléfono.</p>
+      <p>DINEX <strong>no es un banco ni una entidad financiera</strong>: no ofrece préstamos, créditos, inversiones, seguros ni pagos, y no transfiere dinero. Los precios de dólar y criptomonedas que muestra son solo informativos. Las respuestas de Dinex IA son orientación general y no reemplazan la asesoría de un profesional.</p>
+      <p>Esta política explica qué información usa la versión actual de DINEX, para qué, dónde se guarda, con quién se comparte y cómo puedes ejercer tus derechos, de acuerdo con la Ley N.° 29733, Ley de Protección de Datos Personales del Perú, y su Reglamento.</p>
+    </section>
+
+    <section id="responsable">
+      <h2><span class="n">2</span>Identidad del responsable</h2>
+      <p>El responsable de la aplicación y del tratamiento de tus datos personales es <strong>Yeferson Rodrigo Quispe Alcasihuincha</strong>, desarrollador independiente de DINEX.</p>
+      <p>Correo de contacto para privacidad: <span class="pending">[pendiente: correo de contacto]</span>.</p>
+    </section>
+
+    <section id="informacion">
+      <h2><span class="n">3</span>Información que recopilamos</h2>
+      <h3>Datos de tu cuenta</h3>
+      <ul>
+        <li><strong>Nombre</strong> que eliges al crear la cuenta (o el de tu cuenta de Google si entras con Google).</li>
+        <li><strong>Correo electrónico.</strong></li>
+        <li><strong>Identificador de cuenta</strong> (UID) que asigna Firebase Authentication.</li>
+        <li><strong>Contraseña:</strong> la recibe y protege Firebase Authentication (Google). DINEX no la guarda en su base de datos ni puede verla.</li>
+        <li><strong>Constancia de aceptación</strong> de los Términos y de esta Política (versión y fecha).</li>
+      </ul>
+      <h3>Datos financieros que tú registras</h3>
+      <ul>
+        <li>Ingresos y gastos: descripción, monto, categoría, fecha y medio de pago (por ejemplo, efectivo, Yape o Plin).</li>
+        <li>Presupuestos: límite diario y límites por categoría.</li>
+        <li>Metas de ahorro, monto ahorrado, racha de ahorro y recordatorios de pago.</li>
+        <li>Lugar de cada gasto, si activas la ubicación (ver la sección 10).</li>
+      </ul>
+      <h3>Datos de uso de Dinex IA</h3>
+      <ul>
+        <li>Cantidad de consultas del día, para aplicar el límite de 3 consultas diarias.</li>
+        <li>Si reportas una respuesta: el motivo, tu comentario, la respuesta reportada y tu pregunta (ver la sección 6).</li>
+      </ul>
+      <h3>Datos que se usan solo si activas una función</h3>
+      <ul>
+        <li><strong>Voz:</strong> tus comandos hablados, convertidos en texto (sección 7).</li>
+        <li><strong>Avisos de pago:</strong> el texto de las notificaciones de pagos que llegan a tu teléfono (sección 8).</li>
+        <li><strong>Fotos de comprobantes</strong> que tomas con la cámara (sección 9).</li>
+        <li><strong>Ubicación</strong> del teléfono al registrar un gasto (sección 10).</li>
+        <li><strong>Foto de perfil</strong> que eliges: se guarda solo en tu teléfono y no se sube a la nube.</li>
+      </ul>
+      <h3>Lo que DINEX no recopila</h3>
+      <ul class="chips">
+        <li>Contactos</li><li>SMS</li><li>Historial de llamadas</li><li>Claves de bancos</li><li>Números de tarjeta</li>
+        <li>Ubicación en segundo plano</li><li>ID de publicidad</li><li>Analítica de uso propia</li><li>Teléfono o dirección</li>
+      </ul>
+    </section>
+
+    <section id="finalidad">
+      <h2><span class="n">4</span>Finalidad del tratamiento</h2>
+      <p>Usamos tu información únicamente para:</p>
+      <ul>
+        <li>Crear y administrar tu cuenta, e iniciar sesión.</li>
+        <li>Guardar tus finanzas y sincronizarlas entre tus dispositivos.</li>
+        <li>Mostrarte saldos, reportes, gráficos, el mapa de tus gastos y los widgets de la pantalla de inicio.</li>
+        <li>Enviarte alertas de presupuesto y recordatorios de ahorro y de pago (notificaciones generadas en tu propio teléfono).</li>
+        <li>Responder tus consultas a Dinex IA y leer comprobantes.</li>
+        <li>Registrar movimientos por voz o a partir de avisos de pago, solo cuando tú lo confirmas.</li>
+        <li>Revisar respuestas de la IA que reportes, para mejorar la seguridad del asistente.</li>
+        <li>Atender tus solicitudes sobre tus datos personales.</li>
+      </ul>
+      <p>No usamos tus datos para publicidad, no elaboramos perfiles comerciales, no los vendemos y no los compartimos con bancos, empresas de cobranza ni centrales de riesgo.</p>
+      <div class="note"><p><strong>Datos sensibles:</strong> la ley peruana considera los ingresos económicos como datos sensibles. Por eso DINEX te pide aceptar expresamente los Términos y esta Política antes de crear tu cuenta.</p></div>
+    </section>
+
+    <section id="firebase">
+      <h2><span class="n">5</span>Uso de Firebase y servicios de Google</h2>
+      <ul>
+        <li><strong>Firebase Authentication:</strong> administra tu cuenta (correo y contraseña, o inicio de sesión con Google).</li>
+        <li><strong>Cloud Firestore:</strong> guarda tu nombre, correo, perfil financiero, la constancia de aceptación y el conteo diario de Dinex IA. La base de datos está en la región <strong>southamerica-west1 (Santiago de Chile)</strong>, lo que constituye un flujo transfronterizo de datos.</li>
+        <li><strong>Inicio de sesión con Google:</strong> si lo eliges, Google comparte con DINEX tu nombre y correo para crear o abrir tu cuenta.</li>
+        <li><strong>Firebase AI Logic y Firebase App Check (con Google Play Integrity):</strong> permiten consultar a Gemini y comprueban que la consulta viene de una copia auténtica de DINEX. Para ello, Google Play verifica la app y el dispositivo.</li>
+      </ul>
+      <p>Las ilustraciones de tus metas de ahorro y tu foto de perfil se quedan en tu teléfono y no se suben a Firebase. DINEX no usa Firebase Storage, Firebase Analytics, Crashlytics ni Firebase Cloud Messaging.</p>
+      <p>Google trata estos datos como proveedor de servicios de DINEX, según sus propias condiciones: <a href="https://firebase.google.com/support/privacy" rel="noopener">privacidad de Firebase</a> y <a href="https://policies.google.com/privacy" rel="noopener">Política de Privacidad de Google</a>.</p>
+    </section>
+
+    <section id="gemini">
+      <h2><span class="n">6</span>Dinex IA (Gemini) y tu información financiera</h2>
+      <h3>Dónde se responde tu consulta</h3>
+      <ul>
+        <li><strong>En tu teléfono (Gemini Nano):</strong> si tu equipo lo admite y el modelo está descargado, la consulta se responde dentro del teléfono, sin enviarla a internet.</li>
+        <li><strong>En la nube (Google Gemini):</strong> si Gemini Nano no está disponible o no responde, la consulta se envía a Google Gemini mediante Firebase AI Logic o directamente a la API de Gemini. En la versión web, las consultas se envían a la API de Gemini.</li>
+      </ul>
+      <h3>Qué recibe Gemini en la nube</h3>
+      <ul>
+        <li>Tu pregunta y hasta 6 mensajes anteriores de la misma conversación.</li>
+        <li>Un resumen de tus finanzas: ingresos, gastos, saldo, gasto de hoy y límite diario, racha y ahorro, gasto por categoría con sus límites, totales por periodo y tus <strong>8 movimientos más recientes</strong> (fecha, descripción, monto, categoría y medio de pago).</li>
+        <li>Al leer un comprobante: la foto, el texto que tu teléfono leyó en ella y el código de barras, si lo hay.</li>
+      </ul>
+      <p>Gemini <strong>no recibe</strong> tu nombre, tu correo, tu identificador de cuenta ni la ubicación de tus gastos. La conversación con Dinex IA no se guarda en la nube de DINEX ni en el almacenamiento del teléfono: solo se mantiene en memoria mientras la app está abierta.</p>
+      <div class="note"><p><strong>Importante:</strong> DINEX usa actualmente el nivel sin costo de la API de Gemini. Según las condiciones de Google para ese nivel, Google puede usar las consultas y respuestas para mejorar sus productos, y revisores humanos pueden leerlas después de desvincularlas de la cuenta y del proyecto. Por eso, <strong>no escribas en Dinex IA</strong> datos que no quieras compartir, como claves, números de tarjeta o de documento. Más información en las <a href="https://ai.google.dev/gemini-api/terms" rel="noopener">condiciones de la API de Gemini</a>.</p></div>
+      <h3>Contenido generado por IA</h3>
+      <p>Las respuestas de Dinex IA las genera un modelo de inteligencia artificial y pueden contener errores. Cada respuesta tiene un botón <strong>Reportar</strong> (ofensiva, peligrosa, incorrecta u otra). Al reportarla se guardan en Firestore tu identificador de cuenta, el motivo, tu comentario opcional, la respuesta, tu pregunta, el motor usado y la fecha. Solo el responsable de DINEX puede leer estos reportes, desde la consola de Firebase.</p>
+      <p>Puedes usar Dinex IA hasta 3 veces al día.</p>
+    </section>
+
+    <section id="microfono">
+      <h2><span class="n">7</span>Micrófono y reconocimiento de voz</h2>
+      <p>El micrófono es opcional. Android te pide el permiso la primera vez que usas la voz.</p>
+      <h3>Comandos de voz</h3>
+      <p>Cuando tocas el botón de voz, DINEX usa el servicio de reconocimiento de voz de tu teléfono (normalmente el de Google), que convierte tu voz en texto. Ese servicio puede procesar el audio en sus servidores, según sus propias condiciones. DINEX recibe solo el texto: <strong>no graba ni guarda tu audio</strong>. El texto se interpreta dentro de tu teléfono para registrar un movimiento o responder sobre tu saldo, y DINEX te pide confirmar antes de guardar cuando el monto es alto o no está claro.</p>
+      <h3>“Oye DINEX” y la burbuja flotante</h3>
+      <ul>
+        <li>Solo funciona si lo activas expresamente en la app. Mientras está activo, verás una <strong>notificación permanente</strong> y Android muestra su indicador de micrófono cuando se escucha.</li>
+        <li>Para reconocer la frase “Oye DINEX”, el micrófono se abre en ciclos mientras la app no está en pantalla. El audio lo procesa el servicio de voz del teléfono; DINEX no lo guarda.</li>
+        <li>La escucha manos libres se pausa sola tras 15 minutos sin uso. También puedes pausarla cuando quieras desde la burbuja (“Pausar escucha”) o desde la notificación (“Pausar”). La burbuja sigue visible para hablar con un toque.</li>
+        <li>Cada comando escucha como máximo 12 segundos.</li>
+        <li>Si la pregunta necesita a Dinex IA, el panel te muestra el botón “Preguntar a Dinex IA”. Solo si lo tocas se abre la app y la pregunta usa una de tus consultas diarias.</li>
+        <li>La burbuja usa el permiso “mostrar sobre otras apps” solo para dibujarse en pantalla. No lee el contenido de otras apps.</li>
+        <li>Puedes desactivarlo con “Desactivar” en la notificación o en la burbuja, o retirar el permiso de micrófono en los ajustes de Android.</li>
+      </ul>
+    </section>
+
+    <section id="notificaciones">
+      <h2><span class="n">8</span>Notificaciones y registro automático de movimientos</h2>
+      <h3>Notificaciones que DINEX te envía</h3>
+      <p>Las alertas de presupuesto y los recordatorios de ahorro y de pago se generan dentro de tu teléfono. DINEX no usa un servicio de notificaciones push desde un servidor.</p>
+      <h3>Lectura de avisos de pago (opcional)</h3>
+      <ul>
+        <li>Solo funciona si concedes a DINEX el <strong>acceso a notificaciones</strong> en los ajustes de Android, después de ver la explicación dentro de la app.</li>
+        <li>DINEX revisa las notificaciones para encontrar avisos de pago (por ejemplo, de Yape, Plin o bancos). <strong>Ignora por completo los chats y conversaciones</strong> y las notificaciones que no son pagos.</li>
+        <li>De cada aviso de pago guarda en tu teléfono el nombre de la app, el texto del aviso (máximo 500 caracteres), el monto, si es ingreso o gasto, y la hora.</li>
+        <li>Los avisos detectados aparecen en una lista dentro de DINEX. <strong>Solo se convierten en movimientos cuando tú decides importarlos.</strong> Al importarlos, se sincronizan como cualquier otro movimiento.</li>
+        <li>El texto completo de los avisos no se envía a la nube ni a Gemini.</li>
+        <li>Puedes retirar este acceso en cualquier momento desde los ajustes de Android.</li>
+      </ul>
+    </section>
+
+    <section id="fotos">
+      <h2><span class="n">9</span>Fotos y comprobantes</h2>
+      <ul>
+        <li>Para leer una boleta o factura, DINEX abre la app de cámara de tu teléfono. DINEX no pide el permiso de cámara ni accede a tu galería para esta función.</li>
+        <li>La foto se analiza primero en tu teléfono con Google ML Kit (lectura de texto, etiquetas de imagen y código de barras).</li>
+        <li>Si Dinex IA en la nube está disponible, la foto (reducida y comprimida) y el texto leído se envían a Google Gemini para entender mejor el comprobante (ver la sección 6).</li>
+        <li>Si la foto tiene un código de barras, solo ese número se consulta en Open Food Facts para obtener el nombre del producto.</li>
+        <li>La foto <strong>no se sube a la nube de DINEX</strong>. Queda en la carpeta temporal (caché) privada de la app, a la que otras apps no tienen acceso, hasta que Android la limpie, borres los datos de la app o la desinstales. Solo se guarda el movimiento que confirmes.</li>
+      </ul>
+    </section>
+
+    <section id="ubicacion">
+      <h2><span class="n">10</span>Ubicación geográfica</h2>
+      <ul>
+        <li>Es opcional. Si concedes el permiso, DINEX guarda junto a cada <strong>gasto nuevo</strong> las coordenadas y el nombre de la calle donde estabas, para mostrar el mapa de tus gastos.</li>
+        <li>Solo se obtiene <strong>con la app abierta</strong>. DINEX no pide ubicación en segundo plano.</li>
+        <li>El nombre de la calle se obtiene con el servicio de geocodificación de Android, que puede consultar a Google.</li>
+        <li>La ubicación de los gastos se guarda en tu teléfono y se sincroniza en Cloud Firestore como parte de tu perfil financiero. No se envía a Gemini.</li>
+        <li>Al ver el mapa, DINEX descarga las imágenes del mapa de OpenStreetMap, que recibe la zona que estás viendo y tu dirección IP.</li>
+        <li>Puedes retirar el permiso en los ajustes de Android. Los gastos ya registrados conservan su lugar hasta que los edites o los borres.</li>
+      </ul>
+    </section>
+
+    <section id="terceros">
+      <h2><span class="n">11</span>Servicios y API de terceros</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Servicio</th><th>Para qué</th><th>Qué recibe</th></tr></thead>
+          <tbody>
+            <tr><td>Firebase Authentication (Google)</td><td>Cuenta e inicio de sesión</td><td>Nombre, correo, contraseña o credencial de Google</td></tr>
+            <tr><td>Cloud Firestore (Google)</td><td>Guardar y sincronizar tus datos</td><td>Nombre, correo, perfil financiero con ubicación de gastos, aceptación de términos, conteo de IA, reportes de IA</td></tr>
+            <tr><td>Google Gemini (Firebase AI Logic o API de Gemini)</td><td>Dinex IA y lectura de comprobantes</td><td>Pregunta, mensajes recientes, resumen financiero, fotos de comprobantes</td></tr>
+            <tr><td>Firebase App Check y Google Play Integrity</td><td>Proteger las consultas a la IA</td><td>Información de integridad de la app y del dispositivo</td></tr>
+            <tr><td>Inicio de sesión con Google</td><td>Entrar con tu cuenta de Google</td><td>La cuenta de Google que eliges</td></tr>
+            <tr><td>Gemini Nano (AICore, en el teléfono)</td><td>Dinex IA sin internet</td><td>Se procesa en el teléfono</td></tr>
+            <tr><td>Google ML Kit (en el teléfono)</td><td>Leer comprobantes</td><td>La foto se procesa en el teléfono. ML Kit puede enviar a Google datos técnicos de diagnóstico (modelo del equipo, versión de la app, rendimiento, errores)</td></tr>
+            <tr><td>Reconocimiento de voz del teléfono</td><td>Comandos de voz y “Oye DINEX”</td><td>El audio de tus comandos</td></tr>
+            <tr><td>Geocodificación de Android</td><td>Nombre de la calle del gasto</td><td>Coordenadas del gasto</td></tr>
+            <tr><td>OpenStreetMap</td><td>Imágenes del mapa</td><td>Zona del mapa que ves y dirección IP</td></tr>
+            <tr><td>Open Food Facts</td><td>Nombre del producto por código de barras</td><td>Solo el número del código de barras</td></tr>
+            <tr><td>CoinGecko</td><td>Precios de dólar y criptomonedas</td><td>Solo qué monedas consultar; ningún dato personal</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Cada servicio trata la información según sus propias políticas. DINEX no integra redes de publicidad ni herramientas de analítica o rastreo.</p>
+    </section>
+
+    <section id="conservacion">
+      <h2><span class="n">12</span>Almacenamiento y conservación de la información</h2>
+      <ul>
+        <li><strong>En tu teléfono:</strong> tus finanzas, preferencias, foto de perfil, ilustraciones de metas, la sesión de Firebase (sin la contraseña), los avisos de pago detectados y las fotos temporales de comprobantes se guardan en el almacenamiento privado de la app.</li>
+        <li><strong>En Cloud Firestore:</strong> tu cuenta y tu perfil financiero se conservan mientras tu cuenta esté activa y se borran cuando la eliminas.</li>
+        <li><strong>Reportes de respuestas de IA:</strong> se conservan para revisar la seguridad del asistente. Hoy no tienen un plazo de borrado automático y no se eliminan al borrar tu cuenta. Puedes pedir que se eliminen escribiendo al correo de contacto.</li>
+        <li><strong>En Google Gemini:</strong> las consultas enviadas a la nube se conservan según las condiciones de Google para la API de Gemini.</li>
+        <li><strong>Archivos que exportas</strong> (PDF, Excel o CSV) se guardan donde tú elijas y quedan bajo tu control.</li>
+      </ul>
+    </section>
+
+    <section id="seguridad">
+      <h2><span class="n">13</span>Seguridad de los datos</h2>
+      <ul>
+        <li>Toda la comunicación de la app con servicios en línea usa conexiones cifradas <strong>HTTPS</strong>.</li>
+        <li>Las reglas de seguridad de Cloud Firestore permiten que cada cuenta lea y modifique <strong>solo su propio documento</strong>. Los reportes de IA no se pueden leer desde la app.</li>
+        <li>Tu contraseña la administra Firebase Authentication. DINEX no la guarda.</li>
+        <li>Las consultas a Gemini mediante Firebase AI Logic están protegidas con Firebase App Check.</li>
+        <li>Los datos del teléfono están en el almacenamiento privado de la app, aislado por Android. DINEX no les aplica un cifrado adicional propio.</li>
+        <li>La copia de seguridad automática de Android está desactivada para DINEX.</li>
+      </ul>
+      <p>Ningún sistema es completamente seguro. Te recomendamos proteger tu teléfono con bloqueo de pantalla y no compartir tu contraseña.</p>
+    </section>
+
+    <section id="comparticion">
+      <h2><span class="n">14</span>Compartición de información</h2>
+      <ul>
+        <li>DINEX <strong>no vende</strong> tus datos ni los comparte con terceros para publicidad o marketing.</li>
+        <li>Tus datos solo los procesan los proveedores de la sección 11 para que la app funcione.</li>
+        <li>No compartimos tu información con bancos, empresas de cobranza, centrales de riesgo ni otros usuarios de DINEX.</li>
+        <li>Podríamos entregar información si una autoridad competente lo exige conforme a la ley.</li>
+        <li>Tú decides cuándo compartir un reporte o archivo exportado desde DINEX con otras personas o apps.</li>
+      </ul>
+    </section>
+
+    <section id="derechos">
+      <h2><span class="n">15</span>Tus derechos</h2>
+      <p>De acuerdo con la Ley N.° 29733, puedes ejercer en cualquier momento tus derechos de:</p>
+      <ul>
+        <li><strong>Acceso e información:</strong> saber qué datos tuyos tratamos. Dentro de la app puedes ver todos tus movimientos, metas y presupuestos, y exportarlos en PDF, Excel o CSV.</li>
+        <li><strong>Rectificación:</strong> corregir o editar tus datos y movimientos desde la app.</li>
+        <li><strong>Cancelación (supresión):</strong> eliminar tu cuenta y tus datos (sección 16).</li>
+        <li><strong>Oposición:</strong> oponerte a un tratamiento. Puedes desactivar en cualquier momento la voz, “Oye DINEX”, la ubicación, la lectura de avisos de pago y las alertas.</li>
+        <li><strong>Revocar tu consentimiento</strong> eliminando tu cuenta.</li>
+      </ul>
+      <p>Para cualquier solicitud, escribe a <span class="pending">[pendiente: correo de contacto]</span>. Si no quedas conforme con la respuesta, puedes acudir a la Autoridad Nacional de Protección de Datos Personales del Ministerio de Justicia y Derechos Humanos del Perú.</p>
+    </section>
+
+    <section id="eliminacion">
+      <h2><span class="n">16</span>Eliminación de cuentas y datos</h2>
+      <h3>Cómo eliminar tu cuenta</h3>
+      <ol>
+        <li>Abre DINEX e inicia sesión.</li>
+        <li>Toca tu foto o inicial para abrir <strong>Mi perfil</strong>.</li>
+        <li>Toca <strong>Eliminar mi cuenta</strong> y confirma. Si Firebase lo pide, vuelve a iniciar sesión y repite el paso.</li>
+      </ol>
+      <p>También puedes hacerlo desde la versión web, en Mi perfil → Eliminar mi cuenta, o pedirlo escribiendo al correo de contacto.</p>
+      <h3>Qué se elimina</h3>
+      <ul>
+        <li>Tu documento en Cloud Firestore: nombre, correo, perfil financiero, constancia de aceptación y conteo de IA.</li>
+        <li>Tu cuenta en Firebase Authentication.</li>
+        <li>En el teléfono desde el que eliminas la cuenta: tu perfil financiero, foto de perfil, aceptación de términos y conteo de IA.</li>
+      </ul>
+      <h3>Qué no se elimina automáticamente</h3>
+      <ul>
+        <li>Los reportes de respuestas de IA que hayas enviado (puedes pedir su eliminación por correo).</li>
+        <li>En el teléfono: los avisos de pago detectados que no importaste, las preferencias de “Oye DINEX” y las fotos temporales de comprobantes. Se borran si limpias los datos de DINEX en los ajustes de Android o desinstalas la app.</li>
+        <li>Las copias guardadas en otros teléfonos donde usaste tu cuenta, hasta que borres los datos de DINEX o la desinstales en ellos.</li>
+        <li>Las consultas ya enviadas a Google Gemini, que siguen las condiciones de Google.</li>
+        <li>Tu cuenta de Google, si entraste con Google: pertenece a Google y no se ve afectada.</li>
+      </ul>
+      <p>La eliminación es inmediata y no se puede deshacer.</p>
+    </section>
+
+    <section id="menores">
+      <h2><span class="n">17</span>Privacidad de menores</h2>
+      <p>DINEX está dirigida a personas de <strong>18 años o más</strong> y no está diseñada para niños. La app no verifica la edad. Si eres madre, padre o tutor y crees que un menor creó una cuenta, escríbenos al correo de contacto para eliminarla, o elimínala desde Mi perfil.</p>
+    </section>
+
+    <section id="cambios">
+      <h2><span class="n">18</span>Cambios en esta política</h2>
+      <p>Podemos actualizar esta política cuando cambie el funcionamiento de DINEX o la ley. Publicaremos la nueva versión en esta página con su fecha de actualización. Cuando el cambio sea importante, te lo informaremos dentro de la app y te pediremos aceptarlo de nuevo.</p>
+    </section>
+
+    <section id="contacto">
+      <h2><span class="n">19</span>Información de contacto</h2>
+      <p>Responsable: <strong>Yeferson Rodrigo Quispe Alcasihuincha</strong>, desarrollador de DINEX.</p>
+      <p>Correo: <span class="pending">[pendiente: correo de contacto]</span>.</p>
+      <a class="top" href="#contenido">↑ Volver al inicio</a>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <p>DINEX · Tu dinero, con propósito. · Política de privacidad, actualizada el 19 de noviembre de 2026.</p>
+</footer>
+</body>
+</html>
