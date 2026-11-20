@@ -79,8 +79,8 @@ android {
         applicationId = "com.yefersonquispe.dinex"
         minSdk = libs.versions.android.minSdk.get().toInt()
         targetSdk = libs.versions.android.targetSdk.get().toInt()
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.7.1"
         manifestPlaceholders["geminiApiKey"] = geminiTestKey
         firebaseAndroidConfig(applicationId.orEmpty()).forEach { (name, value) -> resValue("string", name, value) }
     }
