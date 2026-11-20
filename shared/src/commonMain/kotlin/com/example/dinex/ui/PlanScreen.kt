@@ -220,7 +220,7 @@ internal fun CategoryBudgetEditorDialog(
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
-                Text("Total destinado: ${money(total)} · Ingresos: ${money(income)}", color = if (total > income) Orange else Gray, fontSize = 11.sp)
+                Text(t("Total destinado: {0} · Ingresos: {1}", money(total), money(income)), color = if (total > income) Orange else Gray, fontSize = 11.sp)
                 if (total > income) Text(t("El total supera tus ingresos registrados."), color = Orange, fontSize = 11.sp)
                 TextButton(onClick = onReset) { Text(t("Volver a sugerencias automáticas")) }
             }
@@ -310,10 +310,10 @@ private fun reminderUrgency(date: String): Int = when (date.trim().uppercase()) 
 private fun reminderHeadline(reminder: PaymentReminder): String {
     val amount = if (reminder.amount > 0) " de ${money(reminder.amount)}" else ""
     return when (reminderUrgency(reminder.date)) {
-        0 -> "Hoy toca pagar ${reminder.title}$amount. Tenlo en cuenta antes de gastar."
-        1 -> "Mañana pagas ${reminder.title}$amount. Sepáralo desde hoy y duerme tranquilo."
-        2 -> "Tu próximo pago es ${reminder.title}$amount, el ${reminder.date.lowercase()}."
-        else -> "Tienes pendiente ${reminder.title}$amount. Ponle fecha para que te avisemos."
+        0 -> t("Hoy toca pagar {0}{1}. Tenlo en cuenta antes de gastar.", reminder.title, amount)
+        1 -> t("Mañana pagas {0}{1}. Sepáralo desde hoy y duerme tranquilo.", reminder.title, amount)
+        2 -> t("Tu próximo pago es {0}{1}, el {2}.", reminder.title, amount, reminder.date.lowercase())
+        else -> t("Tienes pendiente {0}{1}. Ponle fecha para que te avisemos.", reminder.title, amount)
     }
 }
 
@@ -350,14 +350,14 @@ internal fun PayLine(reminder: PaymentReminder, onDelete: () -> Unit) {
         Column(Modifier.weight(1f)) {
             Text(reminder.title, color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
             Text(
-                when (urgency) { 0 -> "Vence hoy"; 1 -> "Vence mañana"; 2 -> "Vence el ${raw.lowercase()}"; else -> "Sin fecha fija" },
+                when (urgency) { 0 -> "Vence hoy"; 1 -> "Vence mañana"; 2 -> t("Vence el {0}", raw.lowercase()); else -> "Sin fecha fija" },
                 color = tone, fontSize = 12.sp, fontWeight = FontWeight.Medium,
             )
         }
         if (reminder.amount > 0) Text(money(reminder.amount), color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         Spacer(Modifier.width(4.dp))
         IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
-            Icon(DinexNavigationIcons.Close, "Quitar recordatorio ${reminder.title}", tint = Gray, modifier = Modifier.size(15.dp))
+            Icon(DinexNavigationIcons.Close, t("Quitar recordatorio {0}", reminder.title), tint = Gray, modifier = Modifier.size(15.dp))
         }
     }
 }

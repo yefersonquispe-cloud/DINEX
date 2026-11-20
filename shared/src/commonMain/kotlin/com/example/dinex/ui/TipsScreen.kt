@@ -26,7 +26,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,7 +73,7 @@ internal fun TipsScreen(data: FinancialData, onClose: () -> Unit, onAction: (Tip
                 Spacer(Modifier.width(6.dp))
                 Column {
                     Text("Consejos para ti", color = Night, fontWeight = FontWeight.Black, fontSize = 20.sp)
-                    Text("Basados en tus movimientos de ${currentMonthName().lowercase()}", color = Gray, fontSize = 12.sp)
+                    Text(t("Basados en tus movimientos de {0}", currentMonthName().lowercase()), color = Gray, fontSize = 12.sp)
                 }
             }
             LazyColumn(
@@ -86,9 +85,9 @@ internal fun TipsScreen(data: FinancialData, onClose: () -> Unit, onAction: (Tip
                 item(key = "health") { HealthCard(health) }
                 item(key = "personal-title") {
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        TipsSection("Para ti", "${tips.size} ${if (tips.size == 1) "consejo" else "consejos"} según tus números")
+                        TipsSection("Para ti", t("{0} según tus números", countLabel(tips.size, "consejo", "consejos")))
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TopicChip("Todos (${tips.size})", topic == null) { topic = null }
+                            TopicChip(t("Todos ({0})", tips.size), topic == null) { topic = null }
                             TipTopic.entries.forEach { option ->
                                 val count = tips.count { it.topic == option }
                                 if (count > 0) TopicChip("${option.label} ($count)", topic == option) { topic = option }
@@ -192,7 +191,7 @@ private fun HealthCard(health: FinancialHealth) {
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(86.dp).semantics { contentDescription = "Salud financiera ${health.score} de 100" }, contentAlignment = Alignment.Center) {
+                Box(Modifier.size(86.dp).semantics { contentDescription = t("Salud financiera {0} de 100", health.score) }, contentAlignment = Alignment.Center) {
                     Canvas(Modifier.fillMaxSize()) {
                         val stroke = 9.dp.toPx()
                         drawArc(Border, 135f, 270f, false, style = Stroke(stroke, cap = StrokeCap.Round))
@@ -289,7 +288,7 @@ private fun BudgetRuleCard(monthIncome: Double) {
         Triple("Ahorro", .20, Lime),
     )
     LearnCard("Regla 50/30/20", "Una forma simple de repartir tu dinero cada mes.") {
-        Text("Si ganas ${money(income.toDouble())} al mes:", color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+        Text(t("Si ganas {0} al mes:", money(income.toDouble())), color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp)
         DinexSlider(income, 300f..10_000f) { income = (it / 50).roundToInt() * 50f }
         Row(Modifier.fillMaxWidth().height(14.dp).clip(RoundedCornerShape(50))) {
             parts.forEach { (_, share, color) -> Box(Modifier.weight(share.toFloat()).fillMaxHeight().background(color)) }
@@ -315,18 +314,18 @@ private fun CompoundCard() {
     val total = futureValue(monthly.toDouble(), years.roundToInt(), rate / 100.0)
     val deposited = monthly.toDouble() * years.roundToInt() * 12
     LearnCard("Cómo crece tu ahorro", "Guardar seguido y dejar que gane intereses.") {
-        Text("Ahorro mensual: ${money(monthly.toDouble())}", color = NightSoft, fontSize = 13.sp)
+        Text(t("Ahorro mensual: {0}", money(monthly.toDouble())), color = NightSoft, fontSize = 13.sp)
         DinexSlider(monthly, 10f..1000f) { monthly = (it / 10).roundToInt() * 10f }
-        Text("Durante: ${years.roundToInt()} ${if (years.roundToInt() == 1) "año" else "años"}", color = NightSoft, fontSize = 13.sp)
+        Text(t("Durante: {0}", countLabel(years.roundToInt(), "año", "años")), color = NightSoft, fontSize = 13.sp)
         DinexSlider(years, 1f..30f) { years = it.roundToInt().toFloat() }
-        Text("Interés anual: ${rate.roundToInt()}%", color = NightSoft, fontSize = 13.sp)
+        Text(t("Interés anual: {0}%", rate.roundToInt()), color = NightSoft, fontSize = 13.sp)
         DinexSlider(rate, 0f..15f) { rate = it.roundToInt().toFloat() }
         Spacer(Modifier.height(6.dp))
         Surface(shape = RoundedCornerShape(14.dp), color = Lime.copy(alpha = .12f)) {
             Column(Modifier.fillMaxWidth().padding(14.dp)) {
                 Text("Tendrías", color = Gray, fontSize = 12.sp)
                 Text(money(total), color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp)
-                Text("Pones ${money(deposited)} y ganas ${money((total - deposited).coerceAtLeast(0.0))} en intereses.", color = NightSoft, fontSize = 12.sp)
+                Text(t("Pones {0} y ganas {1} en intereses.", money(deposited), money((total - deposited).coerceAtLeast(0.0))), color = NightSoft, fontSize = 12.sp)
             }
         }
         Text("Ejemplo con interés fijo; en la vida real las tasas cambian.", color = Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))

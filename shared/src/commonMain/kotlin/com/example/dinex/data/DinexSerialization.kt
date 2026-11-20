@@ -7,7 +7,7 @@ package com.example.dinex
 internal fun money(value: Double): String = "S/ ${format2(value)}"
 
 /** "1 meta", "3 metas": cantidad con la palabra en singular o plural. */
-internal fun countLabel(count: Int, one: String, many: String): String = "$count ${if (count == 1) one else many}"
+internal fun countLabel(count: Int, one: String, many: String): String = "$count ${t(if (count == 1) one else many)}"
 
 /** Monto escrito a mano: "1,500" son mil quinientos y "12,50" son doce soles con cincuenta. */
 internal fun parseMoneyInput(text: String): Double? {

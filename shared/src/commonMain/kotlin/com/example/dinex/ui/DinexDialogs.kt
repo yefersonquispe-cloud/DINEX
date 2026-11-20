@@ -197,7 +197,7 @@ internal fun AutomationDialog(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(14.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = Green),
-                        ) { Text("Registrar ${captured.size} ${if (captured.size == 1) t("alerta") else t("alertas")}", fontWeight = FontWeight.Bold) }
+                        ) { Text(t("Registrar {0}", countLabel(captured.size, "alerta", "alertas")), fontWeight = FontWeight.Bold) }
                     }
                 }
 
@@ -270,7 +270,7 @@ internal fun AutomationDialog(
                     status = if (automation.locationAvailable) "Activa" to true else "Apagada" to false,
                 ) {
                     if (automation.locationAvailable) {
-                        Text("Estás en: ${automation.currentLocationLabel() ?: "se guardará al registrar"}", color = NightSoft, fontSize = 13.sp)
+                        Text(t("Estás en: {0}", automation.currentLocationLabel() ?: t("se guardará al registrar")), color = NightSoft, fontSize = 13.sp)
                     } else {
                         Text(t("Solo se pide con tu permiso y se guarda en tu teléfono."), color = Gray, fontSize = 13.sp)
                         OutlinedButton(onClick = { automation.requestLocationPermission() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
@@ -732,7 +732,7 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
                         )
                     }
                 }
-                Text("Disponible para ahorrar: ${money(available)}. Este monto se separará del saldo disponible; no es un gasto.", color = Gray)
+                Text(t("Disponible para ahorrar: {0}. Este monto se separará del saldo disponible; no es un gasto.", money(available)), color = Gray)
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it.filter { char -> char.isDigit() || char == '.' || char == ',' }; error = false },
@@ -759,7 +759,7 @@ internal fun SavingDialog(onDismiss: () -> Unit, onSave: (SavingEntry) -> Unit, 
 
 private fun goalSummary(goal: SavingsGoal): String =
     if (goal.target > 0) "${money(goal.saved)} de ${money(goal.target)} · ${((goal.saved / goal.target) * 100).toInt().coerceIn(0, 100)}%"
-    else "${money(goal.saved)} ahorrados · sin meta total"
+    else t("{0} ahorrados · sin meta total", money(goal.saved))
 
 @Composable
 private fun NewGoalBadge() {
@@ -807,7 +807,7 @@ internal fun GoalCelebrationDialog(goalName: String, amount: Double, onDismiss: 
                     Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex celebra tu meta", Modifier.size(142.dp), contentScale = ContentScale.Fit)
                     Text(t("¡Enhorabuena!"), color = Night, fontWeight = FontWeight.Black, fontSize = 27.sp)
                     Spacer(Modifier.height(5.dp))
-                    Text("Ya reuniste ${money(amount)} para $goalName.", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center)
+                    Text(t("Ya reuniste {0} para {1}.", money(amount), goalName), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(7.dp))
                     Text(t("Disfruta tu logro y sigue construyendo tus próximas metas financieras."), color = Gray, fontSize = 10.sp, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(18.dp))
@@ -879,7 +879,7 @@ internal fun ScanReviewDialog(result: ScannedPurchase, movementId: Int?, nextId:
     AlertDialog(onDismissRequest = onDismiss, shape = RoundedCornerShape(28.dp),
         title = { Column { Text(t("Compra detectada"), fontWeight = FontWeight.Black); Text(t("Revísala antes de registrarla. Nada se guarda sin tu confirmación."), color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Normal) } },
         text = { Column(Modifier.verticalScroll(rememberScrollState())) {
-            Surface(shape = RoundedCornerShape(16.dp), color = Indigo.copy(alpha = .14f)) { Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex IA", Modifier.size(46.dp), contentScale = ContentScale.Fit); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(if (result.analyzedWithGemini) t("Analizado con Dinex IA") else t("Análisis local completado"), color = GreenDark, fontWeight = FontWeight.Black, fontSize = 12.sp); Text("Confianza ${result.confidence}%${if (result.priceEstimated) t(" · precio estimado") else ""}", color = Gray, fontSize = 9.sp) }; Text(t("REVISAR"), color = GreenDark, fontWeight = FontWeight.Black, fontSize = 8.sp) } }
+            Surface(shape = RoundedCornerShape(16.dp), color = Indigo.copy(alpha = .14f)) { Row(Modifier.fillMaxWidth().padding(13.dp), verticalAlignment = Alignment.CenterVertically) { Image(painterResource(Res.drawable.dinex_mascot_ai), "Dinex IA", Modifier.size(46.dp), contentScale = ContentScale.Fit); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(if (result.analyzedWithGemini) t("Analizado con Dinex IA") else t("Análisis local completado"), color = GreenDark, fontWeight = FontWeight.Black, fontSize = 12.sp); Text(t("Confianza {0}%", result.confidence) + (if (result.priceEstimated) t(" · precio estimado") else ""), color = Gray, fontSize = 9.sp) }; Text(t("REVISAR"), color = GreenDark, fontWeight = FontWeight.Black, fontSize = 8.sp) } }
             val details = listOfNotNull(result.kind.takeIf { it.isNotBlank() }, receiptDate?.let { "${it.day.toString().padStart(2, '0')}/${it.month.toString().padStart(2, '0')}/${it.year}" }, result.method)
             if (details.isNotEmpty()) {
                 Spacer(Modifier.height(10.dp))
@@ -971,7 +971,7 @@ internal fun BudgetWarningDialog(
                     Spacer(Modifier.height(12.dp))
                     Surface(shape = RoundedCornerShape(14.dp), color = Red.copy(alpha = .10f)) {
                         Text(
-                            "Te pasaste por ${money(over)}",
+                            t("Te pasaste por {0}", money(over)),
                             color = Red, fontSize = 13.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
                         )

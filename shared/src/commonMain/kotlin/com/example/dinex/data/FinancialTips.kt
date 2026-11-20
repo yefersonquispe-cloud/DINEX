@@ -71,10 +71,10 @@ internal fun financialHealth(data: FinancialData, today: Int = currentDayIndex()
     return FinancialHealth(
         score = savingPoints + budgetPoints + cushionPoints + habitPoints,
         factors = listOf(
-            HealthFactor("Lo que te queda del mes", if (month.income > 0) "${(rate * 100).roundToInt()}% de tus ingresos (meta: 20%)" else "Registra tus ingresos", savingPoints, 30),
-            HealthFactor("Límite diario", if (month.expenseItems.isEmpty()) "Sin gastos este mes" else "Te pasaste ${month.overLimitDays} de ${month.daysSoFar} días", budgetPoints, 30),
-            HealthFactor("Colchón de ahorro", "${formatAmount(cushionMonths, 1)} meses de gastos (meta: 3)", cushionPoints, 20),
-            HealthFactor("Racha de ahorro", "$streak ${if (streak == 1) "día" else "días"} seguidos (meta: 7)", habitPoints, 20),
+            HealthFactor("Lo que te queda del mes", if (month.income > 0) t("{0}% de tus ingresos (meta: 20%)", (rate * 100).roundToInt()) else "Registra tus ingresos", savingPoints, 30),
+            HealthFactor("Límite diario", if (month.expenseItems.isEmpty()) "Sin gastos este mes" else t("Te pasaste {0} de {1} días", month.overLimitDays, month.daysSoFar), budgetPoints, 30),
+            HealthFactor("Colchón de ahorro", t("{0} meses de gastos (meta: 3)", formatAmount(cushionMonths, 1)), cushionPoints, 20),
+            HealthFactor("Racha de ahorro", t("{0} seguidos (meta: 7)", countLabel(streak, "día", "días")), habitPoints, 20),
         ),
     )
 }
@@ -90,18 +90,17 @@ internal fun personalTips(data: FinancialData, today: Int = currentDayIndex()): 
             TipAction.AddMovement)
     } else if (month.expenses > month.income) {
         tips += FinancialTip("overspent", TipTopic.Spending, 3, "Este mes gastas más de lo que ganas",
-            "Llevas ${money(month.expenses)} en gastos y ${money(month.income)} en ingresos: ${money(month.expenses - month.income)} de diferencia. " +
-                "Revisa qué gasto puedes pausar esta semana.", TipAction.Analysis)
+            t("Llevas {0} en gastos y {1} en ingresos: {2} de diferencia. Revisa qué gasto puedes pausar esta semana.", money(month.expenses), money(month.income), money(month.expenses - month.income)), TipAction.Analysis)
     } else {
         val left = month.income - month.expenses
         val rate = left / month.income
         if (rate < .10) {
             tips += FinancialTip("low-margin", TipTopic.Savings, 2, "Apunta a guardar el 10%",
-                "Te queda ${money(left)} (${(rate * 100).roundToInt()}% de tus ingresos). Guardar el 10% serían ${money(month.income * .10)} al mes.",
+                t("Te queda {0} ({1}% de tus ingresos). Guardar el 10% serían {2} al mes.", money(left), (rate * 100).roundToInt(), money(month.income * .10)),
                 TipAction.Save)
         } else {
-            tips += FinancialTip("good-margin", TipTopic.Savings, 0, "Te queda ${(rate * 100).roundToInt()}% de tus ingresos",
-                "Tienes ${money(left)} libres este mes. Pásalos a una meta antes de que se vayan en gastos pequeños.", TipAction.Save)
+            tips += FinancialTip("good-margin", TipTopic.Savings, 0, t("Te queda {0}% de tus ingresos", (rate * 100).roundToInt()),
+                t("Tienes {0} libres este mes. Pásalos a una meta antes de que se vayan en gastos pequeños.", money(left)), TipAction.Save)
         }
     }
 
@@ -110,28 +109,28 @@ internal fun personalTips(data: FinancialData, today: Int = currentDayIndex()): 
         val (topName, topAmount) = byCategory.maxBy { it.value }
         val share = topAmount / month.expenses
         if (share >= .4 && byCategory.size > 1 || share >= .6) {
-            tips += FinancialTip("top-category", TipTopic.Spending, 2, "$topName se lleva ${(share * 100).roundToInt()}% de tus gastos",
-                "Llevas ${money(topAmount)} en $topName. Si lo recortas un 10% ahorras ${money(topAmount * .10)} al mes.", TipAction.Analysis)
+            tips += FinancialTip("top-category", TipTopic.Spending, 2, t("{0} se lleva {1}% de tus gastos", topName, (share * 100).roundToInt()),
+                t("Llevas {0} en {1}. Si lo recortas un 10% ahorras {2} al mes.", money(topAmount), topName, money(topAmount * .10)), TipAction.Analysis)
         }
         val budgets = suggestedCategoryBudgets(data.movements.filter { it.isInCurrentMonth() }, data.movements) + data.categoryBudgets
         byCategory.forEach { (name, spent) ->
             val limit = budgets[name] ?: return@forEach
             if (limit > 0 && spent > limit) {
-                tips += FinancialTip("over-$name", TipTopic.Spending, 3, "Te pasaste en $name",
-                    "Gastaste ${money(spent)} y tu presupuesto era ${money(limit)}: ${money(spent - limit)} de más.", TipAction.Plan)
+                tips += FinancialTip("over-$name", TipTopic.Spending, 3, t("Te pasaste en {0}", name),
+                    t("Gastaste {0} y tu presupuesto era {1}: {2} de más.", money(spent), money(limit), money(spent - limit)), TipAction.Plan)
             }
         }
         val small = month.expenseItems.filter { it.amount < 10 }
         if (small.size >= 5) {
-            tips += FinancialTip("small-expenses", TipTopic.Spending, 1, "Gastos hormiga: ${small.size} compras pequeñas",
-                "Compras de menos de S/ 10 ya suman ${money(small.sumOf { it.amount })} este mes. Juntas pesan más de lo que parece.",
+            tips += FinancialTip("small-expenses", TipTopic.Spending, 1, t("Gastos hormiga: {0} compras pequeñas", small.size),
+                t("Compras de menos de S/ 10 ya suman {0} este mes. Juntas pesan más de lo que parece.", money(small.sumOf { it.amount })),
                 TipAction.Analysis)
         }
     }
 
     if (month.overLimitDays >= 3) {
-        tips += FinancialTip("daily-limit", TipTopic.Habits, 2, "Superaste tu límite ${month.overLimitDays} días",
-            "Tu límite es ${money(data.dailyLimit.toDouble())} al día. Si casi siempre te pasas, súbelo un poco para que sea realista, o planifica tus compras.",
+        tips += FinancialTip("daily-limit", TipTopic.Habits, 2, t("Superaste tu límite {0} días", month.overLimitDays),
+            t("Tu límite es {0} al día. Si casi siempre te pasas, súbelo un poco para que sea realista, o planifica tus compras.", money(data.dailyLimit.toDouble())),
             TipAction.Plan)
     }
 
@@ -144,22 +143,22 @@ internal fun personalTips(data: FinancialData, today: Int = currentDayIndex()): 
             val remaining = goal.target - goal.saved
             val weekly = (month.income * .10 / 4.3).takeIf { it >= 1 } ?: 10.0
             val weeks = ceil(remaining / weekly).toInt()
-            tips += FinancialTip("goal-${goal.id}", TipTopic.Goals, 1, "Te faltan ${money(remaining)} para «${goal.name}»",
-                "Guardando ${money(weekly)} por semana llegas en unas $weeks ${if (weeks == 1) "semana" else "semanas"}.", TipAction.Save)
+            tips += FinancialTip("goal-${goal.id}", TipTopic.Goals, 1, t("Te faltan {0} para «{1}»", money(remaining), goal.name),
+                t("Guardando {0} por semana llegas en unas {1}.", money(weekly), countLabel(weeks, "semana", "semanas")), TipAction.Save)
         }
     }
 
     val cushionTarget = month.expenses * 3
     if (month.expenses > 0 && data.savings < cushionTarget) {
         tips += FinancialTip("emergency", TipTopic.Savings, 1, "Arma tu fondo de emergencia",
-            "Lo ideal es tener 3 meses de gastos guardados: unos ${money(cushionTarget)}. Te faltan ${money(cushionTarget - data.savings)}.",
+            t("Lo ideal es tener 3 meses de gastos guardados: unos {0}. Te faltan {1}.", money(cushionTarget), money(cushionTarget - data.savings)),
             TipAction.Save)
     }
 
     val streak = data.activeStreak(today)
     val savedToday = data.streakDay == today
     when {
-        streak > 0 && !savedToday -> tips += FinancialTip("streak-risk", TipTopic.Habits, 3, "No pierdas tu racha de $streak ${if (streak == 1) "día" else "días"}",
+        streak > 0 && !savedToday -> tips += FinancialTip("streak-risk", TipTopic.Habits, 3, t("No pierdas tu racha de {0}", countLabel(streak, "día", "días")),
             "Ahorra hoy aunque sea S/ 1 para mantenerla viva.", TipAction.Save)
         streak == 0 -> tips += FinancialTip("streak-start", TipTopic.Habits, 1, "Empieza una racha hoy",
             "Ahorrar un poco cada día crea el hábito. Con 7 días seguidos subes de nivel.", TipAction.Save)
@@ -167,8 +166,8 @@ internal fun personalTips(data: FinancialData, today: Int = currentDayIndex()): 
 
     val pending = data.reminders.filter { it.amount.isFinite() && it.amount > 0 }
     if (pending.isNotEmpty()) {
-        tips += FinancialTip("reminders", TipTopic.Spending, 2, "Tienes ${pending.size} ${if (pending.size == 1) "pago pendiente" else "pagos pendientes"}",
-            "Suman ${money(pending.sumOf { it.amount })}. Sepáralos antes de gastar en otras cosas.", TipAction.Plan)
+        tips += FinancialTip("reminders", TipTopic.Spending, 2, t("Tienes {0}", countLabel(pending.size, "pago pendiente", "pagos pendientes")),
+            t("Suman {0}. Sepáralos antes de gastar en otras cosas.", money(pending.sumOf { it.amount })), TipAction.Plan)
     }
 
     return tips.sortedByDescending { it.priority }

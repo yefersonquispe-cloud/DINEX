@@ -110,7 +110,7 @@ internal fun HistoryPage(movements: List<Movement>, onAdd: () -> Unit, onDelete:
             } else {
                 item {
                     DinexCard {
-                        Text(if (visible.size == 1) t("1 movimiento") else "${visible.size} movimientos", color = Gray, fontSize = 12.sp)
+                        Text(if (visible.size == 1) t("1 movimiento") else t("{0} movimientos", visible.size), color = Gray, fontSize = 12.sp)
                     }
                 }
                 items(visible, key = { it.id }) { movement ->
@@ -210,7 +210,7 @@ private fun MovementTypeSwitch(selected: Int, onSelect: (Int) -> Unit) {
                 Modifier.weight(1f).fillMaxHeight().clip(RoundedCornerShape(9.dp))
                     .background(if (active) Card else Color.Transparent)
                     .then(if (active) Modifier.border(1.dp, Border, RoundedCornerShape(9.dp)) else Modifier)
-                    .clickable(onClickLabel = "Ver $label") { onSelect(index) },
+                    .clickable(onClickLabel = t("Ver {0}", label)) { onSelect(index) },
                 contentAlignment = Alignment.Center,
             ) {
                 Text(label, color = if (active) Night else Gray, fontSize = 13.sp, fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium)
@@ -236,7 +236,7 @@ private fun MovementFilterMenu(
         Row(
             Modifier.clip(shape).background(if (active) Green.copy(alpha = if (DinexThemeState.dark) .18f else .07f) else Card)
                 .border(1.dp, if (active) GreenDark.copy(alpha = .55f) else Border, shape)
-                .clickable(onClickLabel = "Filtrar por ${label.lowercase()}") { open = true }
+                .clickable(onClickLabel = t("Filtrar por {0}", label.lowercase())) { open = true }
                 .padding(start = 12.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {

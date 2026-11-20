@@ -681,5 +681,7 @@ private val DinexTranslations: Map<String, Pair<String, String>> = mapOf(
         ("This account was deleted. We also removed its data from this device." to "Kay cuentaqa chinkachisqañam. Kay equipomantapas willakuyninkunata chinkachirqanchikmi."),
 )
 
-private val DinexEnglish: Map<String, String> = DinexTranslations.mapValues { it.value.first }
-private val DinexQuechua: Map<String, String> = DinexTranslations.mapValues { it.value.second }
+// Las claves del diccionario principal ganan si se repiten en DinexAppTranslations.
+private val DinexAllTranslations: Map<String, Pair<String, String>> = DinexAppTranslations + DinexTranslations
+private val DinexEnglish: Map<String, String> = DinexAllTranslations.mapValues { it.value.first }
+private val DinexQuechua: Map<String, String> = DinexAllTranslations.mapValues { it.value.second }

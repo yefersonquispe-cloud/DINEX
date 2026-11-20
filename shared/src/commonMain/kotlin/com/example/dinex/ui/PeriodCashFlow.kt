@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -178,10 +177,10 @@ internal fun PeriodCashFlow(movements: List<Movement>, dates: List<String>) {
         Surface(shape = RoundedCornerShape(18.dp), color = CardRaised, border = BorderStroke(1.dp, Border)) {
             Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(if (selected == today) "Hoy · ${shortDate(selected)}" else shortDate(selected), color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                    Text(if (selected == today) t("Hoy · {0}", shortDate(selected)) else shortDate(selected), color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                     Text(
                         if (selected > today) "Este día todavía no llega."
-                        else "Entró ${money(day.first)} · Salió ${money(day.second)}",
+                        else t("Entró {0} · Salió {1}", money(day.first), money(day.second)),
                         color = Gray, fontSize = 12.sp,
                     )
                 }
@@ -237,12 +236,12 @@ internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpoch
     DinexCard(accent = Indigo) {
         Text(t("CALENDARIO DE GASTO"), color = Indigo, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
         Spacer(Modifier.height(2.dp))
-        Text("Gasto diario · ${currentMonthName(month)}", color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        Text(t("Gasto diario · {0}", currentMonthName(month)), color = Night, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             FlowPill("Total", money(total), Night, Modifier.weight(1f))
             FlowPill("Promedio/día", money(average), Indigo, Modifier.weight(1f))
-            if (dailyLimit > 0 && elapsed > 0) FlowPill("En tu límite", "$withinLimit de $elapsed días", GreenDark, Modifier.weight(1.2f))
+            if (dailyLimit > 0 && elapsed > 0) FlowPill("En tu límite", t("{0} de {1} días", withinLimit, elapsed), GreenDark, Modifier.weight(1.2f))
         }
         Spacer(Modifier.height(16.dp))
         Row(Modifier.fillMaxWidth()) {
@@ -281,7 +280,7 @@ internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpoch
             Column(Modifier.fillMaxWidth().padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        (if (isCurrentMonth && selectedDay == now.day) "Hoy · " else "") + "$selectedDay de ${currentMonthName(month).lowercase()}",
+                        (if (isCurrentMonth && selectedDay == now.day) t("Hoy · ") else "") + t("{0} de {1}", selectedDay, currentMonthName(month).lowercase()),
                         color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f),
                     )
                     Text(money(selectedTotal), color = if (selectedTotal > 0) Red else Gray, fontWeight = FontWeight.Black, fontSize = 16.sp)
@@ -290,8 +289,8 @@ internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpoch
                     Spacer(Modifier.height(8.dp))
                     DinexProgress((selectedTotal / dailyLimit).toFloat().coerceIn(0f, 1f), dayTone(selectedTotal, dailyLimit, peak), height = 6.dp)
                     Text(
-                        if (selectedTotal > dailyLimit) "Te pasaste por ${money(selectedTotal - dailyLimit)} de tu límite de ${money(dailyLimit)}."
-                        else "Te quedaron ${money(dailyLimit - selectedTotal)} de tu límite de ${money(dailyLimit)}.",
+                        if (selectedTotal > dailyLimit) t("Te pasaste por {0} de tu límite de {1}.", money(selectedTotal - dailyLimit), money(dailyLimit))
+                        else t("Te quedaron {0} de tu límite de {1}.", money(dailyLimit - selectedTotal), money(dailyLimit)),
                         color = Gray, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp),
                     )
                 }
@@ -340,8 +339,8 @@ private fun CalendarDay(day: Int, value: Double, peak: Double, limit: Double, se
                     else -> Modifier
                 },
             )
-            .clickable(enabled = !future, onClickLabel = "Ver el $day") { onClick() }
-            .semantics { contentDescription = "Día $day: " + if (future) "todavía no llega" else "gastaste ${money(value)}" },
+            .clickable(enabled = !future, onClickLabel = t("Ver el {0}", day)) { onClick() }
+            .semantics { contentDescription = t("Día {0}: ", day) + if (future) "todavía no llega" else t("gastaste {0}", money(value)) },
         contentAlignment = Alignment.Center,
     ) {
         Text(

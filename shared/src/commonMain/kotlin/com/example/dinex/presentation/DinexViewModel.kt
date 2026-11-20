@@ -283,7 +283,7 @@ internal class DinexViewModel(
         // Constancia del consentimiento dado en la casilla del registro.
         repository.setTermsConsent(session.email, TermsConsent(DinexLegal.VERSION, epochMillis()))
         completeCloudLogin(session, name, trustLocal = true)
-        if (verification) "Te enviamos un correo a ${session.email} para verificar tu cuenta." else null
+        if (verification) t("Te enviamos un correo a {0} para verificar tu cuenta.", session.email) else null
     }
 
     fun sendPasswordReset(email: String) = launchAuth {
@@ -293,7 +293,7 @@ internal class DinexViewModel(
             if (error.code != "EMAIL_NOT_FOUND") throw error
         }
         // El mismo mensaje exista o no la cuenta, para no revelar qué correos están registrados.
-        "Si $email tiene una cuenta, te llegará un enlace para crear una nueva contraseña."
+        t("Si {0} tiene una cuenta, te llegará un enlace para crear una nueva contraseña.", email)
     }
 
     /**
@@ -642,7 +642,7 @@ internal class DinexViewModel(
         val limit = value.data.dailyLimit.toDouble()
         if (after > before && after > limit) {
             mutableState.value = value.copy(
-                budgetWarning = "Hoy gastaste ${money(after)}. Superaste tu presupuesto de ${money(limit)} por ${money(after - limit)}.",
+                budgetWarning = t("Hoy gastaste {0}. Superaste tu presupuesto de {1} por {2}.", money(after), money(limit), money(after - limit)),
             )
             // Only fire the real notification when the limit is crossed, not on
             // every extra expense once the day is already over budget.
@@ -670,10 +670,10 @@ internal class DinexViewModel(
         val limit = value.data.dailyLimit.toDouble()
         val after = value.data.movements.filter { !it.income && it.isToday() }.sumOf { it.amount }
         if (after > before && after > limit) {
-            mutableState.value = value.copy(budgetWarning = "Los movimientos importados llevan el gasto de hoy a ${money(after)}, por encima de tu límite de ${money(limit)}.")
+            mutableState.value = value.copy(budgetWarning = t("Los movimientos importados llevan el gasto de hoy a {0}, por encima de tu límite de {1}.", money(after), money(limit)))
             if (value.budgetAlerts && before <= limit) DinexAlerts.budgetExceeded(after, limit)
         }
-        showMessage("${countLabel(clean.size, "movimiento importado", "movimientos importados")}")
+        showMessage(countLabel(clean.size, "movimiento importado", "movimientos importados"))
     }
     fun importNotifications(items: List<CapturedTransaction>, location: String?) {
         importMovements(items.map {
@@ -713,7 +713,7 @@ internal class DinexViewModel(
         persist(value.data.copy(goals = remaining, nextGoalId = maxOf(value.data.nextGoalId, (goals.maxOfOrNull { it.id } ?: 0) + 1), savings = remaining.sumOf { it.saved }, goalName = last?.name.orEmpty(),
             goalTarget = last?.target ?: 0.0, goalArtwork = last?.artwork.orEmpty()))
         mutableState.value = value.copy(lastSavedGoalId = last?.id, goalCelebration = false, celebrationGoal = null,
-            message = "Meta eliminada. ${money(goal.saved)} vuelven a tu saldo disponible.")
+            message = t("Meta eliminada. {0} vuelven a tu saldo disponible.", money(goal.saved)))
         return true
     }
     fun setInitialBalance(amount: Double) {
@@ -725,7 +725,7 @@ internal class DinexViewModel(
     fun saveSaving(entry: SavingEntry, today: Int = currentDayIndex()): Boolean {
         if (!entry.amount.isFinite() || entry.amount <= 0) return false
         if (entry.amount > value.data.availableBalance() + 0.000001) {
-            showMessage("Saldo insuficiente. Tienes ${money(value.data.availableBalance())} disponibles para ahorrar.")
+            showMessage(t("Saldo insuficiente. Tienes {0} disponibles para ahorrar.", money(value.data.availableBalance())))
             return false
         }
         val old = value.data
@@ -759,7 +759,7 @@ internal class DinexViewModel(
             lastSavedGoalId = goal.id,
             celebrationGoal = goal,
             goalCelebration = goal.target > 0 && goal.saved >= goal.target && (existing?.saved ?: 0.0) < goal.target,
-            message = "Ahorro de ${money(entry.amount)} guardado",
+            message = t("Ahorro de {0} guardado", money(entry.amount)),
         )
         // The person already saved today: remove a nudge that may still be on screen.
         DinexAlerts.cancelSaveReminder()

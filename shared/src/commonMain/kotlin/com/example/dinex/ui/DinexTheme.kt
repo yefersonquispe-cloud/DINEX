@@ -17,7 +17,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.material3.Shapes
 import androidx.compose.runtime.Composable

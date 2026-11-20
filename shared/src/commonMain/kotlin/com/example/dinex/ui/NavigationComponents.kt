@@ -498,8 +498,8 @@ internal fun ProfileDialog(
                                 StreakBadge(level, 30.dp, locked = streak == 0)
                                 Spacer(Modifier.width(8.dp))
                                 Column {
-                                    Text(t("Nivel {0} · {1} de racha", t(level.name), "$streak ${if (streak == 1) t("día") else t("días")}"), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                                    Text(if (next == null) t("Completaste los 365 días") else t("{0} para {1}", "${next.startsAt - streak} ${if (next.startsAt - streak == 1) t("día") else t("días")}", t(next.name)), color = Color.White.copy(alpha = .75f), fontSize = 10.sp)
+                                    Text(t("Nivel {0} · {1} de racha", t(level.name), countLabel(streak, "día", "días")), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(if (next == null) t("Completaste los 365 días") else t("{0} para {1}", countLabel(next.startsAt - streak, "día", "días"), t(next.name)), color = Color.White.copy(alpha = .75f), fontSize = 10.sp)
                                 }
                             }
                         }
@@ -527,7 +527,7 @@ internal fun ProfileDialog(
                             Row(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                                 Icon(DinexNavigationIcons.Check, null, tint = GreenDark, modifier = Modifier.size(13.dp))
                                 Spacer(Modifier.width(5.dp))
-                                Text(t("{0} sincronizados con tu cuenta", "${movements.size} ${if (movements.size == 1) t("movimiento") else t("movimientos")}"), color = Gray, fontSize = 11.sp)
+                                Text(t("{0} sincronizados con tu cuenta", countLabel(movements.size, "movimiento", "movimientos")), color = Gray, fontSize = 11.sp)
                             }
                         }
                     }
@@ -545,7 +545,7 @@ internal fun ProfileDialog(
                         ProfileRowDivider()
                         ProfileSwitchRow(
                             DinexNavigationIcons.Target, "Recordatorio para ahorrar",
-                            if (saveReminderEnabled) "Si aún no ahorras, a las ${reminderHourLabel(saveReminderHour)}" else "Un aviso al día para no romper tu racha",
+                            if (saveReminderEnabled) t("Si aún no ahorras, a las {0}", reminderHourLabel(saveReminderHour)) else "Un aviso al día para no romper tu racha",
                             saveReminderEnabled,
                         ) { enabled ->
                             onSaveReminderEnabled(enabled)

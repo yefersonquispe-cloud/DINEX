@@ -139,7 +139,7 @@ internal fun AssistantPage(assistant: GeminiAssistant, model: AssistantViewModel
                 }
                 if (nanoStatus == NanoStatus.UNAVAILABLE && assistant.nanoDetail != null) {
                     Text(
-                        "${assistant.nanoDevice.ifBlank { "Este dispositivo" }}: ${assistant.nanoDetail}",
+                        "${assistant.nanoDevice.ifBlank { t("Este dispositivo") }}: ${assistant.nanoDetail?.let { t(it) }.orEmpty()}",
                         color = Gray,
                         fontSize = 9.5.sp,
                         lineHeight = 13.sp,
@@ -219,9 +219,9 @@ private fun AiQuotaNotice(remaining: Int) {
         Spacer(Modifier.width(10.dp))
         Text(
             when {
-                empty -> "Usaste tus $DAILY_AI_QUERIES consultas de hoy. Se renuevan mañana."
+                empty -> t("Usaste tus {0} consultas de hoy. Se renuevan mañana.", DAILY_AI_QUERIES)
                 remaining == 1 -> "Te queda 1 consulta hoy"
-                else -> "Te quedan $remaining de $DAILY_AI_QUERIES consultas hoy"
+                else -> t("Te quedan {0} de {1} consultas hoy", remaining, DAILY_AI_QUERIES)
             },
             color = if (empty) Orange else Gray, fontSize = 11.sp, fontWeight = if (empty) FontWeight.SemiBold else FontWeight.Normal,
         )
@@ -263,7 +263,7 @@ private fun NanoDownloadCard(downloading: Boolean, progress: Float?, error: Stri
                 Spacer(Modifier.height(8.dp))
                 if (progress != null) {
                     DinexProgress(progress, ElectricBlue, height = 6.dp)
-                    Text("${(progress * 100).toInt()}% descargado", color = Gray, fontSize = 10.sp)
+                    Text(t("{0}% descargado", (progress * 100).toInt()), color = Gray, fontSize = 10.sp)
                 } else {
                     Text(t("Preparando la descarga…"), color = Gray, fontSize = 10.sp)
                 }

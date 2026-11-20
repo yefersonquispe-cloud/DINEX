@@ -309,7 +309,7 @@ private fun guideCards(firstName: String, web: Boolean, openLegal: (Int) -> Unit
     ) { HeatmapDemo() },
     GuideCard(
         "Dinex IA", "Pregunta lo que quieras",
-        "Dinex IA responde con tus propios números y te da consejos prácticos. Tienes $DAILY_AI_QUERIES consultas al día.",
+        t("Dinex IA responde con tus propios números y te da consejos prácticos. Tienes {0} consultas al día.", DAILY_AI_QUERIES),
         DinexNavigationIcons.Tips, Color(0xFF438A53), "",
         listOf("Es una orientación: la decisión siempre es tuya."),
         action = "Probar Dinex IA" to GuideAction.Assistant,
@@ -393,7 +393,7 @@ private fun RegisterDemo() {
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(if (income) t("Pago de clases") else t("Almuerzo"), color = Night, fontWeight = FontWeight.Bold)
-                    Text("${if (income) t("Ingreso") else t("Comida")} · $method", color = Gray, fontSize = 12.sp)
+                    Text("${if (income) t("Ingreso") else t("Comida")} · ${t(method)}", color = Gray, fontSize = 12.sp)
                 }
                 Text((if (income) "+ " else "- ") + "S/ ${if (income) "120.00" else "18.50"}", color = tone, fontWeight = FontWeight.Black)
             }
@@ -476,7 +476,7 @@ private fun GoalDemo() {
                 Text("S/ ${saved.toInt()} de S/ ${target.toInt()}", color = Gray, fontSize = 12.sp)
             }
             Surface(shape = RoundedCornerShape(12.dp), color = Orange.copy(alpha = .18f)) {
-                Text("Racha ${(saved / 50).toInt()} días", color = readableAccent(Orange), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
+                Text(t("Racha {0} días", (saved / 50).toInt()), color = readableAccent(Orange), fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
             }
         }
         Box(Modifier.fillMaxWidth().height(14.dp).clip(CircleShape).background(Border)) {
@@ -504,15 +504,15 @@ private fun LimitDemo() {
     val over = spent > limit
     val tone by animateColorAsState(if (over) Red else Green, label = "limite")
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("Límite diario: S/ ${limit.toInt()}", color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp)
+        Text(t("Límite diario: S/ {0}", limit.toInt()), color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp)
         Box(Modifier.fillMaxWidth().height(14.dp).clip(CircleShape).background(Border)) {
             Box(Modifier.fillMaxHeight().fillMaxWidth((spent / limit).coerceAtMost(1f)).clip(CircleShape).background(tone))
         }
-        Text("Hoy gastaste S/ ${spent.toInt()}", color = Gray, fontSize = 12.sp)
+        Text(t("Hoy gastaste S/ {0}", spent.toInt()), color = Gray, fontSize = 12.sp)
         Slider(limit, { limit = it }, valueRange = 20f..120f, colors = guideSliderColors())
         Surface(shape = RoundedCornerShape(14.dp), color = tone.copy(alpha = .12f), modifier = Modifier.fillMaxWidth()) {
             Text(
-                if (over) "Te pasaste por S/ ${(spent - limit).toInt()}. Dinex te avisaría ahora." else "Vas bien: te quedan S/ ${(limit - spent).toInt()} para hoy.",
+                if (over) t("Te pasaste por S/ {0}. Dinex te avisaría ahora.", (spent - limit).toInt()) else t("Vas bien: te quedan S/ {0} para hoy.", (limit - spent).toInt()),
                 color = tone, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(10.dp),
             )
         }
@@ -549,7 +549,7 @@ private fun HeatmapDemo() {
                 drawCircle(Brush.radialGradient(listOf(Color(0xCCE03131), Color(0x66F59F00), Color.Transparent), center, radius), radius, center)
             }
         }
-        Text("Toca el mapa para agregar un gasto (${spots.size} lugares)", color = Gray, fontSize = 12.sp)
+        Text(t("Toca el mapa para agregar un gasto ({0} lugares)", spots.size), color = Gray, fontSize = 12.sp)
     }
 }
 

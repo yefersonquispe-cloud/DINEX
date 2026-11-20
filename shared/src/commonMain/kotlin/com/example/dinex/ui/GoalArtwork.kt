@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -140,7 +139,7 @@ internal fun GoalAvatar(name: String, size: Dp) {
  */
 @Composable
 internal fun GoalArtwork(goal: SavingsGoal, modifier: Modifier = Modifier, height: Dp = 200.dp) {
-    val t = goalTheme(goal.name)
+    val theme = goalTheme(goal.name)
     val progress = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
     // Monedas: con meta total, según el avance; sin meta, según el monto guardado.
     val coins = when {
@@ -158,7 +157,7 @@ internal fun GoalArtwork(goal: SavingsGoal, modifier: Modifier = Modifier, heigh
 
     BoxWithConstraints(
         modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(24.dp))
-            .background(Brush.linearGradient(listOf(t.top, t.bottom, t.top.copy(alpha = .9f)),
+            .background(Brush.linearGradient(listOf(theme.top, theme.bottom, theme.top.copy(alpha = .9f)),
                 start = Offset(0f, 600f * aurora), end = Offset(900f, 600f * (1f - aurora) + 300f))),
     ) {
         val w = maxWidth
@@ -192,13 +191,13 @@ internal fun GoalArtwork(goal: SavingsGoal, modifier: Modifier = Modifier, heigh
             }
         }
         // Ilustración de apoyo detrás de la principal.
-        t.extra?.let {
+        theme.extra?.let {
             Image(painterResource(it), null, Modifier.size(height * .4f).align(Alignment.TopEnd).offset(x = (-12).dp, y = (10 - float * .6f).dp)
                 .graphicsLayer { rotationZ = -sway * 2; alpha = .95f }, contentScale = ContentScale.Fit)
         }
         // Ilustración principal flotando.
         Image(
-            painterResource(t.main), "Ilustración de ${goal.name}",
+            painterResource(theme.main), t("Ilustración de {0}", goal.name),
             Modifier.size(height * .62f).align(Alignment.CenterEnd).offset(x = -(w * .1f), y = float.dp - 6.dp)
                 .graphicsLayer { rotationZ = sway; val s = .97f + .03f * pulse; scaleX = s; scaleY = s },
             contentScale = ContentScale.Fit,
@@ -218,12 +217,12 @@ internal fun GoalArtwork(goal: SavingsGoal, modifier: Modifier = Modifier, heigh
         // Nombre de la meta y avance.
         Column(Modifier.align(Alignment.TopStart).padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Surface(shape = RoundedCornerShape(50), color = Color.Black.copy(alpha = .28f)) {
-                Text("✨ " + t.label.uppercase(), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp,
+                Text("✨ " + theme.label.uppercase(), color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp,
                     modifier = Modifier.padding(horizontal = 9.dp, vertical = 3.dp))
             }
             Text(goal.name, color = Color.White, fontWeight = FontWeight.Black, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.fillMaxWidth(.58f))
-            Text(if (goal.target > 0) "${(progress * 100).toInt()}% · ${money(goal.saved)} de ${money(goal.target)}" else "${money(goal.saved)} ahorrados",
+            Text(if (goal.target > 0) "${(progress * 100).toInt()}% · ${money(goal.saved)} de ${money(goal.target)}" else t("{0} ahorrados", money(goal.saved)),
                 color = Color.White.copy(alpha = .9f), fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
     }

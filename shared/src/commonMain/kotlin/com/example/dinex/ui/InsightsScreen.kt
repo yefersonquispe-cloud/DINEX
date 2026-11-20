@@ -103,7 +103,7 @@ internal fun InsightsPage(
                     InsightBox(
                         "AH",
                         "Gastos hormiga",
-                        "Llevas ${money(antTotal)} en ${countLabel(smallSpends.size, "compra menor", "compras menores")} a S/ 15.",
+                        t("Llevas {0} en {1} a S/ 15.", money(antTotal), countLabel(smallSpends.size, "compra menor", "compras menores")),
                         Orange,
                     )
                 }
@@ -113,7 +113,7 @@ internal fun InsightsPage(
                     InsightBox(
                         "TOP",
                         "Tu mayor categoría",
-                        "${topCategory.first.name} concentra ${money(topCategory.second)} de tu gasto.",
+                        t("{0} concentra {1} de tu gasto.", topCategory.first.name, money(topCategory.second)),
                         Red,
                     )
                 }
@@ -153,8 +153,8 @@ private fun SpendingRhythm(expense: Double, previousExpense: Double, income: Dou
         if (expanded) {
             HorizontalDivider(color = Border)
             Spacer(Modifier.height(10.dp))
-            Text("Periodo anterior: ${money(previousExpense)} en gastos", color = Night, fontSize = 13.sp)
-            Text("Disponible después de gastos: ${money(income - expense)}", color = Night, fontSize = 13.sp)
+            Text(t("Periodo anterior: {0} en gastos", money(previousExpense)), color = Night, fontSize = 13.sp)
+            Text(t("Disponible después de gastos: {0}", money(income - expense)), color = Night, fontSize = 13.sp)
         }
     }
 }
@@ -173,7 +173,7 @@ internal fun ForecastCard(income: Double, expense: Double) {
         Spacer(Modifier.height(12.dp))
         DinexProgress(monthProgress, Indigo)
         Spacer(Modifier.height(6.dp))
-        Text("Día $day del mes", color = Gray, fontSize = 10.sp)
+        Text(t("Día {0} del mes", day), color = Gray, fontSize = 10.sp)
     }
 }
 

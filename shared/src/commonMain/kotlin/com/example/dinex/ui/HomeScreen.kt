@@ -312,7 +312,7 @@ internal fun SavingsHero(
             }
             if (goals.size > 3) {
                 Spacer(Modifier.height(8.dp))
-                Text("Y ${goals.size - 3} ${if (goals.size - 3 == 1) t("meta más") else t("metas más")}", color = Gray, fontSize = 11.sp)
+                Text(t("Y {0}", countLabel(goals.size - 3, "meta más", "metas más")), color = Gray, fontSize = 11.sp)
             }
         }
 
@@ -333,7 +333,7 @@ private fun SavingsGoalRow(goal: SavingsGoal, onOpen: () -> Unit) {
     val name = displayGoalName(goal.name)
     val goalProgress = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
     Column(
-        Modifier.fillMaxWidth().clickable(onClickLabel = "Abrir meta $name", onClick = onOpen).padding(horizontal = 14.dp, vertical = 14.dp),
+        Modifier.fillMaxWidth().clickable(onClickLabel = t("Abrir meta {0}", name), onClick = onOpen).padding(horizontal = 14.dp, vertical = 14.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(name, color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
@@ -382,7 +382,7 @@ private fun SavingsProgress(progress: Float, color: Color, height: androidx.comp
     val dark = Color(0xFF0E5A36)
     val lime = Color(0xFF7BE0A0)
     val tick = if (DinexThemeState.dark) Color.White.copy(alpha = .18f) else Color(0xFFC9DACF)
-    Canvas(Modifier.fillMaxWidth().height(height).semantics { contentDescription = "Avance ${savingsPercent(progress)}" }) {
+    Canvas(Modifier.fillMaxWidth().height(height).semantics { contentDescription = t("Avance {0}", savingsPercent(progress)) }) {
         val h = size.height
         val r = CornerRadius(h / 2f, h / 2f)
         drawRoundRect(track, size = size, cornerRadius = r)
@@ -430,8 +430,8 @@ internal fun SavingsStreak(streak: Int, savedToday: Boolean, onSaveToday: () -> 
             Column(Modifier.weight(1f)) {
                 Text(t("Racha actual"), color = Gray, fontSize = 10.sp)
                 Text(countLabel(streak, "día", "días"), color = Night, fontWeight = FontWeight.Black, fontSize = 22.sp)
-                Text("Nivel ${level.name.uppercase()}", color = readableAccent(level.color), fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                if (next != null) Text("Progreso hacia ${next.name}", color = Gray, fontSize = 10.sp)
+                Text(t("Nivel {0}", t(level.name).uppercase()), color = readableAccent(level.color), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                if (next != null) Text(t("Progreso hacia {0}", t(next.name)), color = Gray, fontSize = 10.sp)
             }
             FilledTonalButton(
                 onClick = onSaveToday,
@@ -590,7 +590,7 @@ private fun SpendingLegend(visible: List<Pair<CategoryInfo, Double>>, total: Dou
         visible.take(5).forEach { (category, value) ->
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp))
                 .background(category.color.copy(alpha = .06f))
-                .clickable(onClickLabel = "Filtrar ${category.name}") { onCategory(category.name) }.padding(horizontal = 9.dp, vertical = 5.dp),
+                .clickable(onClickLabel = t("Filtrar {0}", category.name)) { onCategory(category.name) }.padding(horizontal = 9.dp, vertical = 5.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Box(Modifier.size(8.dp).clip(CircleShape).background(category.color))
                 Spacer(Modifier.width(8.dp))
@@ -684,7 +684,7 @@ internal fun MovementRow(movement: Movement, onClick: (() -> Unit)? = null) {
                 MethodMark(movement.method, tint)
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    "${movement.category} · ${movement.method} · ${movement.dateLabel()}",
+                    "${t(movement.category)} · ${t(movement.method)} · ${movement.dateLabel()}",
                     color = Gray,
                     fontSize = 11.sp,
                     maxLines = 1,

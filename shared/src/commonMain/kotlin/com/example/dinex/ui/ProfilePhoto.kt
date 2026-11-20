@@ -5,7 +5,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -30,7 +29,7 @@ internal fun ProfilePhoto(name: String, encoded: String, size: Dp, modifier: Mod
         if (encoded.isBlank()) null else runCatching { Base64.decode(encoded).decodeToImageBitmap() }.getOrNull()
     }
     Box(modifier.size(size).clip(CircleShape).background(Green), contentAlignment = Alignment.Center) {
-        if (image != null) Image(image, "Foto de perfil de $name", Modifier.size(size), contentScale = ContentScale.Crop)
+        if (image != null) Image(image, t("Foto de perfil de {0}", name), Modifier.size(size), contentScale = ContentScale.Crop)
         else Text(name.firstOrNull()?.uppercase() ?: "D", color = Color.White, fontWeight = FontWeight.Black, fontSize = (size.value * .34f).sp)
     }
 }

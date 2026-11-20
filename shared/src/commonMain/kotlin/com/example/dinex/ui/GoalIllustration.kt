@@ -56,7 +56,7 @@ internal fun SavingsGoalsDialog(goals: List<SavingsGoal>, onOpen: (Int) -> Unit,
                         Column(Modifier.weight(1f)) {
                             Text("TOTAL RESERVADO", color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
                             Text(money(total), color = GreenDark, fontWeight = FontWeight.Black, fontSize = 22.sp)
-                            if (target > 0) Text("de ${money(target)} entre todas tus metas", color = Gray, fontSize = 11.sp)
+                            if (target > 0) Text(t("de {0} entre todas tus metas", money(target)), color = Gray, fontSize = 11.sp)
                         }
                         Column(horizontalAlignment = Alignment.End) {
                             Text("${goals.size}", color = Night, fontWeight = FontWeight.Black, fontSize = 22.sp)
@@ -68,7 +68,7 @@ internal fun SavingsGoalsDialog(goals: List<SavingsGoal>, onOpen: (Int) -> Unit,
                 goals.forEach { goal ->
                     val p = if (goal.target > 0) (goal.saved / goal.target).toFloat().coerceIn(0f, 1f) else 0f
                     Surface(
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClickLabel = "Abrir ${goal.name}") { onOpen(goal.id) },
+                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).clickable(onClickLabel = t("Abrir {0}", goal.name)) { onOpen(goal.id) },
                         shape = RoundedCornerShape(16.dp), color = Card, border = BorderStroke(1.dp, Border),
                     ) {
                         Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -79,7 +79,7 @@ internal fun SavingsGoalsDialog(goals: List<SavingsGoal>, onOpen: (Int) -> Unit,
                                     Text(displayGoalName(goal.name), color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, modifier = Modifier.weight(1f))
                                     if (goal.target > 0) Text(percentText(p), color = if (p >= 1f) Lime else GreenDark, fontWeight = FontWeight.Black, fontSize = 13.sp)
                                 }
-                                Text(if (goal.target > 0) "${money(goal.saved)} de ${money(goal.target)}" else "${money(goal.saved)} · sin meta total", color = Gray, fontSize = 11.sp)
+                                Text(if (goal.target > 0) "${money(goal.saved)} de ${money(goal.target)}" else t("{0} · sin meta total", money(goal.saved)), color = Gray, fontSize = 11.sp)
                                 if (goal.target > 0) {
                                     Spacer(Modifier.height(6.dp))
                                     Box(Modifier.fillMaxWidth().height(5.dp).clip(RoundedCornerShape(50)).background(Border.copy(alpha = .7f))) {
@@ -156,8 +156,8 @@ internal fun GoalProgress(goal: SavingsGoal) {
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
                     GoalStat("Falta", money(remaining))
-                    if (next != null) GoalStat("Próximo hito ${(next * 100).toInt()}%", money(target * next - goal.saved))
-                    if (remaining > 0) GoalStat("Ritmo", "${money(pace)} al día · ${kotlin.math.ceil(remaining / pace).toInt()} días")
+                    if (next != null) GoalStat(t("Próximo hito {0}%", (next * 100).toInt()), money(target * next - goal.saved))
+                    if (remaining > 0) GoalStat("Ritmo", t("{0} al día · {1} días", money(pace), kotlin.math.ceil(remaining / pace).toInt()))
                 }
             }
             Text(

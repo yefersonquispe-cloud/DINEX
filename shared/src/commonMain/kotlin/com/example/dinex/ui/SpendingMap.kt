@@ -6,7 +6,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -93,7 +92,7 @@ internal fun SpendingPlacesSection(
                 Text(t("Mapa de calor de tus lugares"), color = Gray, fontSize = 11.sp)
             }
             if (places.isNotEmpty()) {
-                Text("${places.size} ${if (places.size == 1) "lugar" else "lugares"}", color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Text(countLabel(places.size, "lugar", "lugares"), color = Red, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
         }
         Spacer(Modifier.height(10.dp))
@@ -160,7 +159,7 @@ private fun PlaceSpendRow(place: SpendingPlace, top: Double) {
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                "${place.visits} ${if (place.visits == 1) "visita" else "visitas"}",
+                countLabel(place.visits, "visita", "visitas"),
                 color = Gray, fontSize = 9.sp, modifier = Modifier.width(58.dp),
             )
             DinexProgress((place.total / top).toFloat().coerceIn(0f, 1f), Red, height = 5.dp)

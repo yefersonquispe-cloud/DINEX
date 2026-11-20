@@ -167,7 +167,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Text(money(item.amount), color = if (item.income) Green else Red, fontSize = 28.sp, fontWeight = FontWeight.Black)
-                    Text("${item.title} · ${item.category} · ${item.day}/${item.month}/${item.year}", color = Night)
+                    Text("${item.title} · ${t(item.category)} · ${item.day}/${item.month}/${item.year}", color = Night)
                     draft.doubts.forEach { Text("• $it", color = Gray, fontSize = 13.sp) }
                 }
             },
@@ -321,13 +321,13 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             onAdd = { goalDetails = false; savingGoalId = goal.id; savingDialog = true },
             onDelete = { goalToDelete = goal }) }
     }
-    goalToDelete?.let { goal -> AlertDialog(onDismissRequest = { goalToDelete = null }, title = { Text("¿Eliminar ${goal.name}?") },
-        text = { Text("Se eliminará esta meta. ${money(goal.saved)} volverán al saldo disponible. Las demás metas y tu historial no cambiarán.") },
+    goalToDelete?.let { goal -> AlertDialog(onDismissRequest = { goalToDelete = null }, title = { Text(t("¿Eliminar {0}?", goal.name)) },
+        text = { Text(t("Se eliminará esta meta. {0} volverán al saldo disponible. Las demás metas y tu historial no cambiarán.", money(goal.saved))) },
         confirmButton = { TextButton(onClick = { model.deleteSavingsGoal(goal.id); goalToDelete = null; selectedGoalId = null }) { Text(t("Eliminar meta"), color = Red) } },
         dismissButton = { TextButton(onClick = { goalToDelete = null }) { Text(t("Conservar meta")) } }) }
     state.pendingExpense?.let { pending ->
         AlertDialog(onDismissRequest = model::cancelPendingExpense, title = { Text(t("¿Deseas continuar?")) }, text = {
-            Text("Ya alcanzaste tu límite diario de ${money(dailyLimit.toDouble())}. Registrar ${pending.title} por ${money(pending.amount)} aumentará tu gasto de hoy. No se guardará hasta que confirmes.")
+            Text(t("Ya alcanzaste tu límite diario de {0}. Registrar {1} por {2} aumentará tu gasto de hoy. No se guardará hasta que confirmes.", money(dailyLimit.toDouble()), pending.title, money(pending.amount)))
         }, confirmButton = { Button(onClick = model::confirmPendingExpense) { Text(t("Sí, registrar gasto")) } }, dismissButton = { TextButton(onClick = model::cancelPendingExpense) { Text(t("Cancelar gasto")) } })
     }
     state.budgetWarning?.let { warning ->

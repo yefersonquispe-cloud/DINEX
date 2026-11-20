@@ -29,7 +29,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -389,12 +388,12 @@ internal fun StreakLevelDialog(level: StreakLevel, streak: Int, onDismiss: () ->
                     }
 
                     Surface(shape = RoundedCornerShape(50), color = accent.copy(alpha = .18f), border = BorderStroke(1.dp, accent.copy(alpha = .6f))) {
-                        Text("MEDALLA DE AHORRO · NIVEL ${index + 1} DE ${streakLevels.size}", color = accent, fontSize = 10.sp, fontWeight = FontWeight.Black,
+                        Text(t("MEDALLA DE AHORRO · NIVEL {0} DE {1}", index + 1, streakLevels.size), color = accent, fontSize = 10.sp, fontWeight = FontWeight.Black,
                             letterSpacing = 1.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp))
                     }
                     Spacer(Modifier.height(10.dp))
                     Text(level.name.uppercase(), color = Color.White, fontWeight = FontWeight.Black, fontSize = 34.sp, letterSpacing = 1.sp)
-                    Text("$streak ${if (streak == 1) t("día") else t("días")} ahorrando seguido", color = Color.White.copy(alpha = .82f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(t("{0} ahorrando seguido", countLabel(streak, "día", "días")), color = Color.White.copy(alpha = .82f), fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(14.dp))
 
                     // Camino: nivel anterior, actual y siguiente.
@@ -408,7 +407,7 @@ internal fun StreakLevelDialog(level: StreakLevel, streak: Int, onDismiss: () ->
                     }
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        if (next != null) "Siguiente medalla: ${next.name} en ${next.startsAt - streak} ${if (next.startsAt - streak == 1) "día" else "días"}"
+                        if (next != null) t("Siguiente medalla: {0} en {1}", t(next.name), countLabel(next.startsAt - streak, "día", "días"))
                         else "¡Llegaste al nivel máximo! Eres una leyenda del ahorro.",
                         color = Color.White.copy(alpha = .65f), fontSize = 11.sp, textAlign = TextAlign.Center,
                     )

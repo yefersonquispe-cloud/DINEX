@@ -30,7 +30,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -107,9 +106,9 @@ internal fun MarketScreen(onClose: () -> Unit, model: MarketViewModel = viewMode
                     status = when {
                         loading && snapshot == null -> "Conectando con el mercado..."
                         error != null && snapshot == null -> "Sin datos todavía"
-                        error != null -> "Mostrando los últimos precios · ${updatedAt?.let { elapsedLabel((now - it).inWholeSeconds) }.orEmpty()}"
+                        error != null -> t("Mostrando los últimos precios · {0}", updatedAt?.let { elapsedLabel((now - it).inWholeSeconds) }.orEmpty())
                         loading -> "Actualizando..."
-                        else -> updatedAt?.let { "Actualizado ${elapsedLabel((now - it).inWholeSeconds)}" }.orEmpty()
+                        else -> updatedAt?.let { t("Actualizado {0}", elapsedLabel((now - it).inWholeSeconds)) }.orEmpty()
                     },
                     live = error == null && snapshot != null,
                     loading = loading,
@@ -222,7 +221,7 @@ private fun MarketContent(
             }
             if (filter == MarketFilter.All || filter == MarketFilter.Crypto) {
                 item(key = "crypto-title") {
-                    MarketSection("Criptomonedas", "Las ${data.crypto.size} más grandes · toca una para ver su gráfico")
+                    MarketSection("Criptomonedas", t("Las {0} más grandes · toca una para ver su gráfico", data.crypto.size))
                     Spacer(Modifier.height(10.dp))
                     OutlinedTextField(
                         value = query,
@@ -243,7 +242,7 @@ private fun MarketContent(
                     }
                 }
                 if (crypto.isEmpty()) item(key = "crypto-empty") {
-                    Text("No encontramos “${query.trim()}” entre las ${data.crypto.size} criptomonedas.", color = Gray, fontSize = 13.sp,
+                    Text(t("No encontramos “{0}” entre las {1} criptomonedas.", query.trim(), data.crypto.size), color = Gray, fontSize = 13.sp,
                         textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(16.dp))
                 }
                 items(crypto, key = { "coin-" + it.id }) { quote ->
@@ -258,8 +257,7 @@ private fun MarketContent(
             }
             item(key = "source") {
                 Text(
-                    "Fuente: CoinGecko. Precios referenciales que se actualizan cada minuto; " +
-                        "pueden diferir de tu banco o casa de cambio. No es una recomendación de inversión.",
+                    "Fuente: CoinGecko. Precios referenciales que se actualizan cada minuto; pueden diferir de tu banco o casa de cambio. No es una recomendación de inversión.",
                     color = Gray, fontSize = 11.sp, lineHeight = 16.sp, textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                 )
@@ -300,7 +298,7 @@ private fun MarketHeader(
                         fontWeight = FontWeight.Bold,
                         fontSize = 12.sp,
                         modifier = Modifier.clip(RoundedCornerShape(50)).background(if (selected) Green else Color.Transparent)
-                            .clickable(role = Role.Tab, onClickLabel = "Ver precios en $label") { onCurrencyChange(usd) }
+                            .clickable(role = Role.Tab, onClickLabel = t("Ver precios en {0}", label)) { onCurrencyChange(usd) }
                             .padding(horizontal = 10.dp, vertical = 6.dp),
                     )
                 }
@@ -387,7 +385,7 @@ private fun Converter(data: MarketSnapshot, code: String, onCode: (String) -> Un
                         fontSize = 12.sp,
                         modifier = Modifier.clip(RoundedCornerShape(50))
                             .background(if (selected) Color.White else Color.White.copy(alpha = .14f))
-                            .clickable(role = Role.Tab, onClickLabel = "Convertir con ${option.name}") { onCode(option.id) }
+                            .clickable(role = Role.Tab, onClickLabel = t("Convertir con {0}", option.name)) { onCode(option.id) }
                             .padding(horizontal = 11.dp, vertical = 6.dp),
                     )
                 }
@@ -423,7 +421,7 @@ private fun MarketSection(title: String, subtitle: String) {
 private fun CurrencyTile(quote: MarketQuote, display: PriceDisplay, selected: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val border by animateColorAsState(if (selected) Green else Border, tween(160))
     Surface(
-        modifier.clip(RoundedCornerShape(RadiusMd)).clickable(onClickLabel = "Usar ${quote.name} en el convertidor", onClick = onClick),
+        modifier.clip(RoundedCornerShape(RadiusMd)).clickable(onClickLabel = t("Usar {0} en el convertidor", quote.name), onClick = onClick),
         shape = RoundedCornerShape(RadiusMd),
         color = if (selected) Green.copy(alpha = .08f) else Card,
         border = BorderStroke(if (selected) 2.dp else 1.dp, border),
@@ -475,7 +473,7 @@ private fun CryptoCard(quote: MarketQuote, display: PriceDisplay, penPerUsd: Dou
         shape = RoundedCornerShape(RadiusMd),
         color = Card,
         border = BorderStroke(1.dp, border),
-        modifier = Modifier.clip(RoundedCornerShape(RadiusMd)).clickable(onClickLabel = if (expanded) "Ocultar detalle" else "Ver detalle de ${quote.name}", onClick = onToggle),
+        modifier = Modifier.clip(RoundedCornerShape(RadiusMd)).clickable(onClickLabel = if (expanded) "Ocultar detalle" else t("Ver detalle de {0}", quote.name), onClick = onToggle),
     ) {
         Column {
             Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -508,7 +506,7 @@ private fun CryptoCard(quote: MarketQuote, display: PriceDisplay, penPerUsd: Dou
                         quote.change7d?.let { "7 días" to "${if (it >= 0) "+" else "−"}${formatAmount(abs(it), 2)}%" },
                         quote.marketCapUsd?.let { "Capitalización" to compactAmount(toDisplay(it), display.inUsd) },
                         quote.volumeUsd?.let { "Volumen 24 h" to compactAmount(toDisplay(it), display.inUsd) },
-                        quote.rank?.let { "Ranking" to "#$it en el mundo" },
+                        quote.rank?.let { "Ranking" to t("#{0} en el mundo", it) },
                     )
                     stats.chunked(2).forEach { pair ->
                         Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -567,7 +565,7 @@ private fun InteractiveChart(points: List<Double>, current: Double, color: Color
                 Text(display.amount(if (index == null) current else points[index]), color = Night, fontWeight = FontWeight.Black, fontSize = 20.sp, maxLines = 1)
             }
             Text(
-                if (index == null) "Toca o desliza\nsobre el gráfico" else "Máx. ${display.amount(high)}\nMín. ${display.amount(low)}",
+                if (index == null) "Toca o desliza\nsobre el gráfico" else t("Máx. {0}\nMín. {1}", display.amount(high), display.amount(low)),
                 color = Gray, fontSize = 11.sp, lineHeight = 15.sp, textAlign = TextAlign.End, maxLines = 2,
             )
         }
@@ -656,16 +654,16 @@ private fun priceDecimals(value: Double): Int = when {
 
 private fun elapsedLabel(seconds: Long): String = when {
     seconds < 5 -> "ahora"
-    seconds < 60 -> "hace $seconds s"
-    else -> "hace ${seconds / 60} min"
+    seconds < 60 -> t("hace {0} s", seconds)
+    else -> t("hace {0} min", seconds / 60)
 }
 
 /** The 7-day trend has one point per hour, newest last. */
 private fun hoursAgoLabel(hours: Int): String = when {
     hours <= 0 -> "Ahora"
-    hours < 24 -> "Hace $hours h"
-    hours % 24 == 0 -> "Hace ${hours / 24} d"
-    else -> "Hace ${hours / 24} d ${hours % 24} h"
+    hours < 24 -> t("Hace {0} h", hours)
+    hours % 24 == 0 -> t("Hace {0} d", hours / 24)
+    else -> t("Hace {0} d {1} h", hours / 24, hours % 24)
 }
 
 /** Big amounts in Spanish short scale: 1.62 bill. (billones), 24.1 mil M, 950.3 M. */

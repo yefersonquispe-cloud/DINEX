@@ -67,22 +67,22 @@ internal fun ImportMovementsDialog(existing: List<Movement>, onDismiss: () -> Un
             }
             if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(t("Preparando la vista previa…"), color = Gray) }
             review?.let { result ->
-                Text("${countLabel(candidates.size, "movimiento", "movimientos")} para importar", color = Green, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Text("Ingresos ${money(candidates.filter { it.income }.sumOf { it.amount })}\nEgresos ${money(candidates.filterNot { it.income }.sumOf { it.amount })}", color = Night)
+                Text(t("{0} para importar", countLabel(candidates.size, "movimiento", "movimientos")), color = Green, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(t("Ingresos {0}\nEgresos {1}", money(candidates.filter { it.income }.sumOf { it.amount }), money(candidates.filterNot { it.income }.sumOf { it.amount })), color = Night)
                 Row { Checkbox(skipDuplicates, { skipDuplicates = it }); Text(t("Omitir movimientos repetidos"), modifier = Modifier.padding(top = 12.dp), color = Night) }
-                if (duplicates > 0) Text("$duplicates movimientos repetidos se omitirán.", color = Gray)
+                if (duplicates > 0) Text(t("{0} movimientos repetidos se omitirán.", duplicates), color = Gray)
                 result.warnings.forEach { Text(it, color = Orange, fontSize = 13.sp) }
                 candidates.take(6).forEach { item ->
                     HorizontalDivider(color = Border)
                     Text(item.title, color = Night, fontWeight = FontWeight.SemiBold)
-                    Text("${item.dateLabel()} · ${if (item.income) t("Ingreso") else t("Egreso")} ${money(item.amount)}\n${item.category} · ${item.method}", color = Gray, fontSize = 13.sp)
+                    Text("${item.dateLabel()} · ${if (item.income) t("Ingreso") else t("Egreso")} ${money(item.amount)}\n${t(item.category)} · ${t(item.method)}", color = Gray, fontSize = 13.sp)
                 }
-                if (candidates.size > 6) Text("Y ${candidates.size - 6} movimientos más. Se conservarán sus fechas.", color = Gray, fontSize = 13.sp)
+                if (candidates.size > 6) Text(t("Y {0} movimientos más. Se conservarán sus fechas.", candidates.size - 6), color = Gray, fontSize = 13.sp)
             }
             if (error.isNotBlank()) Text(error, color = Red)
             Text(t("Nada se guarda sin tu confirmación. Formatos: .xlsx, .csv y .tsv; hasta 20 MB."), color = Gray, fontSize = 12.sp)
         } },
-        confirmButton = { Button(onClick = { onImport(candidates) }, enabled = !busy && candidates.isNotEmpty()) { Text("Importar ${candidates.size}") } },
+        confirmButton = { Button(onClick = { onImport(candidates) }, enabled = !busy && candidates.isNotEmpty()) { Text(t("Importar {0}", candidates.size)) } },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(t("Cancelar")) } },
     )
 }

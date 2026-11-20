@@ -235,6 +235,12 @@ internal fun LegalDialog(initialTab: Int = 0, onDismiss: () -> Unit) {
                         Text(document.title, color = Night, fontSize = 25.sp, lineHeight = 31.sp, fontWeight = FontWeight.Bold)
                         Spacer(Modifier.height(6.dp))
                         Text("Última actualización: ${DinexLegal.UPDATED}", color = Gray, fontSize = 12.sp)
+                        // En inglés y quechua se avisa que el texto legal oficial está en español.
+                        if (DinexI18n.language != DinexLanguage.ES) {
+                            Spacer(Modifier.height(10.dp))
+                            Text(t("El texto legal está en español, que es su versión oficial según la ley peruana."),
+                                color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                        }
                         Spacer(Modifier.height(18.dp))
                         document.intro.forEach { LegalParagraph(it); Spacer(Modifier.height(14.dp)) }
                     }
