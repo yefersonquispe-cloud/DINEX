@@ -59,6 +59,15 @@ actual fun rememberDeviceAutomation(): DeviceAutomation {
     return automation
 }
 
+/**
+ * Las clases de la app siguen en el paquete com.example.dinex aunque el id de la app en Google Play
+ * es com.yefersonquispe.dinex. Por eso los servicios se buscan con este paquete y no con packageName:
+ * con packageName Android no los encuentra (la pantalla de acceso a notificaciones se abría negra y se cerraba).
+ */
+private const val APP_CLASSES = "com.example.dinex"
+
+private fun Context.appComponent(simpleName: String) = ComponentName(packageName, "$APP_CLASSES.$simpleName")
+
 private class AndroidDeviceAutomation(private val context: Context) : DeviceAutomation {
     private val hotwordPrefs get() = context.getSharedPreferences("dinex_hotword", Context.MODE_PRIVATE)
     private var recognizer: SpeechRecognizer? = null
@@ -148,7 +157,7 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     override fun reconnectNotifications() {
         if (notificationReaderAvailable) {
             runCatching { NotificationListenerService.requestRebind(
-                ComponentName(context.packageName, context.packageName + ".DinexNotificationListenerService"),
+                context.appComponent("DinexNotificationListenerService"),
             ) }
         }
     }
@@ -195,7 +204,7 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     override fun stopVoice() { recognizer?.destroy(); recognizer = null }
 
     override fun openNotificationSettings() {
-        val component = ComponentName(context.packageName, "${context.packageName}.DinexNotificationListenerService")
+        val component = context.appComponent("DinexNotificationListenerService")
         val detailed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             Intent(Settings.ACTION_NOTIFICATION_LISTENER_DETAIL_SETTINGS).apply {
                 putExtra("android.provider.extra.NOTIFICATION_LISTENER_COMPONENT_NAME", component.flattenToString())
@@ -237,7 +246,7 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     override fun setHotwordEnabled(enabled: Boolean): String? {
         if (!enabled) {
             hotwordPrefs.edit().putBoolean("enabled", false).apply()
-            context.stopService(Intent().setClassName(context.packageName, "${context.packageName}.DinexHotwordService"))
+            context.stopService(Intent().setComponent(context.appComponent("DinexHotwordService")))
             return null
         }
         if (!voiceAvailable) return "Este teléfono no tiene un servicio de reconocimiento de voz disponible."
@@ -256,7 +265,7 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
         }
         return runCatching {
             hotwordPrefs.edit().putBoolean("enabled", true).apply()
-            val service = Intent().setClassName(context.packageName, "${context.packageName}.DinexHotwordService")
+            val service = Intent().setComponent(context.appComponent("DinexHotwordService"))
                 .setAction("com.example.dinex.action.START_HOTWORD")
             ContextCompat.startForegroundService(context, service)
             null
