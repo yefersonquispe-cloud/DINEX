@@ -107,10 +107,12 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
             }
             ACTION_RESUME_HANDS_FREE -> {
                 if (!foregroundStarted) { stopSelf(); return START_NOT_STICKY }
-                handsFree = true
-                touch()
-                updateNotification()
-                scheduleWake(300)
+                resumeHandsFree(showPanel = false)
+                return keepAlive()
+            }
+            ACTION_PAUSE_HANDS_FREE -> {
+                if (!foregroundStarted) { stopSelf(); return START_NOT_STICKY }
+                pauseByUser(showPanel = false)
                 return keepAlive()
             }
             ACTION_LISTEN -> if (foregroundStarted) { onListen(); return keepAlive() }
@@ -140,7 +142,10 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
             stopSelf()
             return START_NOT_STICKY
         }
-        handsFree = true
+        // Al activarlo desde Dinex se escucha de nuevo; si el sistema lo reinició, se respeta la pausa.
+        if (intent?.action == ACTION_START) prefs().edit().putBoolean(KEY_LISTEN_PAUSED, false).apply()
+        handsFree = !prefs().getBoolean(KEY_LISTEN_PAUSED, false)
+        updateNotification()
         touch()
         handler.removeCallbacks(idleCheck)
         handler.post(idleCheck)
@@ -214,6 +219,10 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
     }
 
     override fun onDisable() = disable()
+
+    override fun onToggleHandsFree() {
+        if (handsFree) pauseByUser(showPanel = true) else resumeHandsFree(showPanel = true)
+    }
 
     override fun onPanelClosed() {
         if (commandActive) { stopRecognizer() }
@@ -456,6 +465,40 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
         if (!prefs().getBoolean(KEY_APP_VISIBLE, false) && !overlay.panelOpen) overlay.render(idleUi(), openPanel = false)
     }
 
+    /**
+     * La persona deja de escuchar sin apagar Oye Dinex: el micrófono se cierra y la
+     * burbuja se queda para hablar con un toque. La pausa dura hasta que la reanude.
+     */
+    private fun pauseByUser(showPanel: Boolean) {
+        prefs().edit().putBoolean(KEY_LISTEN_PAUSED, true).apply()
+        handler.removeCallbacks(commandWatchdog)
+        commandActive = false
+        stopRecognizer()
+        engine.reset()
+        handler.removeCallbacks(autoClose)
+        // Desde la notificación se cierra el panel; desde la burbuja se confirma en el mismo panel.
+        if (!showPanel) overlay.hidePanel()
+        pauseHandsFree()
+        if (showPanel) {
+            render(VoicePanelUi(VoicePanelMode.HINT, "Listo, dejé de escuchar. La burbuja se queda: tócala cuando quieras hablar.", aiOnline = isOnline(), handsFree = false))
+            scheduleAutoClose(5_000)
+        }
+    }
+
+    private fun resumeHandsFree(showPanel: Boolean) {
+        prefs().edit().putBoolean(KEY_LISTEN_PAUSED, false).apply()
+        handsFree = true
+        touch()
+        updateNotification()
+        if (showPanel) {
+            render(VoicePanelUi(VoicePanelMode.HINT, "Listo, vuelvo a esperar que digas “Oye Dinex”.", aiOnline = isOnline(), handsFree = true))
+            scheduleAutoClose(5_000)
+        } else if (!prefs().getBoolean(KEY_APP_VISIBLE, false) && !overlay.panelOpen) {
+            overlay.render(idleUi(), openPanel = false)
+        }
+        scheduleWake(if (showPanel) 1_600 else 300)
+    }
+
     private fun disable() {
         prefs().edit().putBoolean(KEY_ENABLED, false).apply()
         stopSelf()
@@ -534,13 +577,16 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
         .setContentTitle(if (handsFree) "Oye Dinex está activo" else "Oye Dinex en pausa")
         .setContentText(
             if (handsFree) "Escuchando la frase “Oye Dinex”. Se pausa sola si no la usas."
-            else "Toca la burbuja para hablar. La escucha manos libres está en pausa.",
+            else "La escucha está en pausa. Toca la burbuja para hablar.",
         )
         .setOngoing(true)
         .setOnlyAlertOnce(true)
         .setContentIntent(PendingIntent.getActivity(this, 4100, Intent(this, MainActivity::class.java), PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         .apply {
-            if (!handsFree) addAction(0, "Reanudar", PendingIntent.getService(this@DinexHotwordService, 4103,
+            if (handsFree) addAction(0, "Pausar", PendingIntent.getService(this@DinexHotwordService, 4104,
+                Intent(this@DinexHotwordService, DinexHotwordService::class.java).setAction(ACTION_PAUSE_HANDS_FREE),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
+            else addAction(0, "Reanudar", PendingIntent.getService(this@DinexHotwordService, 4103,
                 Intent(this@DinexHotwordService, DinexHotwordService::class.java).setAction(ACTION_RESUME_HANDS_FREE),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         }
@@ -554,6 +600,7 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
         const val ACTION_STOP = "com.example.dinex.action.STOP_HOTWORD"
         const val ACTION_RESUME = "com.example.dinex.action.RESUME_HOTWORD"
         const val ACTION_RESUME_HANDS_FREE = "com.example.dinex.action.RESUME_HANDS_FREE"
+        const val ACTION_PAUSE_HANDS_FREE = "com.example.dinex.action.PAUSE_HANDS_FREE"
         const val ACTION_LISTEN = "com.example.dinex.action.LISTEN"
         const val ACTION_DEBUG_PHRASE = "com.example.dinex.action.DEBUG_PHRASE"
         const val EXTRA_PHRASE = "phrase"
@@ -563,6 +610,8 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
         const val KEY_ENABLED = "enabled"
         const val KEY_PENDING_COMMAND = "pending_command"
         const val KEY_APP_VISIBLE = "app_visible"
+        /** La persona pausó la escucha desde la burbuja o la notificación. */
+        const val KEY_LISTEN_PAUSED = "listen_paused"
         private const val SERVICE_CHANNEL = "dinex_hotword_service"
         private const val COMMAND_CHANNEL = "dinex_voice_commands"
         private const val NOTIFICATION_ID = 4100

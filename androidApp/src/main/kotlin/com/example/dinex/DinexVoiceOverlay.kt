@@ -46,6 +46,7 @@ internal interface DinexVoiceOverlayActions {
     fun onAskAi()
     fun onOpenApp()
     fun onDisable()
+    fun onToggleHandsFree()
     fun onPanelClosed()
 }
 
@@ -88,7 +89,7 @@ internal class DinexVoiceOverlay(
         if (bubble != null || !Settings.canDrawOverlays(context)) return
         val view = DinexMascotBubbleView(context, reducedMotion).apply {
             setOnClickListener { actions.onListen() }
-            setOnLongClickListener { render(VoicePanelUi(VoicePanelMode.HINT, hintText())); true }
+            setOnLongClickListener { render(VoicePanelUi(VoicePanelMode.HINT, hintText(), handsFree = current?.handsFree ?: false)); true }
         }
         attachDrag(view)
         runCatching { manager.addView(view, bubbleParams); bubble = view }
@@ -147,6 +148,8 @@ internal class DinexVoiceOverlay(
         ui.items.forEach { line -> v.items.addView(itemRow(line)) }
         v.items.visibility = if (ui.items.isEmpty()) View.GONE else View.VISIBLE
         configureButtons(v, ui.mode)
+        v.pause.text = if (ui.handsFree) "Pausar escucha" else "Reanudar escucha"
+        v.pause.contentDescription = if (ui.handsFree) "Pausar la escucha de Oye Dinex sin quitar la burbuja" else "Volver a escuchar “Oye Dinex”"
         if (ui.mode != VoicePanelMode.LISTENING) v.message.announceForAccessibility(ui.message)
     }
 
@@ -175,6 +178,7 @@ internal class DinexVoiceOverlay(
     private class PanelViews(
         val state: TextView, val connection: TextView, val wave: DinexVoiceWaveView, val transcript: TextView,
         val message: TextView, val items: LinearLayout, val secondary: TextView, val primary: TextView,
+        val pause: TextView,
     )
 
     private fun rounded(color: Int, radius: Int, strokeColor: Int? = null) = GradientDrawable().apply {
@@ -249,15 +253,21 @@ internal class DinexVoiceOverlay(
         row.addView(primary, LinearLayout.LayoutParams(0, dp(46), 1f).apply { marginStart = dp(8) })
         layout.addView(row, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(14) })
 
-        // Enlaces discretos: abrir la app o apagar el asistente.
+        // Enlaces discretos: abrir la app, pausar la escucha (la burbuja se queda) o apagar el asistente.
         val footer = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER }
         fun link(label: String, onClick: () -> Unit) = TextView(context).apply {
             text = label; textSize = 12f; setTextColor(DinexVoiceColors.TEXT_SOFT); gravity = Gravity.CENTER
-            minHeight = dp(40); setPadding(dp(12), 0, dp(12), 0); setOnClickListener { onClick() }
+            minHeight = dp(40); setPadding(dp(7), 0, dp(7), 0); setOnClickListener { onClick() }
         }
+        fun dot() = TextView(context).apply { text = "·"; setTextColor(DinexVoiceColors.STROKE) }
         footer.addView(link("Abrir Dinex") { hidePanel(); actions.onOpenApp() })
-        footer.addView(TextView(context).apply { text = "·"; setTextColor(DinexVoiceColors.STROKE) })
-        footer.addView(link("Desactivar Oye Dinex") { actions.onDisable() })
+        footer.addView(dot())
+        val pause = link("Pausar escucha") { actions.onToggleHandsFree() }.apply {
+            setTextColor(DinexVoiceColors.ACCENT); typeface = Typeface.DEFAULT_BOLD
+        }
+        footer.addView(pause)
+        footer.addView(dot())
+        footer.addView(link("Desactivar") { actions.onDisable() }.apply { contentDescription = "Desactivar Oye Dinex y quitar la burbuja" })
         layout.addView(footer, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(4) })
 
         val metrics = context.resources.displayMetrics
@@ -268,7 +278,7 @@ internal class DinexVoiceOverlay(
             val below = bubbleParams.y + bubbleSize + dp(6)
             y = if (below + dp(330) < metrics.heightPixels) below else (bubbleParams.y - dp(340)).coerceAtLeast(dp(32))
         }
-        val created = PanelViews(state, connection, wave, transcript, message, items, secondary, primary)
+        val created = PanelViews(state, connection, wave, transcript, message, items, secondary, primary, pause)
         runCatching { manager.addView(layout, panelParams); panel = layout; views = created }
     }
 
