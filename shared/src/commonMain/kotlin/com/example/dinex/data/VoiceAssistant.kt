@@ -261,6 +261,52 @@ internal fun parseVoiceQuery(text: String, followUpOf: VoiceQuery? = null): Voic
 
 // ── Registro de movimientos ───────────────────────────────────────────────────
 
+/**
+ * Formas de decir que entró dinero. Incluye conjugaciones que da el dictado ("ingresé", "me pagó",
+ * "me yapeó") y palabras de ingresos comunes en Perú (quincena, gratificación, CTS, propina…).
+ */
+private val IncomeWords = arrayOf(
+    "ingreso", "ingresos", "ingrese", "ingresa", "ingresar", "ingresaron", "ingresando", "entrada de dinero", "entrada de plata",
+    "recibi", "recibo", "recibir", "recibido", "recibimos", "gane", "gano", "ganar", "ganamos", "ganancia", "ganancias",
+    "cobre", "cobrar", "cobramos", "le cobre", "les cobre",
+    "me pagaron", "me pago", "me pagan", "me paga", "me depositaron", "me deposito", "me abonaron", "me abono",
+    "me yapearon", "me yapeo", "me yapean", "me plinearon", "me plineo", "me transfirieron", "me transfirio",
+    "me mandaron", "me mando", "me enviaron", "me envio", "me dieron", "me dio", "me regalaron", "me regalo",
+    "me prestaron", "me presto", "me devolvieron", "me devolvio", "me llego", "me llegaron", "me entro", "me entraron",
+    "me cayo", "me cayeron", "sueldo", "salario", "quincena", "remuneracion", "propina", "propinas", "vendi", "vendimos",
+    "venta", "ventas", "abono", "bono", "bonificacion", "aguinaldo", "gratificacion", "cts", "mesada", "comision", "utilidades",
+)
+
+/** Formas de decir que salió dinero. "me cobraron" es un gasto aunque contenga "cobr…". */
+private val ExpenseWords = arrayOf(
+    "gasto", "gastos", "gaste", "gastar", "gastamos", "egreso", "salida de dinero", "pague", "pagar", "pagamos", "le pague", "les pague",
+    "compre", "comprar", "compramos", "compra", "yapee", "le yapee", "plinee", "le plinee", "transferi", "le transferi", "consumi",
+    "me cobraron", "me cobro", "me cobran", "invite", "preste", "le preste", "recargue", "recarga",
+)
+
+/** Palabras que dicen el tipo sin dudas ("registra un ingreso", "anota un gasto"): pesan más que las demás. */
+private val IncomeTypeWords = arrayOf("ingreso", "ingresos", "ingrese", "ingresa", "ingresar")
+private val ExpenseTypeWords = arrayOf("gasto", "gastos", "gaste", "egreso")
+
+internal data class MovementKind(val income: Int, val expense: Int, val isIncome: Boolean)
+
+/** Cuenta las señales de ingreso y de gasto; si empatan, gana la que se dijo primero. */
+internal fun movementKind(normalized: String): MovementKind {
+    fun positions(words: Array<String>) = words.flatMap { word -> Regex("\\b${Regex.escape(word)}\\b").findAll(normalized).map { it.range.first }.toList() }
+    val incomeAt = positions(IncomeWords)
+    // "me cobraron" no debe contar también como "cobr…" de ingreso: ya no hay "cobraron" en la lista de ingresos.
+    val expenseAt = positions(ExpenseWords)
+    val income = incomeAt.size + 2 * IncomeTypeWords.count { normalized.hasAny(it) }
+    val expense = expenseAt.size + 2 * ExpenseTypeWords.count { normalized.hasAny(it) }
+    val isIncome = when {
+        income == 0 -> false
+        expense == 0 -> true
+        income != expense -> income > expense
+        else -> (incomeAt.minOrNull() ?: Int.MAX_VALUE) < (expenseAt.minOrNull() ?: Int.MAX_VALUE)
+    }
+    return MovementKind(income, expense, isIncome)
+}
+
 private val AmountWithCurrency = Regex(
     "(?:s/\\.?|soles?|sol|pen|lucas?|dolares?|usd|\\$)\\s*(\\d+(?:\\.\\d{1,2})?)|(\\d+(?:\\.\\d{1,2})?)\\s*(s/|soles?|sol|pen|lucas?|dolares?|usd|\\$)",
 )
@@ -279,10 +325,10 @@ internal fun parseVoiceDraft(text: String, nextId: Int, today: Int = currentDayI
     val amountText = withCurrency?.let { it.groupValues[1].ifBlank { it.groupValues[2] } } ?: numbers.lastOrNull() ?: return null
     val amount = amountText.toDoubleOrNull()?.takeIf { it > 0 && it.isFinite() } ?: return null
 
-    val incomeHint = normalized.hasAny("ingreso", "recibi", "gane", "me pagaron", "cobre", "me depositaron", "me yapearon", "me plinearon",
-        "sueldo", "salario", "propina", "vendi", "abono", "me transfirieron", "me prestaron", "me devolvieron")
-    val expenseHint = normalized.hasAny("gasto", "gaste", "pague", "compre", "yapee", "plinee", "pagar", "gastar", "consumi")
-    val income = incomeHint && !normalized.hasAny("gasto de", "un gasto")
+    val kind = movementKind(normalized)
+    val incomeHint = kind.income > 0
+    val expenseHint = kind.expense > 0
+    val income = kind.isIncome
     val category = if (income) "Ingreso" else voiceCategory(normalized) ?: "Otros"
     val method = when {
         normalized.hasAny("yape", "yapee", "yapeo", "yapearon") -> "Yape"
