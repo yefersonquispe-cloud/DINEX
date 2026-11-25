@@ -1,6 +1,10 @@
 package com.example.dinex
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -24,6 +28,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -70,6 +75,7 @@ internal fun DinexAppShell(
     onWalletClick: () -> Unit,
     onMarket: () -> Unit,
     onTips: () -> Unit,
+    onYupay: () -> Unit,
     darkMode: Boolean,
     onToggleTheme: () -> Unit,
     streak: Int,
@@ -90,6 +96,7 @@ internal fun DinexAppShell(
                     onProfile = onProfile,
                     onAssistant = onAssistant,
                     onTips = onTips,
+                    onYupay = onYupay,
                     name = name,
                     email = email,
                     profilePhoto = profilePhoto,
@@ -117,7 +124,7 @@ internal fun DinexAppShell(
             }
         } else {
             Column(Modifier.fillMaxSize()) {
-                DinexTopBar(streak = streak, name = name, email = email, profilePhoto = profilePhoto, onProfile = onProfile, onWalletClick = onWalletClick,
+                DinexTopBar(streak = streak, name = name, email = email, profilePhoto = profilePhoto, onProfile = onProfile, onWalletClick = onWalletClick, onYupay = onYupay,
                     onMarket = onMarket, onTips = onTips, darkMode = darkMode, onToggleTheme = onToggleTheme)
                 // The dock floats over the page; scrollable screens add only end-of-list space.
                 Box(Modifier.weight(1f)) { content(PaddingValues(0.dp)) }
@@ -136,6 +143,7 @@ internal fun DinexSidebar(
     onProfile: () -> Unit,
     onAssistant: () -> Unit,
     onTips: () -> Unit,
+    onYupay: () -> Unit,
     name: String,
     email: String,
     profilePhoto: String,
@@ -145,7 +153,9 @@ internal fun DinexSidebar(
             Modifier.fillMaxHeight().width(256.dp).background(Card.copy(alpha = .94f))
                 .padding(horizontal = 16.dp, vertical = 20.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
+            var brandMenu by remember { mutableStateOf(false) }
+            Box {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp).clickable(onClickLabel = "Abrir menú de DINEX", onClick = { brandMenu = true })) {
                 Box(
                     Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(Mint),
                     contentAlignment = Alignment.Center,
@@ -162,6 +172,8 @@ internal fun DinexSidebar(
                     Text(t("DINEX"), color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp, letterSpacing = 1.6.sp)
                     Text(t("Tu dinero, con propósito."), color = Gray, fontSize = 11.sp)
                 }
+            }
+            YupayBrandMenu(brandMenu, onDismiss = { brandMenu = false }, onOpen = { brandMenu = false; onYupay() })
             }
             Spacer(Modifier.height(22.dp))
             Button(
@@ -331,11 +343,14 @@ internal fun DinexAssistantBubble(onClick: () -> Unit) {
 @Composable
 internal fun DinexTopBar(
     streak: Int, name: String, email: String, profilePhoto: String, onProfile: () -> Unit, onWalletClick: () -> Unit,
-    onMarket: () -> Unit, onTips: () -> Unit, darkMode: Boolean, onToggleTheme: () -> Unit,
+    onMarket: () -> Unit, onTips: () -> Unit, onYupay: () -> Unit, darkMode: Boolean, onToggleTheme: () -> Unit,
 ) {
     val level = streakLevel(streak)
+    var brandMenu by remember { mutableStateOf(false) }
     Surface(modifier = Modifier.statusBarsPadding(), color = AppBg.copy(alpha = .88f)) {
         Row(Modifier.fillMaxWidth().height(60.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.clickable(onClickLabel = "Abrir menú de DINEX", onClick = { brandMenu = true })) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
             Image(
                 painter = painterResource(Res.drawable.dinex_mascot_ai),
                 contentDescription = "Logo Dinex",
@@ -343,10 +358,14 @@ internal fun DinexTopBar(
                 contentScale = ContentScale.Fit,
             )
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
+            Column {
                 Text(t("DINEX"), color = Night, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 1.2.sp)
                 Text(currentDateLabel(), color = Gray, fontSize = 10.sp)
             }
+            }
+            YupayBrandMenu(brandMenu, onDismiss = { brandMenu = false }, onOpen = { brandMenu = false; onYupay() })
+            }
+            Spacer(Modifier.weight(1f))
             Surface(
                 modifier = Modifier.clickable(onClickLabel = "Ver mi racha y ahorro", role = Role.Button, onClick = onWalletClick),
                 shape = RoundedCornerShape(16.dp),
@@ -444,6 +463,7 @@ internal fun ProfileDialog(
     onDeleteAccount: (password: String?, useGoogle: Boolean, onDone: (String?) -> Unit) -> Unit,
     googleAvailable: Boolean,
     onLanguage: (DinexLanguage) -> Unit = {},
+    webSidePanel: Boolean = false,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     val income = movements.filter { it.income }.sumOf { it.amount }
@@ -459,14 +479,28 @@ internal fun ProfileDialog(
         }, onSaved = {}, onError = { photoError = it },
     )
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize(), color = AppBg) {
+        BoxWithConstraints(Modifier.fillMaxSize().background(if (webSidePanel) Color.Transparent else AppBg)) {
+        if (webSidePanel) Box(Modifier.fillMaxSize().clickable(onClick = onDismiss))
+        val panelWidth = if (webSidePanel) maxOf(380.dp, minOf(560.dp, maxWidth * .34f)) else maxWidth
+        val appearing = remember(webSidePanel) { MutableTransitionState(false) }
+        SideEffect { appearing.targetState = true }
+        AnimatedVisibility(
+            visibleState = appearing,
+            modifier = Modifier.align(Alignment.CenterEnd),
+            enter = slideInHorizontally(tween(if (webSidePanel && !reduceMotion) 220 else 0)) { it } + fadeIn(tween(if (webSidePanel && !reduceMotion) 220 else 0)),
+        ) {
+        Surface(
+            Modifier.width(panelWidth).fillMaxHeight().clickable(remember { MutableInteractionSource() }, null) {},
+            shape = if (webSidePanel) RoundedCornerShape(topStart = 24.dp, bottomStart = 24.dp) else RectangleShape,
+            color = AppBg,
+        ) {
             Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 // Cabecera: foto, nombre, correo y nivel de racha sobre el verde de la marca.
                 Box(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
                         .background(Brush.verticalGradient(listOf(Color(0xFF1F7A4D), Color(0xFF0F4A2E)))),
                 ) {
-                    Column(Modifier.fillMaxWidth().statusBarsPadding().padding(bottom = 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Column(Modifier.fillMaxWidth().statusBarsPadding().padding(bottom = if (webSidePanel) 14.dp else 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = onDismiss) {
                                 Icon(DinexNavigationIcons.Back, null, tint = Color.White, modifier = Modifier.size(18.dp))
@@ -478,7 +512,7 @@ internal fun ProfileDialog(
                                 modifier = Modifier.padding(end = 12.dp))
                         }
                         Box {
-                            Box(Modifier.clip(CircleShape).border(3.dp, Color.White, CircleShape)) { ProfilePhoto(name, profilePhoto, 96.dp) }
+                            Box(Modifier.clip(CircleShape).border(3.dp, Color.White, CircleShape)) { ProfilePhoto(name, profilePhoto, if (webSidePanel) 70.dp else 96.dp) }
                             Box(
                                 Modifier.align(Alignment.BottomEnd).size(32.dp).clip(CircleShape).background(Color.White)
                                     .clickable(onClickLabel = if (profilePhoto.isBlank()) "Agregar foto" else "Cambiar foto") { files.chooseImport() },
@@ -486,7 +520,7 @@ internal fun ProfileDialog(
                             ) { Icon(DinexNavigationIcons.Camera, null, tint = Color(0xFF0F4A2E), modifier = Modifier.size(17.dp)) }
                         }
                         Spacer(Modifier.height(12.dp))
-                        Text(name, fontWeight = FontWeight.Black, fontSize = 24.sp, color = Color.White, textAlign = TextAlign.Center)
+                        Text(name, fontWeight = FontWeight.Black, fontSize = if (webSidePanel) 20.sp else 24.sp, color = Color.White, textAlign = TextAlign.Center)
                         Text(email, color = Color.White.copy(alpha = .8f), fontSize = 13.sp)
                         if (profilePhoto.isNotBlank()) TextButton(onClick = { photoError = if (onProfilePhoto(null)) "" else "No se pudo quitar la foto." }) {
                             Text(t("Quitar foto"), color = Color.White.copy(alpha = .85f), fontSize = 12.sp)
@@ -585,6 +619,8 @@ internal fun ProfileDialog(
                     Spacer(Modifier.height(18.dp))
                 }
             }
+        }
+        }
         }
     }
     if (confirmDelete) DeleteAccountDialog(

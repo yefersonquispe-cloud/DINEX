@@ -811,4 +811,17 @@ internal class DinexViewModel(
         mutableState.value = value.copy(data = data)
         scheduleSync()
     }
+
+    /** Sesión de la cuenta para consultar la alcancía; null si no hay sesión o ya no es válida. */
+    suspend fun yupayToken(renew: Boolean): String? = try {
+        if (renew) cloudSession = cloudSession?.copy(expiresAt = 0)
+        validSession()?.idToken
+    } catch (_: CloudAuthException) { null }
+
+    /** YUPAY solo guarda la meta y el permiso de enlace; nunca cambia las cifras financieras. */
+    fun setYupay(settings: YupaySettings) {
+        if (value.email == null) return
+        val goal = settings.goal?.takeIf { it.name.isNotBlank() && it.name.length <= 40 && it.targetCents > 0 }
+        persist(value.data.copy(yupay = settings.copy(goal = goal)))
+    }
 }

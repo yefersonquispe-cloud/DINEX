@@ -96,6 +96,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var profileOpen by remember { mutableStateOf(false) }
     var assistantOpen by remember { mutableStateOf(false) }
     var marketOpen by remember { mutableStateOf(false) }
+    var yupayOpen by remember { mutableStateOf(false) }
     var tipsOpen by remember { mutableStateOf(false) }
     var welcomeGuideOpen by remember { mutableStateOf(false) }
     var legalTab by remember { mutableStateOf<Int?>(null) }
@@ -147,6 +148,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             DinexQuickAction.GOALS -> { selectedGoalId = null; goalDetails = true }
             DinexQuickAction.PLAN -> model.selectPage(2)
             DinexQuickAction.HISTORY -> model.selectPage(1)
+            DinexQuickAction.YUPAY -> yupayOpen = true
             null -> Unit
         }
     }
@@ -194,6 +196,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                 onAddReminder = { reminderDialog = true },
                 onResolveReminder = { reminderToResolve = it },
                 onProfile = { profileOpen = true },
+                onYupay = { yupayOpen = true },
             ),
             assistant = {
                 WebAssistantPage(assistant, assistantModel, data)
@@ -209,6 +212,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             onWalletClick = { walletBubbleOpen = true },
             onMarket = { marketOpen = true },
             onTips = { tipsOpen = true },
+            onYupay = { yupayOpen = true },
             darkMode = state.darkMode,
             onToggleTheme = { model.setDarkMode(!state.darkMode) },
             streak = streak,
@@ -376,6 +380,9 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     ) {
         MarketScreen(onClose = { marketOpen = false })
     }
+    if (yupayOpen) Dialog(onDismissRequest = { yupayOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        YupayScreen(model, onClose = { yupayOpen = false })
+    }
     if (tipsOpen) Dialog(
         onDismissRequest = { tipsOpen = false },
         properties = fullScreenDialogProperties(),
@@ -411,7 +418,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             onRemoveOnly = { model.resolveReminder(reminder, false); reminderToResolve = null },
             onRegisterExpense = { model.resolveReminder(reminder, true); reminderToResolve = null })
     }
-    if (profileOpen) ProfileDialog(
+    if (profileOpen) BoxWithConstraints(Modifier.fillMaxSize()) { ProfileDialog(
         name, state.email.orEmpty(), streak, savings, movements,
         onDismiss = { profileOpen = false }, onLogout = { profileOpen = false; automation.setHotwordEnabled(false); model.logout() },
         reduceMotion = state.reduceMotion, onReduceMotion = model::setReduceMotion,
@@ -440,6 +447,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         },
         googleAvailable = googleIdentity.available,
         onLanguage = model::setLanguage,
-    )
+        webSidePanel = LocalWebLayout.current && maxWidth >= WebDesktopMinWidth,
+    ) }
     premiumLoading?.let { PremiumLoadingDialog(it) }
 }

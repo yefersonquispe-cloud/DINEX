@@ -24,6 +24,7 @@ internal data class FinancialData(
     val goalArtwork: String = "",
     val goals: List<SavingsGoal> = emptyList(),
     val nextGoalId: Int = 1,
+    val yupay: YupaySettings = YupaySettings(),
 )
 
 internal data class SavingsGoal(val id: Int, val name: String, val target: Double, val saved: Double = 0.0, val artwork: String = "")
@@ -140,6 +141,23 @@ internal class DinexRepository(
 
 private fun packFields(fields: List<String>): String = fields.joinToString("") { "${it.length}:$it" }
 
+/** Campo final del bloque de presupuestos: el lector anterior ignora el elemento suelto. */
+private fun packYupay(settings: YupaySettings): List<String> =
+    if (!settings.linked && settings.goal == null) emptyList() else listOf("yupay:v1:" + packFields(listOf(
+        settings.linked.toString(), settings.goal?.name.orEmpty(), settings.goal?.targetCents?.toString().orEmpty(),
+    )))
+
+private fun unpackYupay(raw: String?): YupaySettings {
+    val fields = unpackFields(raw).orEmpty()
+    if (fields.size % 2 != 1 || !fields.last().startsWith("yupay:v1:")) return YupaySettings()
+    val values = unpackFields(fields.last().removePrefix("yupay:v1:")) ?: return YupaySettings()
+    if (values.size != 3) return YupaySettings()
+    val goal = values[2].toIntOrNull()?.takeIf { it > 0 }?.let { target ->
+        values[1].takeIf { it.isNotBlank() && it.length <= 40 }?.let { YupayGoal(it, target) }
+    }
+    return YupaySettings(linked = values[0] == "true", goal = goal)
+}
+
 private fun unpackFields(raw: String?): List<String>? {
     if (raw == null) return null
     val result = mutableListOf<String>()
@@ -161,7 +179,7 @@ internal fun packProfile(data: FinancialData): String = packFields(listOf(
     data.savings.toString(), data.streak.toString(), data.streakDay?.toString().orEmpty(),
     data.goalName, data.goalTarget.toString(), data.dailyLimit.toString(),
     data.onboardingCompleted.toString(),
-    packFields(data.categoryBudgets.entries.flatMap { listOf(it.key, it.value.toString()) }), data.goalArtwork,
+    packFields(data.categoryBudgets.entries.flatMap { listOf(it.key, it.value.toString()) } + packYupay(data.yupay)), data.goalArtwork,
     packFields(data.goals.map { packFields(listOf(it.id.toString(), it.name, it.target.toString(), it.saved.toString(), it.artwork)) }),
     data.nextGoalId.toString(),
 ))
@@ -202,6 +220,7 @@ internal fun unpackProfileOrNull(raw: String?): FinancialData? {
             SavingsGoal(id, goal[1], target, saved, goal[4])
         }.distinctBy { it.id },
         nextGoalId = fields.getOrNull(13)?.toIntOrNull()?.coerceAtLeast(1) ?: 1,
+        yupay = unpackYupay(fields.getOrNull(10)),
     )
 }
 

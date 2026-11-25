@@ -143,6 +143,7 @@ internal class WebActions(
     val onAddReminder: () -> Unit,
     val onResolveReminder: (PaymentReminder) -> Unit,
     val onProfile: () -> Unit,
+    val onYupay: () -> Unit,
 )
 
 // ---------------------------------------------------------------- Paleta y tipografía
@@ -395,7 +396,10 @@ private fun WebSidebar(
             .padding(horizontal = if (compact) 14.dp else 16.dp, vertical = 20.dp),
         horizontalAlignment = if (compact) Alignment.CenterHorizontally else Alignment.Start,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = if (compact) 0.dp else 4.dp)) {
+        var brandMenu by remember { mutableStateOf(false) }
+        Box {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = if (compact) 0.dp else 4.dp)
+            .clickable(onClickLabel = "Abrir menú de DINEX", onClick = { brandMenu = true })) {
             Box {
                 Image(painterResource(Res.drawable.dinex_app_icon), "DINEX", Modifier.size(38.dp).clip(RoundedCornerShape(11.dp)), contentScale = ContentScale.Crop)
                 Box(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp).size(10.dp).clip(CircleShape).background(W.forest).padding(2.dp).clip(CircleShape).background(W.lime))
@@ -407,6 +411,8 @@ private fun WebSidebar(
                     Text("Tu dinero, con propósito.", color = W.sidebarMuted, fontSize = 11.sp)
                 }
             }
+        }
+        YupayBrandMenu(brandMenu, onDismiss = { brandMenu = false }, onOpen = { brandMenu = false; actions.onYupay() })
         }
         Spacer(Modifier.height(22.dp))
         PaletteLauncher(compact, onPalette)
@@ -643,7 +649,8 @@ private fun RemindersBell(reminders: List<PaymentReminder>, actions: WebActions,
         if (reminders.isNotEmpty()) Box(
             Modifier.align(Alignment.TopEnd).offset(x = 4.dp, y = (-4).dp).size(18.dp).clip(CircleShape).background(W.negative).border(2.dp, W.canvas, CircleShape),
             contentAlignment = Alignment.Center,
-        ) { Text("${reminders.size.coerceAtMost(9)}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+        ) { Text("${reminders.size.coerceAtMost(9)}", color = Color.White, fontSize = 9.sp, lineHeight = 9.sp,
+            textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, modifier = Modifier.offset(y = (-1).dp)) }
         DropdownMenu(open, { open = false }, containerColor = W.surface, shape = RoundedCornerShape(16.dp), modifier = Modifier.width(320.dp)) {
             Text("Próximos pagos", color = W.ink, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
             if (reminders.isEmpty()) Text("No tienes pagos pendientes.", color = W.ink3, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
@@ -689,6 +696,7 @@ private fun webCommands(darkMode: Boolean, actions: WebActions, toggleTheme: () 
         WebCommand("Acciones", "Registrar gasto", "Anota lo que acabas de pagar", DinexNavigationIcons.ArrowDown, "nuevo compra pagar", actions.onExpense),
         WebCommand("Acciones", "Registrar ingreso", "Sueldo, ventas o pagos recibidos", DinexNavigationIcons.ArrowUp, "nuevo cobro sueldo", actions.onIncome),
         WebCommand("Acciones", "Ahorrar en una meta", "Separa dinero para tus metas", DinexNavigationIcons.Target, "meta guardar") { actions.onSave(null) },
+        WebCommand("Ir a", "Dinex YUPAY", "Mi alcancía inteligente", DinexNavigationIcons.Target, "alcancia monedas esp32", actions.onYupay),
         WebCommand("Acciones", "Agregar recordatorio de pago", "DINEX te avisa antes de pagar", DinexNavigationIcons.Bell, "pago recibo", actions.onAddReminder),
         WebCommand("Acciones", "Escanear comprobante", "Lee el monto desde una foto", DinexNavigationIcons.ScanReceipt, "foto boleta factura", actions.onScan),
         WebCommand("Acciones", "Importar Excel o CSV", "Trae movimientos de tu banco", DinexNavigationIcons.Swap, "archivo banco", actions.onImport),
