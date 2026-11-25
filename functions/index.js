@@ -142,7 +142,7 @@ async function callGemini(request, apiKey) {
 
 exports.dinexAi = onRequest({
   secrets: [GEMINI_API_KEY],
-  cors: ["https://dinex-63ed4.web.app", "https://dinex-63ed4.firebaseapp.com"],
+  cors: ["https://dinex.tecsup20.site", "https://dinex-63ed4.firebaseapp.com"],
   timeoutSeconds: 40,
   memory: "256MiB",
   maxInstances: 10,

@@ -2,7 +2,7 @@ package com.example.dinex
 
 // Dinex IA en la web: consulta Gemini por HTTPS con una clave propia de la web
 // (GEMINI_WEB_API_KEY en local.properties). Restringe esa clave en Google Cloud
-// para que solo funcione desde dinex-63ed4.web.app.
+// para que solo funcione desde dinex.tecsup20.site.
 
 internal val dinexWebAssistantPrompt = """
     Eres Dinex IA, un asistente financiero personal amable y práctico para jóvenes de Perú.

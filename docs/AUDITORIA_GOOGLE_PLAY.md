@@ -87,7 +87,7 @@ Solo lectura: no se cambió ninguna función. Todo sale del código, del manifie
 | Borra Firestore y Auth | Sí: borra `users/{uid}` y luego la cuenta de Firebase Auth | `shared/data/DinexCloud.kt:196`; `shared/presentation/DinexViewModel.kt:344` |
 | Borra datos del teléfono | Sí: perfil financiero, foto, consentimiento y conteo de IA | `shared/data/DinexRepository.kt:105` |
 | Qué queda | 1) Reportes de IA en `aiReports` (uid, texto reportado, pregunta). 2) Avisos de pago capturados y estado de "Oye Dinex" en preferencias locales. 3) Copias locales en **otros** equipos donde la cuenta siga abierta. 4) Sesión de Google en el teléfono (de Google, no de DINEX). | — |
-| Página web | Sí: https://dinex-63ed4.web.app/eliminar-cuenta.html (publicada) | `webApp/src/webMain/resources/eliminar-cuenta.html` |
+| Página web | Sí: https://dinex.tecsup20.site/eliminar-cuenta.html (publicada) | `webApp/src/webMain/resources/eliminar-cuenta.html` |
 
 ---
 
@@ -139,8 +139,8 @@ Solo lectura: no se cambió ninguna función. Todo sale del código, del manifie
 | Permisos sensibles → Ubicación | Solo con la app abierta | Sin ubicación en segundo plano | `android/DeviceAutomation.android.kt:330` | **No** requiere declaración de ubicación en segundo plano | — |
 | Permisos sensibles → Burbuja (`SYSTEM_ALERT_WINDOW`) | Opcional | Burbuja | `app/kotlin/.../DinexVoiceOverlay.kt:73` | No es un permiso restringido de Play | — |
 | **Contenido generado por IA** | Chat con Gemini y lectura de boletas; botón Reportar | Botón y colección `aiReports` | `shared/ui/AssistantScreen.kt:335`; `firestore.rules:55` | Indicar que la app **usa IA generativa** y **permite reportar** respuestas | Definir quién revisa `aiReports` y cada cuánto. |
-| **Eliminación de cuentas** | Dentro de la app y en la web | Sección 5 | `shared/data/DinexCloud.kt:196` | URL: `https://dinex-63ed4.web.app/eliminar-cuenta.html` | Decidir qué pasa con `aiReports` al eliminar la cuenta (hoy se conservan). |
-| **Política de privacidad** | Publicada en la web y dentro de la app | Página pública | `webApp/src/webMain/resources/privacidad.html` | URL: `https://dinex-63ed4.web.app/privacidad.html` | Completar lo que falta (ver sección 8). |
+| **Eliminación de cuentas** | Dentro de la app y en la web | Sección 5 | `shared/data/DinexCloud.kt:196` | URL: `https://dinex.tecsup20.site/eliminar-cuenta.html` | Decidir qué pasa con `aiReports` al eliminar la cuenta (hoy se conservan). |
+| **Política de privacidad** | Publicada en la web y dentro de la app | Página pública | `webApp/src/webMain/resources/privacidad.html` | URL: `https://dinex.tecsup20.site/privacidad.html` | Completar lo que falta (ver sección 8). |
 
 ---
 

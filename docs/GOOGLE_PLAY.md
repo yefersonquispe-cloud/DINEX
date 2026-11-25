@@ -9,8 +9,8 @@ Guía para completar Play Console con lo que la app hace de verdad (revisado en 
 | Nombre del paquete | `com.yefersonquispe.dinex` (cambiado antes de la primera publicación; Play Console lo marcó como disponible) |
 | Versión | 1.6 (versionCode 7) |
 | minSdk / targetSdk | 26 / 36 |
-| Política de privacidad (URL pública) | `https://dinex-63ed4.web.app/privacidad.html` (sale de `webApp/src/webMain/resources/privacidad.html`; requiere publicar Hosting) |
-| Eliminación de cuenta (URL pública) | `https://dinex-63ed4.web.app/eliminar-cuenta.html` |
+| Política de privacidad (URL pública) | `https://dinex.tecsup20.site/privacidad.html` (sale de `webApp/src/webMain/resources/privacidad.html`; requiere publicar Hosting) |
+| Eliminación de cuenta (URL pública) | `https://dinex.tecsup20.site/eliminar-cuenta.html` |
 | Eliminación dentro de la app | Perfil → Eliminar mi cuenta (borra Firestore y la cuenta de Firebase Auth) |
 
 ## 2. Seguridad de los datos (formulario "Data safety")
