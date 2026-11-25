@@ -11,13 +11,27 @@ data class DinexWidgetMovement(val title: String, val detail: String, val amount
 
 data class DinexWidgetDay(val letter: String, val percent: Int, val today: Boolean)
 
+data class DinexWidgetCashFlowDay(
+    val dateIso: String,
+    val dayLabel: String,
+    val income: Double,
+    val expense: Double,
+    val runningBalance: Double,
+    val isToday: Boolean,
+)
+
 /** Lo que muestran los widgets; sin sesión iniciada se queda con estos valores vacíos. */
 data class DinexWidgetSnapshot(
     val signedIn: Boolean = false,
     val privateMode: Boolean = false,
+    val todayIso: String = "",
     val balance: String = HIDDEN_AMOUNT,
     val monthIncome: String = HIDDEN_AMOUNT,
     val monthExpense: String = HIDDEN_AMOUNT,
+    val monthBalance: String = HIDDEN_AMOUNT,
+    val monthIncomeNum: Double = 0.0,
+    val monthExpenseNum: Double = 0.0,
+    val monthBalanceNum: Double = 0.0,
     val savings: String = HIDDEN_AMOUNT,
     val todaySpent: String = HIDDEN_AMOUNT,
     val dailyLimit: String = HIDDEN_AMOUNT,
@@ -29,6 +43,7 @@ data class DinexWidgetSnapshot(
     val savedToday: Boolean = false,
     val goals: List<DinexWidgetGoal> = emptyList(),
     val recent: List<DinexWidgetMovement> = emptyList(),
+    val cashFlowDays: List<DinexWidgetCashFlowDay> = emptyList(),
     val week: List<DinexWidgetDay> = emptyList(),
     val weekTotal: String = HIDDEN_AMOUNT,
 )
@@ -44,16 +59,45 @@ internal fun FinancialData.widgetSnapshot(privateMode: Boolean = false, today: I
     val spent = expensesOn(todayIso)
     val limit = dailyLimit.toDouble()
     val over = spent > limit
-    val days = (6 downTo 0).map { today - it }
-    val weekSpent = days.map { expensesOn(dateIso(civilDateFromEpochDays(it))) }
+    val weekSpent = (6 downTo 0).map { expensesOn(dateIso(civilDateFromEpochDays(today - it))) }
     val peak = weekSpent.max().takeIf { it > 0 } ?: 1.0
+
+    val year = todayIso.take(4).toInt()
+    val monthNum = todayIso.drop(5).take(2).toInt()
+    val monthDays = (1..31).filter { validDate(year, monthNum, it) }
+    val monthIsoDates = monthDays.map { "$year-${monthNum.toString().padStart(2, '0')}-${it.toString().padStart(2, '0')}" }
+    val monthTotals = monthIsoDates.map { date ->
+        val items = movements.filter { it.dateIso() == date }
+        items.filter { it.income }.sumOf { it.amount } to items.filterNot { it.income }.sumOf { it.amount }
+    }
+    val running = monthTotals.runningFold(0.0) { acc, day -> acc + day.first - day.second }.drop(1)
+    val totalIn = month.filter { it.income }.sumOf { it.amount }
+    val totalOut = month.filterNot { it.income }.sumOf { it.amount }
+    val netBalance = totalIn - totalOut
+
+    val cashFlowDays = monthIsoDates.mapIndexed { index, date ->
+        val dayNum = date.takeLast(2)
+        DinexWidgetCashFlowDay(
+            dateIso = date,
+            dayLabel = dayNum,
+            income = monthTotals[index].first,
+            expense = monthTotals[index].second,
+            runningBalance = running[index],
+            isToday = date == todayIso,
+        )
+    }
 
     return DinexWidgetSnapshot(
         signedIn = true,
         privateMode = privateMode,
+        todayIso = todayIso,
         balance = amount(availableBalance()),
-        monthIncome = amount(month.filter { it.income }.sumOf { it.amount }),
-        monthExpense = amount(month.filterNot { it.income }.sumOf { it.amount }),
+        monthIncome = amount(totalIn),
+        monthExpense = amount(totalOut),
+        monthBalance = amount(netBalance),
+        monthIncomeNum = totalIn,
+        monthExpenseNum = totalOut,
+        monthBalanceNum = netBalance,
         savings = amount(savings),
         todaySpent = amount(spent),
         dailyLimit = amount(limit),
@@ -81,8 +125,10 @@ internal fun FinancialData.widgetSnapshot(privateMode: Boolean = false, today: I
                 val day = when (item.dateIso()) { todayIso -> "Hoy"; yesterdayIso -> "Ayer"; else -> item.dateLabel() }
                 DinexWidgetMovement(item.title, "$day · ${item.category}", (if (item.income) "+ " else "− ") + moneyGrouped(item.amount), item.income)
             },
-        week = days.mapIndexed { index, day ->
-            DinexWidgetDay(WeekDayLetters[(day + 3).mod(7)], (weekSpent[index] / peak * 100).roundToInt(), day == today)
+        cashFlowDays = cashFlowDays,
+        week = (6 downTo 0).map { dayIndex ->
+            val day = today - dayIndex
+            DinexWidgetDay(WeekDayLetters[(day + 3).mod(7)], (expensesOn(dateIso(civilDateFromEpochDays(day))) / peak * 100).roundToInt(), day == today)
         },
         weekTotal = amount(weekSpent.sum()),
     )

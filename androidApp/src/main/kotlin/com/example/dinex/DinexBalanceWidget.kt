@@ -71,17 +71,15 @@ class DinexBalanceWidget : DinexWidgetProvider() {
     }
 
     private fun RemoteViews.bindDetails(context: Context, snapshot: DinexWidgetSnapshot, heightDp: Int) {
-        setTextViewText(R.id.widget_week_total, snapshot.weekTotal)
-        snapshot.week.forEachIndexed { index, day ->
-            val bar = DinexWidgets.WeekBars[index]
-            val todayBar = DinexWidgets.TodayBars[index]
-            setViewVisibility(bar, if (day.today) View.GONE else View.VISIBLE)
-            setViewVisibility(todayBar, if (day.today) View.VISIBLE else View.GONE)
-            setProgressBar(if (day.today) todayBar else bar, 100, day.percent.coerceAtLeast(4), false)
-            setTextViewText(DinexWidgets.WeekDays[index], day.letter)
-            setTextColor(DinexWidgets.WeekDays[index], if (day.today) 0xFF3DD68C.toInt() else 0xFF8FA39A.toInt())
-        }
-        // Solo se muestran los movimientos que caben sin aplastar el gráfico de la semana.
+        setTextViewText(R.id.widget_pill_income_value, snapshot.monthIncome)
+        setTextViewText(R.id.widget_pill_expense_value, snapshot.monthExpense)
+        setTextViewText(R.id.widget_pill_balance_value, snapshot.monthBalance)
+        setTextColor(R.id.widget_pill_balance_value, if (snapshot.monthBalanceNum >= 0) 0xFF3DD68C.toInt() else 0xFFF28B82.toInt())
+
+        val chartBitmap = renderCashFlowBitmap(snapshot, 600, 240)
+        setImageViewBitmap(R.id.widget_cashflow_chart, chartBitmap)
+
+        // Solo se muestran los movimientos que caben sin aplastar el gráfico.
         val rowsThatFit = ((heightDp - DETAILS_BASE_HEIGHT) / RECENT_ROW_HEIGHT).coerceIn(0, DinexWidgets.RecentRows.size)
         val emptyText = if (snapshot.privateMode) R.string.widget_recent_hidden else R.string.widget_recent_none
         setViewVisibility(R.id.widget_recent_heading, if (rowsThatFit > 0) View.VISIBLE else View.GONE)
@@ -97,11 +95,110 @@ class DinexBalanceWidget : DinexWidgetProvider() {
                 setTextColor(row.amount, if (item.income) 0xFF3DD68C.toInt() else 0xFFF2F5F3.toInt())
             }
         }
-        DinexWidgets.open(context, this, R.id.widget_week_total, DinexQuickAction.HISTORY)
+        DinexWidgets.open(context, this, R.id.widget_cashflow_chart, DinexQuickAction.HISTORY)
     }
 
+    private fun renderCashFlowBitmap(snapshot: DinexWidgetSnapshot, width: Int, height: Int): android.graphics.Bitmap {
+        val w = if (width > 0) width else 600
+        val h = if (height > 0) height else 240
+        val bitmap = android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+
+        val days = snapshot.cashFlowDays
+        if (days.isEmpty()) return bitmap
+
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        val gridColor = 0x22FFFFFF.toInt()
+        val incomeColor = 0xFF3DD68C.toInt()
+        val expenseColor = 0xFFF28B82.toInt()
+        val lineColor = 0xFF818CF8.toInt()
+
+        val mid = h / 2f
+        val reach = mid * 0.85f
+
+        // Línea central
+        paint.color = gridColor
+        paint.strokeWidth = 2f
+        canvas.drawLine(0f, mid, w.toFloat(), mid, paint)
+
+        val n = days.size.coerceAtLeast(1)
+        val slot = w.toFloat() / n
+        val barWidth = (slot * 0.52f).coerceIn(3f, 24f)
+
+        val maxIn = days.maxOfOrNull { it.income } ?: 1.0
+        val maxOut = days.maxOfOrNull { it.expense } ?: 1.0
+        val peak = maxOf(maxIn, maxOut).takeIf { it > 0.0 } ?: 1.0
+
+        val maxRun = days.maxOfOrNull { kotlin.math.abs(it.runningBalance) }?.takeIf { it > 0.0 } ?: 1.0
+
+        // Saldo acumulado
+        val lastPastIndex = days.indexOfLast { it.dateIso <= snapshot.todayIso }
+        if (lastPastIndex >= 1) {
+            val path = android.graphics.Path()
+            fun getPoint(i: Int): android.graphics.PointF {
+                val cx = slot * i + slot / 2f
+                val y = mid - (days[i].runningBalance.toFloat() / maxRun.toFloat() * reach * 0.7f)
+                return android.graphics.PointF(cx, y)
+            }
+            val p0 = getPoint(0)
+            path.moveTo(p0.x, p0.y)
+            for (i in 1..lastPastIndex) {
+                val a = getPoint(i - 1)
+                val b = getPoint(i)
+                val cx = (a.x + b.x) / 2f
+                path.cubicTo(cx, a.y, cx, b.y, b.x, b.y)
+            }
+            val areaPath = android.graphics.Path(path)
+            val lastP = getPoint(lastPastIndex)
+            areaPath.lineTo(lastP.x, mid)
+            areaPath.lineTo(p0.x, mid)
+            areaPath.close()
+
+            paint.style = android.graphics.Paint.Style.FILL
+            paint.shader = android.graphics.LinearGradient(0f, 0f, 0f, mid, 0x28818CF8.toInt(), 0x05818CF8.toInt(), android.graphics.Shader.TileMode.CLAMP)
+            canvas.drawPath(areaPath, paint)
+            paint.shader = null
+
+            paint.style = android.graphics.Paint.Style.STROKE
+            paint.strokeWidth = 3f
+            paint.color = lineColor
+            paint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(12f, 8f), 0f)
+            canvas.drawPath(path, paint)
+            paint.pathEffect = null
+
+            val pSel = getPoint(lastPastIndex.coerceIn(0, days.lastIndex))
+            paint.style = android.graphics.Paint.Style.FILL
+            paint.color = 0xFFFFFFFF.toInt()
+            canvas.drawCircle(pSel.x, pSel.y, 9f, paint)
+            paint.color = lineColor
+            canvas.drawCircle(pSel.x, pSel.y, 5f, paint)
+        }
+
+        // Barras
+        days.forEachIndexed { i, day ->
+            val cx = slot * i + slot / 2f
+            val inH = (day.income / peak * reach).toFloat()
+            val outH = (day.expense / peak * reach).toFloat()
+
+            if (inH > 0f) {
+                paint.style = android.graphics.Paint.Style.FILL
+                paint.color = incomeColor
+                canvas.drawRoundRect(cx - barWidth / 2f, mid - inH, cx + barWidth / 2f, mid, barWidth / 2f, barWidth / 2f, paint)
+            }
+            if (outH > 0f) {
+                paint.style = android.graphics.Paint.Style.FILL
+                paint.color = expenseColor
+                canvas.drawRoundRect(cx - barWidth / 2f, mid, cx + barWidth / 2f, mid + outH, barWidth / 2f, barWidth / 2f, paint)
+            }
+        }
+
+        return bitmap
+    }
+
+
+
     private companion object {
-        const val DETAILS_BASE_HEIGHT = 380
+        const val DETAILS_BASE_HEIGHT = 260
         const val RECENT_ROW_HEIGHT = 38
     }
 }
@@ -151,9 +248,6 @@ internal object DinexWidgets {
     class RecentRow(val root: Int, val title: Int, val detail: Int, val amount: Int)
     class GoalRow(val root: Int, val name: Int, val saved: Int, val percent: Int, val bar: Int)
 
-    val WeekBars = listOf(R.id.widget_bar_0, R.id.widget_bar_1, R.id.widget_bar_2, R.id.widget_bar_3, R.id.widget_bar_4, R.id.widget_bar_5, R.id.widget_bar_6)
-    val TodayBars = listOf(R.id.widget_bar_today_0, R.id.widget_bar_today_1, R.id.widget_bar_today_2, R.id.widget_bar_today_3, R.id.widget_bar_today_4, R.id.widget_bar_today_5, R.id.widget_bar_today_6)
-    val WeekDays = listOf(R.id.widget_day_0, R.id.widget_day_1, R.id.widget_day_2, R.id.widget_day_3, R.id.widget_day_4, R.id.widget_day_5, R.id.widget_day_6)
     val RecentRows = listOf(
         RecentRow(R.id.widget_recent_0, R.id.widget_recent_title_0, R.id.widget_recent_detail_0, R.id.widget_recent_amount_0),
         RecentRow(R.id.widget_recent_1, R.id.widget_recent_title_1, R.id.widget_recent_detail_1, R.id.widget_recent_amount_1),
