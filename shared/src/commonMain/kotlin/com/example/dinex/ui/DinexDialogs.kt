@@ -1126,67 +1126,179 @@ internal fun DinexCalendarDialog(
     val lastDay = (31 downTo 28).first { validDate(selYear, selMonth, it) }
     var selectedDay by remember { mutableStateOf(initialDay.coerceIn(1, lastDay)) }
     val monthName = currentMonthName(selMonth)
+    val accentGreen = Color(0xFF1B3B2B)
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(24.dp),
-        containerColor = Card,
-        title = {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(t("Selecciona la fecha"), fontWeight = FontWeight.Black, color = Night, fontSize = 18.sp)
-                    Text("$monthName $selYear", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                }
-                IconButton(onClick = {
-                    if (selMonth > 1) selMonth-- else { selMonth = 12; selYear-- }
-                    val newLast = (31 downTo 28).first { validDate(selYear, selMonth, it) }
-                    if (selectedDay > newLast) selectedDay = newLast
-                }) {
-                    Icon(DinexNavigationIcons.Back, contentDescription = "Mes anterior", tint = Night, modifier = Modifier.size(20.dp))
-                }
-                IconButton(onClick = {
-                    if (selMonth < 12) selMonth++ else { selMonth = 1; selYear++ }
-                    val newLast = (31 downTo 28).first { validDate(selYear, selMonth, it) }
-                    if (selectedDay > newLast) selectedDay = newLast
-                }) {
-                    Icon(DinexNavigationIcons.Back, contentDescription = "Mes siguiente", tint = Night, modifier = Modifier.size(20.dp).rotate(180f))
-                }
-            }
-        },
+        shape = RoundedCornerShape(26.dp),
+        containerColor = Color(0xFFFAF8F5),
+        title = null,
         text = {
-            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.height(8.dp))
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                    listOf("L", "M", "X", "J", "V", "S", "D").forEach { dayLetter ->
-                        Text(dayLetter, color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
+            Column(
+                Modifier.fillMaxWidth().widthIn(max = 310.dp).padding(top = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    // Left: Compact tear-off calendar preview card
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color(0xFFF0ECE1),
+                        border = BorderStroke(1.dp, accentGreen.copy(alpha = 0.15f)),
+                        modifier = Modifier.width(82.dp).height(100.dp),
+                    ) {
+                        Column(
+                            Modifier.fillMaxSize().padding(6.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Text(
+                                text = monthName.take(3).uppercase(),
+                                color = accentGreen,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp,
+                                letterSpacing = 0.8.sp,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = selectedDay.toString(),
+                                color = accentGreen,
+                                fontWeight = FontWeight.Black,
+                                fontSize = 36.sp,
+                                lineHeight = 36.sp,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                text = selYear.toString(),
+                                color = Color(0xFF536A5A),
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                        }
                     }
-                }
-                Spacer(Modifier.height(10.dp))
-                val daysList = (1..lastDay).toList()
-                val rows = daysList.chunked(7)
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    rows.forEach { rowDays ->
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                            rowDays.forEach { d ->
-                                val isSelected = d == selectedDay
-                                Surface(
-                                    onClick = { selectedDay = d },
-                                    shape = CircleShape,
-                                    color = if (isSelected) Green else CardRaised,
-                                    modifier = Modifier.size(38.dp),
+
+                    // Right: Month/Year Pills & Day Grid
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            // Month Pill
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = accentGreen,
+                                modifier = Modifier.weight(1f).height(32.dp),
+                            ) {
+                                Row(
+                                    Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
                                 ) {
-                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                        Text(
-                                            d.toString(),
-                                            color = if (isSelected) Color.White else Night,
-                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            fontSize = 13.sp,
-                                        )
-                                    }
+                                    Icon(
+                                        DinexNavigationIcons.Back,
+                                        contentDescription = "Mes anterior",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp).clickable {
+                                            if (selMonth > 1) selMonth-- else { selMonth = 12; selYear-- }
+                                            val newLast = (31 downTo 28).first { validDate(selYear, selMonth, it) }
+                                            if (selectedDay > newLast) selectedDay = newLast
+                                        },
+                                    )
+                                    Text(
+                                        monthName,
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                        maxLines = 1,
+                                    )
+                                    Icon(
+                                        DinexNavigationIcons.Back,
+                                        contentDescription = "Mes siguiente",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp).rotate(180f).clickable {
+                                            if (selMonth < 12) selMonth++ else { selMonth = 1; selYear++ }
+                                            val newLast = (31 downTo 28).first { validDate(selYear, selMonth, it) }
+                                            if (selectedDay > newLast) selectedDay = newLast
+                                        },
+                                    )
                                 }
                             }
-                            repeat(7 - rowDays.size) {
-                                Spacer(Modifier.size(38.dp))
+
+                            // Year Pill
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = accentGreen,
+                                modifier = Modifier.width(74.dp).height(32.dp),
+                            ) {
+                                Row(
+                                    Modifier.fillMaxSize().padding(horizontal = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Icon(
+                                        DinexNavigationIcons.Back,
+                                        contentDescription = "Año anterior",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp).clickable { selYear-- },
+                                    )
+                                    Text(
+                                        selYear.toString(),
+                                        color = Color.White,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 11.sp,
+                                    )
+                                    Icon(
+                                        DinexNavigationIcons.Back,
+                                        contentDescription = "Año siguiente",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(12.dp).rotate(180f).clickable { selYear++ },
+                                    )
+                                }
+                            }
+                        }
+
+                        // Week Day Headers
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                            listOf("Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do").forEach { dayLetter ->
+                                Text(
+                                    dayLetter,
+                                    color = Color(0xFF536A5A),
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.width(22.dp),
+                                )
+                            }
+                        }
+
+                        // Days Grid
+                        val daysList = (1..lastDay).toList()
+                        val rows = daysList.chunked(7)
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            rows.forEach { rowDays ->
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                                    rowDays.forEach { d ->
+                                        val isSelected = d == selectedDay
+                                        Surface(
+                                            onClick = { selectedDay = d },
+                                            shape = RoundedCornerShape(6.dp),
+                                            color = if (isSelected) accentGreen else Color(0xFFF0ECE1),
+                                            modifier = Modifier.size(26.dp),
+                                        ) {
+                                            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                                Text(
+                                                    d.toString(),
+                                                    color = if (isSelected) Color.White else Color(0xFF1A1A1A),
+                                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                    fontSize = 11.sp,
+                                                )
+                                            }
+                                        }
+                                    }
+                                    repeat(7 - rowDays.size) {
+                                        Spacer(Modifier.size(26.dp))
+                                    }
+                                }
                             }
                         }
                     }
@@ -1194,15 +1306,25 @@ internal fun DinexCalendarDialog(
             }
         },
         confirmButton = {
-            Button(
-                onClick = { onSelectDate(selectedDay, selMonth, selYear); onDismiss() },
-                colors = ButtonDefaults.buttonColors(containerColor = Green),
-            ) {
-                Text(t("Aceptar"), fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, accentGreen.copy(alpha = 0.3f)),
+                    modifier = Modifier.weight(1f).height(38.dp),
+                ) {
+                    Text(t("Cancelar"), color = accentGreen, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
+                Button(
+                    onClick = { onSelectDate(selectedDay, selMonth, selYear); onDismiss() },
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = accentGreen),
+                    modifier = Modifier.weight(1f).height(38.dp),
+                ) {
+                    Text(t("Aceptar"), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                }
             }
         },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text(t("Cancelar")) }
-        },
+        dismissButton = {},
     )
 }
