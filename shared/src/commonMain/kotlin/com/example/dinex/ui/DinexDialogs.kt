@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import dinex.shared.generated.resources.Res
+import dinex.shared.generated.resources.calendario
 import dinex.shared.generated.resources.dinex_mascot_ai
 import org.jetbrains.compose.resources.painterResource
 import kotlin.math.max
@@ -345,7 +346,10 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
     var title by remember { mutableStateOf("") }
     var category by remember { mutableStateOf(if (isIncome) "Ingreso" else "Comida") }
     var method by remember { mutableStateOf("Efectivo") }
-    var day by remember { mutableStateOf(currentDayOfMonth().toString()) }
+    val today = civilDateFromEpochDays()
+    var selectedDay by remember { mutableStateOf(today.day) }
+    var selectedMonth by remember { mutableStateOf(today.month) }
+    var selectedYear by remember { mutableStateOf(today.year) }
     var note by remember { mutableStateOf("") }
     var showDetails by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf(false) }
@@ -407,7 +411,8 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                     ),
                 )
 
-                // Nombre
+                // Nombre con calendario integrado a la derecha (*/*/*)
+                var calendarOpen by remember { mutableStateOf(false) }
                 OutlinedTextField(
                     value = title,
                     onValueChange = { title = it.take(60) },
@@ -419,9 +424,40 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                             color = Gray,
                         )
                     },
+                    trailingIcon = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 12.dp).clickable(onClick = { calendarOpen = true })
+                        ) {
+                            VerticalDivider(color = Border, modifier = Modifier.height(26.dp).padding(horizontal = 6.dp))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Image(
+                                    painter = painterResource(Res.drawable.calendario),
+                                    contentDescription = "Cambiar fecha",
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                val dateFmt = "$selectedDay ${currentMonthShort(selectedMonth).uppercase()}"
+                                Text(dateFmt, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = GreenDark)
+                            }
+                        }
+                    },
                     singleLine = true,
                     shape = RoundedCornerShape(16.dp),
                 )
+                if (calendarOpen) {
+                    DinexCalendarDialog(
+                        initialDay = selectedDay,
+                        initialMonth = selectedMonth,
+                        initialYear = selectedYear,
+                        onDismiss = { calendarOpen = false },
+                        onSelectDate = { d, m, y ->
+                            selectedDay = d
+                            selectedMonth = m
+                            selectedYear = y
+                        },
+                    )
+                }
 
                 // Categoría (solo gasto) con iconos
                 if (!isIncome) {
@@ -491,15 +527,6 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                         }
 
                         OutlinedTextField(
-                            value = day,
-                            onValueChange = { day = it.filter(Char::isDigit).take(2) },
-                            modifier = Modifier.fillMaxWidth(),
-                            label = { Text(t("Día del mes")) },
-                            singleLine = true,
-                            shape = RoundedCornerShape(16.dp),
-                        )
-
-                        OutlinedTextField(
                             value = note,
                             onValueChange = { note = it.take(80) },
                             modifier = Modifier.fillMaxWidth(),
@@ -530,7 +557,6 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
             Button(
                 onClick = {
                     val value = parseMoneyInput(amount)
-                    val parsedDay = movementDayOfMonth(day)
                     val savedTitle = buildString {
                         append(title.ifBlank { if (isIncome) "Ingreso" else category })
                         if (note.isNotBlank()) append(" · ").append(note)
@@ -545,7 +571,9 @@ internal fun MovementDialog(income: Boolean, nextId: Int, onDismiss: () -> Unit,
                                 category = if (isIncome) "Ingreso" else category,
                                 amount = value,
                                 income = isIncome,
-                                day = parsedDay,
+                                day = selectedDay,
+                                month = selectedMonth,
+                                year = selectedYear,
                                 method = method,
                             )
                         )
@@ -837,9 +865,13 @@ internal fun PremiumLoadingDialog(message: String) {
 @Composable
 internal fun ReminderDialog(nextId: Int, onDismiss: () -> Unit, onSave: (PaymentReminder) -> Unit) {
     var title by remember { mutableStateOf("") }
-    var date by remember { mutableStateOf("") }
+    val today = civilDateFromEpochDays()
+    var selectedDay by remember { mutableStateOf(today.day) }
+    var selectedMonth by remember { mutableStateOf(today.month) }
+    var selectedYear by remember { mutableStateOf(today.year) }
     var amount by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
+    var calendarOpen by remember { mutableStateOf(false) }
     AlertDialog(
         onDismissRequest = onDismiss,
         shape = RoundedCornerShape(28.dp),
@@ -847,20 +879,61 @@ internal fun ReminderDialog(nextId: Int, onDismiss: () -> Unit, onSave: (Payment
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 OutlinedTextField(title, { title = it; error = false }, Modifier.fillMaxWidth(), label = { Text(t("Nombre del pago")) }, placeholder = { Text(t("Ej. Internet")) }, singleLine = true)
-                OutlinedTextField(date, { date = it.uppercase().take(12); error = false }, Modifier.fillMaxWidth(), label = { Text(t("Fecha")) }, placeholder = { Text(t("Ej. 25 SEP")) }, singleLine = true)
-                OutlinedTextField(amount, { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false }, Modifier.fillMaxWidth(), label = { Text(t("Monto")) }, prefix = { Text(t("S/ ")) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true, isError = error)
-                if (error) Text(t("Completa el nombre, la fecha y un monto válido."), color = Red, fontSize = 9.sp)
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it.filter { c -> c.isDigit() || c == '.' || c == ',' }; error = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(t("Monto")) },
+                    prefix = { Text(t("S/ ")) },
+                    trailingIcon = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(end = 12.dp).clickable(onClick = { calendarOpen = true })
+                        ) {
+                            VerticalDivider(color = Border, modifier = Modifier.height(26.dp).padding(horizontal = 6.dp))
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Image(
+                                    painter = painterResource(Res.drawable.calendario),
+                                    contentDescription = "Cambiar fecha",
+                                    modifier = Modifier.size(18.dp),
+                                )
+                                Spacer(Modifier.height(2.dp))
+                                val dateFmt = "$selectedDay ${currentMonthShort(selectedMonth).uppercase()}"
+                                Text(dateFmt, fontSize = 9.sp, fontWeight = FontWeight.Bold, color = GreenDark)
+                            }
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                    singleLine = true,
+                    isError = error,
+                    shape = RoundedCornerShape(16.dp),
+                )
+                if (error) Text(t("Completa el nombre y un monto válido."), color = Red, fontSize = 9.sp)
             }
         },
         confirmButton = {
             Button(onClick = {
                 val value = parseMoneyInput(amount)
-                if (title.isBlank() || date.isBlank() || value == null || value <= 0) error = true
-                else onSave(PaymentReminder(nextId, title.trim(), date.trim(), value))
+                val dateStr = "$selectedDay ${currentMonthShort(selectedMonth).uppercase()}"
+                if (title.isBlank() || value == null || value <= 0) error = true
+                else onSave(PaymentReminder(nextId, title.trim(), dateStr, value))
             }) { Text(t("Guardar recordatorio")) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(t("Cancelar")) } },
     )
+    if (calendarOpen) {
+        DinexCalendarDialog(
+            initialDay = selectedDay,
+            initialMonth = selectedMonth,
+            initialYear = selectedYear,
+            onDismiss = { calendarOpen = false },
+            onSelectDate = { d, m, y ->
+                selectedDay = d
+                selectedMonth = m
+                selectedYear = y
+            },
+        )
+    }
 }
 
 @Composable
@@ -1038,4 +1111,98 @@ private fun PermissionStep(number: Int, title: String, detail: String, done: Boo
             }
         }
     }
+}
+
+@Composable
+internal fun DinexCalendarDialog(
+    initialDay: Int,
+    initialMonth: Int = civilDateFromEpochDays().month,
+    initialYear: Int = civilDateFromEpochDays().year,
+    onDismiss: () -> Unit,
+    onSelectDate: (day: Int, month: Int, year: Int) -> Unit,
+) {
+    var selYear by remember { mutableStateOf(initialYear) }
+    var selMonth by remember { mutableStateOf(initialMonth.coerceIn(1, 12)) }
+    val lastDay = (31 downTo 28).first { validDate(selYear, selMonth, it) }
+    var selectedDay by remember { mutableStateOf(initialDay.coerceIn(1, lastDay)) }
+    val monthName = currentMonthName(selMonth)
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(24.dp),
+        containerColor = Card,
+        title = {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(t("Selecciona la fecha"), fontWeight = FontWeight.Black, color = Night, fontSize = 18.sp)
+                    Text("$monthName $selYear", color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
+                IconButton(onClick = {
+                    if (selMonth > 1) selMonth-- else { selMonth = 12; selYear-- }
+                    val newLast = (31 downTo 28).first { validDate(selYear, selMonth, it) }
+                    if (selectedDay > newLast) selectedDay = newLast
+                }) {
+                    Icon(DinexNavigationIcons.Back, contentDescription = "Mes anterior", tint = Night, modifier = Modifier.size(20.dp))
+                }
+                IconButton(onClick = {
+                    if (selMonth < 12) selMonth++ else { selMonth = 1; selYear++ }
+                    val newLast = (31 downTo 28).first { validDate(selYear, selMonth, it) }
+                    if (selectedDay > newLast) selectedDay = newLast
+                }) {
+                    Icon(DinexNavigationIcons.Back, contentDescription = "Mes siguiente", tint = Night, modifier = Modifier.size(20.dp).rotate(180f))
+                }
+            }
+        },
+        text = {
+            Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.height(8.dp))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                    listOf("L", "M", "X", "J", "V", "S", "D").forEach { dayLetter ->
+                        Text(dayLetter, color = Gray, fontWeight = FontWeight.Bold, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.width(36.dp))
+                    }
+                }
+                Spacer(Modifier.height(10.dp))
+                val daysList = (1..lastDay).toList()
+                val rows = daysList.chunked(7)
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    rows.forEach { rowDays ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
+                            rowDays.forEach { d ->
+                                val isSelected = d == selectedDay
+                                Surface(
+                                    onClick = { selectedDay = d },
+                                    shape = CircleShape,
+                                    color = if (isSelected) Green else CardRaised,
+                                    modifier = Modifier.size(38.dp),
+                                ) {
+                                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                        Text(
+                                            d.toString(),
+                                            color = if (isSelected) Color.White else Night,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            fontSize = 13.sp,
+                                        )
+                                    }
+                                }
+                            }
+                            repeat(7 - rowDays.size) {
+                                Spacer(Modifier.size(38.dp))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSelectDate(selectedDay, selMonth, selYear); onDismiss() },
+                colors = ButtonDefaults.buttonColors(containerColor = Green),
+            ) {
+                Text(t("Aceptar"), fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(t("Cancelar")) }
+        },
+    )
 }
