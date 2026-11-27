@@ -37,6 +37,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -243,27 +244,82 @@ private fun QuickActionTile(
 
 @Composable
 internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, savingRate: Int) {
+    val dark = DinexThemeState.dark
+    // Brillo de acento: lima sobre el verde del modo claro, celeste suave sobre el pizarra del oscuro.
+    val glow = if (dark) Color(0xFF8FB8DC) else Color(0xFFC6F06A)
+    val spentShare = if (income > 0) (expenses / income).toFloat().coerceIn(0f, 1f) else 0f
+    val spentAnim by animateFloatAsState(spentShare, tween(900, easing = FastOutSlowInEasing))
+    val overspent = income > 0 && expenses > income
     Surface(
         modifier = Modifier.fillMaxWidth().dinexEntrance(),
         shape = RoundedCornerShape(RadiusLg),
         color = HeroBase,
-        shadowElevation = 8.dp,
+        shadowElevation = 10.dp,
     ) {
-        Column(
+        Box(
             Modifier.fillMaxWidth()
                 .background(Brush.linearGradient(HeroGradient))
-                .padding(22.dp),
+                .drawBehind {
+                    // Luz suave arriba a la derecha y un brillo de acento abajo a la izquierda.
+                    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = .20f), Color.Transparent),
+                        center = Offset(size.width * .95f, 0f), radius = size.width * .62f),
+                        radius = size.width * .62f, center = Offset(size.width * .95f, 0f))
+                    drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = .30f), Color.Transparent),
+                        center = Offset(0f, size.height), radius = size.width * .55f),
+                        radius = size.width * .55f, center = Offset(0f, size.height))
+                    // Anillos finos decorativos.
+                    val ring = Offset(size.width - 18.dp.toPx(), 22.dp.toPx())
+                    drawCircle(Color.White.copy(alpha = .10f), radius = 64.dp.toPx(), center = ring, style = Stroke(1.dp.toPx()))
+                    drawCircle(Color.White.copy(alpha = .07f), radius = 100.dp.toPx(), center = ring, style = Stroke(1.dp.toPx()))
+                },
         ) {
-            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                Text(t("SALDO DISPONIBLE"), color = Color.White.copy(alpha = .82f), fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
-                Icon(DinexNavigationIcons.Wallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp))
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(moneyGrouped(rememberCountUp(balance)), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 36.sp, letterSpacing = (-1).sp)
-            Spacer(Modifier.height(18.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                BalanceStat("Ingresos", "+ ${money(income)}", Modifier.weight(1f), expense = false)
-                BalanceStat("Gastos", "− ${money(expenses)}", Modifier.weight(1f), expense = true)
+            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(Color.White.copy(alpha = .15f))
+                            .border(1.dp, Color.White.copy(alpha = .18f), RoundedCornerShape(11.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) { Icon(DinexNavigationIcons.Wallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp)) }
+                    Spacer(Modifier.width(10.dp))
+                    Text(t("SALDO DISPONIBLE"), color = Color.White.copy(alpha = .86f), fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.3.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    if (income > 0) {
+                        Spacer(Modifier.width(8.dp))
+                        Row(
+                            Modifier.clip(CircleShape).background(if (overspent) Color(0x33FF8A98) else Color.White.copy(alpha = .15f))
+                                .border(1.dp, Color.White.copy(alpha = .16f), CircleShape)
+                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Box(Modifier.size(6.dp).clip(CircleShape).background(if (overspent) Color(0xFFFFB4BE) else glow))
+                            Spacer(Modifier.width(6.dp))
+                            Text(if (overspent) t("Gastas de más") else t("Ahorras {0}%", savingRate.coerceAtLeast(0)),
+                                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                        }
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
+                Text(moneyGrouped(rememberCountUp(balance)), color = Color.White, fontWeight = FontWeight.ExtraBold,
+                    fontSize = 38.sp, letterSpacing = (-1.2).sp, maxLines = 1)
+                if (income > 0) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(t("Usaste {0}% de tus ingresos", ((expenses / income) * 100).toInt()),
+                            color = Color.White.copy(alpha = .80f), fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    }
+                    Spacer(Modifier.height(7.dp))
+                    Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(Color.White.copy(alpha = .16f))) {
+                        Box(
+                            Modifier.fillMaxWidth(spentAnim).fillMaxHeight().clip(CircleShape)
+                                .background(if (spentShare >= .8f) Color(0xFFFFB4BE) else Color(0xFFD9FBE6)),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(16.dp))
+                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    BalanceStat("Ingresos", "+ ${moneyGrouped(income)}", Modifier.weight(1f).fillMaxHeight(), expense = false)
+                    BalanceStat("Gastos", "− ${moneyGrouped(expenses)}", Modifier.weight(1f).fillMaxHeight(), expense = true)
+                }
             }
         }
     }
@@ -271,12 +327,24 @@ internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, sav
 
 @Composable
 private fun BalanceStat(label: String, value: String, modifier: Modifier, expense: Boolean) {
-    val amountColor = if (expense) Color(0xFFFF7182) else Color(0xFF56FF9C)
-    Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = HeroInset.copy(alpha = .96f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = .23f))) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(t(label), color = Color.White.copy(alpha = .82f), fontSize = 12.sp, textAlign = TextAlign.Center)
-            Text(value, color = amountColor, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 2, textAlign = TextAlign.Center)
+    val amountColor = if (expense) Color(0xFFFFC2CB) else Color(0xFFC4F7D4)
+    val badge = if (expense) Color(0xFFFF8A98) else Color(0xFF6BE3A0)
+    Surface(
+        modifier,
+        shape = RoundedCornerShape(16.dp),
+        color = HeroInset.copy(alpha = .38f),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = .16f)),
+    ) {
+        Row(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(32.dp).clip(CircleShape).background(badge.copy(alpha = .22f)), contentAlignment = Alignment.Center) {
+                Icon(if (expense) DinexNavigationIcons.ArrowDown else DinexNavigationIcons.ArrowUp, contentDescription = null,
+                    tint = amountColor, modifier = Modifier.size(16.dp))
+            }
+            Spacer(Modifier.width(9.dp))
+            Column(Modifier.weight(1f)) {
+                Text(t(label), color = Color.White.copy(alpha = .78f), fontSize = 12.sp, maxLines = 1)
+                Text(value, color = amountColor, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
         }
     }
 }

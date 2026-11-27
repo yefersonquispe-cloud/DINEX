@@ -9,6 +9,9 @@ package com.example.dinex
 
 internal val DinexAppTranslations: Map<String, Pair<String, String>> = mapOf(
     // Palabras sueltas que llegan como datos (categorías, medios de pago, días)
+    "Ahorras {0}%" to ("You save {0}%" to "{0}% waqaychanki"),
+    "Gastas de más" to ("Overspending" to "Aswanta tukuchkanki"),
+    "Usaste {0}% de tus ingresos" to ("You used {0}% of your income" to "Yaykuq qullqiykimanta {0}% llamk'achirqanki"),
     "Hoy" to ("Today" to "Kunan"),
     "Ayer" to ("Yesterday" to "Qayna p'unchaw"),
     "Importar" to ("Import" to "Apamuy"),
