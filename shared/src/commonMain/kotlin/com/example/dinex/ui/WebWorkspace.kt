@@ -151,16 +151,16 @@ internal class WebActions(
 /** Colores de la web: los verdes y lima de DINEX; en modo oscuro, fondos gris carbón neutros. */
 internal object W {
     private val dark get() = DinexThemeState.dark
-    val canvas get() = if (dark) Color(0xFF0F1113) else Color(0xFFF2F4F0)
-    val surface get() = if (dark) Color(0xFF17191C) else Color(0xFFFFFFFF)
-    val surfaceAlt get() = if (dark) Color(0xFF1D2024) else Color(0xFFF7F8F5)
-    val hover get() = if (dark) Color(0xFF23272B) else Color(0xFFF1F5F1)
-    val line get() = if (dark) Color(0xFF2C3136) else Color(0xFFE2E7E1)
+    val canvas get() = if (dark) Color(0xFF1A1D21) else Color(0xFFF2F4F0)
+    val surface get() = if (dark) Color(0xFF23272B) else Color(0xFFFFFFFF)
+    val surfaceAlt get() = if (dark) Color(0xFF292D32) else Color(0xFFF7F8F5)
+    val hover get() = if (dark) Color(0xFF31363B) else Color(0xFFF1F5F1)
+    val line get() = if (dark) Color(0xFF393F45) else Color(0xFFE2E7E1)
     val ink get() = if (dark) Color(0xFFEEF1F4) else Color(0xFF101B15)
     val ink2 get() = if (dark) Color(0xFFAAB3BB) else Color(0xFF526258)
     val ink3 get() = if (dark) Color(0xFF747E87) else Color(0xFF8A978E)
     val brand get() = if (dark) Color(0xFF5ED49B) else Color(0xFF0D6A43)
-    val brandSoft get() = if (dark) Color(0xFF1E2B25) else Color(0xFFE1F0E6)
+    val brandSoft get() = if (dark) Color(0xFF283630) else Color(0xFFE1F0E6)
     val positive get() = if (dark) Color(0xFF5ED49B) else Color(0xFF12804A)
     val negative get() = if (dark) Color(0xFFF08B7B) else Color(0xFFC0392B)
     val warning get() = if (dark) Color(0xFFF2C46B) else Color(0xFFB7791F)
