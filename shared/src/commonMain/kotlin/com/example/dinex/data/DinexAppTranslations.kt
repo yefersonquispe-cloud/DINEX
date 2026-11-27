@@ -597,4 +597,20 @@ internal val DinexAppTranslations: Map<String, Pair<String, String>> = mapOf(
     "La alcancía no respondió. Inténtalo otra vez." to ("The piggy bank didn't respond. Try again." to "Alcancia mana kutichirqanchu. Hukmanta ruway."),
     "Respuesta inválida de la alcancía." to ("Invalid response from the piggy bank." to "Alcanciaq kutichiynin mana allinchu."),
     "No pudimos cargar el historial." to ("We couldn't load the history." to "Mana ñawpaq willakuyta cargayta atirqanchikchu."),
+    // Accesos rápidos del inicio y comando de voz directo
+    "Apagar ubicación" to ("Turn off location" to "Maypi kasqata wañuchiy"),
+    "Te escucho… habla ahora" to ("I'm listening… speak now" to "Uyarishaykim… kunan rimay"),
+    "Volver a escuchar" to ("Listen again" to "Hukmanta uyariy"),
+    "Más opciones de voz y alertas" to ("More voice and alert options" to "Kunkapaq willakuypaqpas aswan akllanakuna"),
+    "“Registra 21.50 soles en comida”, “recibí 300 soles” o “¿cuánto gasté esta semana?”" to
+        ("“Log 21.50 soles for food”, “I received 300 soles” or “how much did I spend this week?”" to
+            "“Mikuypaq 21.50 solta qillqay”, “300 solta chaskirqani” utaq “¿kay semanapi hayk'atataq tukurqani?”"),
+    "Este equipo no tiene reconocimiento de voz disponible." to ("This device has no speech recognition available." to "Kay equipopi mana kunka riqsiy kanchu."),
+    "La ubicación solo está disponible en la app de Android." to ("Location is only available in the Android app." to "Maypi kasqaqa Android appllapim kan."),
+    "Ubicación activada: tus gastos guardarán dónde los hiciste." to ("Location on: your expenses will save where you made them." to "Maypi kasqa kichasqa: tukusqaykikuna maypi ruwasqaykita waqaychanqa."),
+    "Ubicación apagada: tus gastos no guardarán el lugar." to ("Location off: your expenses won't save the place." to "Maypi kasqa wañusqa: tukusqaykikuna mana maypi kasqata waqaychanqachu."),
+    "La ubicación sigue apagada: permite el acceso a la ubicación para activarla." to
+        ("Location is still off: allow location access to turn it on." to "Maypi kasqa wañusqallam: kichanaykipaq maypi kasqaman yaykuyta saqiy."),
+    "Boleta o foto" to ("Receipt or photo" to "Boleta utaq foto"),
+    "Automático" to ("Automatic" to "Kikinmanta"),
 )

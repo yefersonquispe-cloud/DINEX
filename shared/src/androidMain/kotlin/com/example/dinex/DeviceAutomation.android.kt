@@ -74,8 +74,14 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
     override val voiceAvailable: Boolean get() = SpeechRecognizer.isRecognitionAvailable(context)
     override val notificationReaderAvailable: Boolean
         get() = NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)
-    override val locationAvailable: Boolean
-        get() = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+    /** Precisa o aproximada: si la persona elige "Aproximada" en Android, también sirve. */
+    private val locationPermission: Boolean
+        get() = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+            .any { ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED }
+    /** Interruptor de Dinex: se puede apagar la ubicación sin quitar el permiso de Android. */
+    private val locationSwitchOn: Boolean get() = hotwordPrefs.getBoolean("location_on", true)
+    override val locationAvailable: Boolean get() = locationPermission && locationSwitchOn
+    override val supportsLocation = true
     override val hotwordEnabled: Boolean get() = hotwordPrefs.getBoolean("enabled", false)
     override val supportsBackgroundVoice = true
     override val overlayAvailable: Boolean get() = Settings.canDrawOverlays(context)
@@ -283,6 +289,24 @@ private class AndroidDeviceAutomation(private val context: Context) : DeviceAuto
 
     override fun requestLocationPermission() {
         context.findActivity()?.let { ActivityCompat.requestPermissions(it, arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 7002) }
+    }
+
+    override fun setLocationEnabled(enabled: Boolean) {
+        hotwordPrefs.edit().putBoolean("location_on", enabled).apply()
+        when {
+            !enabled -> { stopFollowingLocation(); freshLocation = null; placeLabel = null }
+            locationPermission -> startFollowingLocation()
+            else -> {
+                val activity = context.findActivity()
+                val askedBefore = hotwordPrefs.getBoolean("location_asked", false)
+                // Si ya se negó y Android no volverá a preguntar, se abren los ajustes de Dinex.
+                val blocked = askedBefore && activity != null &&
+                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_FINE_LOCATION) &&
+                    !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.ACCESS_COARSE_LOCATION)
+                hotwordPrefs.edit().putBoolean("location_asked", true).apply()
+                if (blocked) openAppDetailsSettings() else requestLocationPermission()
+            }
+        }
     }
 
     override fun drainNotifications(): List<CapturedTransaction> = DinexNotificationStore.drain(context)

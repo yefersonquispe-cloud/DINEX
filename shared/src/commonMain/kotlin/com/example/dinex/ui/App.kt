@@ -105,6 +105,7 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     var exportDialog by remember { mutableStateOf(false) }
     var premiumLoading by remember { mutableStateOf<String?>(null) }
     var automationDialog by remember { mutableStateOf(false) }
+    var voiceDialog by remember { mutableStateOf(false) }
     var goalDetails by remember { mutableStateOf(false) }
     var selectedGoalId by remember { mutableStateOf<Int?>(null) }
     var savingGoalId by remember { mutableStateOf<Int?>(null) }
@@ -121,7 +122,11 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
     val automation = rememberDeviceAutomation()
     val owner = LocalLifecycleOwner.current
     val permissionRevision = DinexNotificationPermission.revision
-    val locationAvailable = remember(permissionRevision, automation) { automation.locationAvailable }
+    // Se vuelve a leer al volver de los permisos y cada vez que se usa el interruptor del inicio.
+    var locationSwitch by remember { mutableIntStateOf(0) }
+    // true mientras Android pregunta por el permiso de ubicación pedido desde el botón del inicio.
+    var locationPending by remember { mutableStateOf(false) }
+    val locationAvailable = remember(permissionRevision, automation, locationSwitch) { automation.locationAvailable }
     val notificationsSupported = automation.systemNotificationsSupported
     val notificationsEnabled = remember(permissionRevision, automation) { automation.systemNotificationsEnabled }
     // A command can arrive while MainActivity is already alive. Consume on every resume.
@@ -130,6 +135,14 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
             if (event == Lifecycle.Event.ON_RESUME) {
                 model.refreshProfile()
                 DinexNotificationPermission.refresh()
+                if (locationPending) {
+                    locationPending = false
+                    locationSwitch++
+                    model.showMessage(
+                        if (automation.locationAvailable) "Ubicación activada: tus gastos guardarán dónde los hiciste."
+                        else "La ubicación sigue apagada: permite el acceso a la ubicación para activarla.",
+                    )
+                }
                 automation.consumePendingVoiceCommand()?.let { model.handleVoice(it, automation.currentLocationLabel()) }
             }
         }
@@ -248,8 +261,23 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
                             onDailyLimitChange = model::setDailyLimit,
                             onHistory = { model.selectPage(1) }, onAdd = { quickAdd = true }, onGoalDetails = { selectedGoalId = null; goalDetails = true },
                             goals = goals, onOpenGoal = { selectedGoalId = it; goalDetails = true },
-                            onScan = { scanner() }, onVoice = { automationDialog = true },
-                            onGoals = { savingGoalId = null; savingDialog = true },
+                            onScan = { scanner() }, onVoice = { voiceDialog = true },
+                            locationOn = locationAvailable,
+                            onLocation = {
+                                if (!automation.supportsLocation) model.showMessage("La ubicación solo está disponible en la app de Android.")
+                                else {
+                                    val turnOn = !locationAvailable
+                                    automation.setLocationEnabled(turnOn)
+                                    locationSwitch++
+                                    when {
+                                        !turnOn -> model.showMessage("Ubicación apagada: tus gastos no guardarán el lugar.")
+                                        automation.locationAvailable -> model.showMessage("Ubicación activada: tus gastos guardarán dónde los hiciste.")
+                                        // Android muestra su permiso (o los ajustes); el aviso sale al volver.
+                                        else -> locationPending = true
+                                    }
+                                }
+                            },
+                            onMore = { automationDialog = true },
                             notificationsSupported = notificationsSupported, notificationsEnabled = notificationsEnabled,
                             onEnableNotifications = { automation.requestSystemNotificationPermission() })
                     }
@@ -293,8 +321,13 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         onExpense = { quickAdd = false; manualIncome = false },
         onIncome = { quickAdd = false; manualIncome = true },
     )
+    if (voiceDialog) VoiceCommandDialog(
+        automation, onDismiss = { voiceDialog = false },
+        onVoice = { model.handleVoice(it, automation.currentLocationLabel()); voiceDialog = false },
+        onMore = { voiceDialog = false; automationDialog = true },
+    )
     if (automationDialog) AutomationDialog(
-        automation, onDismiss = { automationDialog = false },
+        automation, onDismiss = { automationDialog = false; locationSwitch++ },
         onVoice = { model.handleVoice(it, automation.currentLocationLabel()); automationDialog = false },
         onImport = { model.importNotifications(it, automation.currentLocationLabel()); automation.acknowledgeNotifications(it); automationDialog = false },
     )

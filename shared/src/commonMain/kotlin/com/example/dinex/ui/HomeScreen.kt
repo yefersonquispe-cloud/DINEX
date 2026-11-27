@@ -62,7 +62,9 @@ internal fun HomePage(
     onOpenGoal: (Int) -> Unit = {},
     onScan: () -> Unit = {},
     onVoice: () -> Unit = {},
-    onGoals: () -> Unit = {},
+    locationOn: Boolean = false,
+    onLocation: () -> Unit = {},
+    onMore: () -> Unit = {},
     notificationsSupported: Boolean = false,
     notificationsEnabled: Boolean = true,
     onEnableNotifications: () -> Unit = {},
@@ -89,15 +91,22 @@ internal fun HomePage(
                 item { NotificationsNudge(onEnableNotifications) }
             }
             item {
-                if (desktop) Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
-                    Box(Modifier.weight(1f)) { BalanceStrip(balance, income, expenses, savingRate) }
-                    Box(Modifier.weight(1f)) { SavingsHero(savings, goals, onClick = onGoalDetails, onOpenGoal = onOpenGoal) }
+                // Accesos rápidos arriba de los ahorros: Escanear, Voz, Ubicación y Más.
+                val quick: @Composable () -> Unit = {
+                    QuickActions(onScan = onScan, onVoice = onVoice, locationOn = locationOn, onLocation = onLocation, onMore = onMore, wide = desktop)
+                }
+                if (desktop) Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                    quick()
+                    Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
+                        Box(Modifier.weight(1f)) { BalanceStrip(balance, income, expenses, savingRate) }
+                        Box(Modifier.weight(1f)) { SavingsHero(savings, goals, onClick = onGoalDetails, onOpenGoal = onOpenGoal) }
+                    }
                 } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     BalanceStrip(balance, income, expenses, savingRate)
+                    quick()
                     SavingsHero(savings, goals, onClick = onGoalDetails, onOpenGoal = onOpenGoal)
                 }
             }
-            item { QuickActions(onScan = onScan, onVoice = onVoice, onGoals = onGoals, onHistory = onHistory, wide = desktop) }
             item {
                 if (desktop) Row(horizontalArrangement = Arrangement.spacedBy(20.dp), verticalAlignment = Alignment.Top) {
                     Box(Modifier.weight(1f)) { SpendingOverview(monthly) }
@@ -136,57 +145,97 @@ internal fun NotificationsNudge(onEnable: () -> Unit) {
 }
 
 @Composable
-private fun QuickActions(onScan: () -> Unit, onVoice: () -> Unit, onGoals: () -> Unit, onHistory: () -> Unit, wide: Boolean = false) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (wide) 16.dp else 10.dp)) {
-        // Un solo color de marca y trazos finos para un estilo más formal.
-        QuickActionTile("Escanear", "Foto del comprobante", DinexNavigationIcons.ScanReceipt, GreenDark, onScan, wide, Modifier.weight(1f))
-        QuickActionTile("Voz", "Dicta un gasto", DinexNavigationIcons.Microphone, GreenDark, onVoice, wide, Modifier.weight(1f))
-        QuickActionTile("Metas", "Ahorra para algo", DinexNavigationIcons.Target, GreenDark, onGoals, wide, Modifier.weight(1f))
-        QuickActionTile("Historial", "Todos tus movimientos", DinexNavigationIcons.History, GreenDark, onHistory, wide, Modifier.weight(1f))
+private fun QuickActions(
+    onScan: () -> Unit,
+    onVoice: () -> Unit,
+    locationOn: Boolean,
+    onLocation: () -> Unit,
+    onMore: () -> Unit,
+    wide: Boolean = false,
+) {
+    // Los cuatro con la misma forma: ícono, nombre y una línea corta debajo, así quedan alineados.
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(if (wide) 16.dp else 10.dp)) {
+        QuickActionTile("Escanear", "Boleta o foto", DinexNavigationIcons.ScanReceipt, GreenDark, onScan, wide, Modifier.weight(1f))
+        QuickActionTile("Voz", "Oye Dinex", DinexNavigationIcons.Microphone, ElectricBlue, onVoice, wide, Modifier.weight(1f))
+        QuickActionTile(
+            "Ubicación", if (locationOn) "Activa" else "Apagada", DinexNavigationIcons.MapPin,
+            if (locationOn) Green else Gray, onLocation, wide, Modifier.weight(1f),
+            toggle = locationOn,
+        )
+        QuickActionTile("Más", "Automático", DinexNavigationIcons.More, Orange, onMore, wide, Modifier.weight(1f))
     }
 }
 
+/**
+ * Acceso rápido del inicio. [toggle] no nulo lo convierte en interruptor: encendido se pinta
+ * relleno con el color de marca y muestra un punto verde; apagado queda en gris.
+ */
 @Composable
 private fun QuickActionTile(
     label: String,
-    hint: String,
+    caption: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    tint: Color,
+    accent: Color,
     onClick: () -> Unit,
     wide: Boolean,
     modifier: Modifier = Modifier,
+    toggle: Boolean? = null,
 ) {
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
+    val on = toggle == true
     Surface(
-        modifier = modifier.clip(RoundedCornerShape(RadiusMd)).hoverable(interaction).clickable(onClickLabel = label, onClick = onClick),
+        modifier = modifier.fillMaxHeight().clip(RoundedCornerShape(RadiusMd)).hoverable(interaction)
+            .clickable(onClickLabel = label, onClick = onClick),
         shape = RoundedCornerShape(RadiusMd),
-        color = if (hovered) SurfaceHover else Card,
-        border = BorderStroke(1.dp, if (hovered) tint.copy(alpha = .35f) else Border),
+        color = when {
+            on -> Mint
+            hovered -> SurfaceHover
+            else -> Card
+        },
+        border = BorderStroke(1.dp, if (on || hovered) accent.copy(alpha = .45f) else Border),
     ) {
         val badge: @Composable () -> Unit = {
             Box(
-                Modifier.size(44.dp).clip(CircleShape).background(Mint).border(1.dp, tint.copy(alpha = .18f), CircleShape),
+                Modifier.size(46.dp).clip(RoundedCornerShape(14.dp))
+                    .background(if (on) accent else accent.copy(alpha = .12f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(icon, null, tint = tint, modifier = Modifier.size(22.dp))
+                Icon(icon, null, tint = if (on) Color.White else accent, modifier = Modifier.size(22.dp))
+            }
+        }
+        val captionRow: @Composable () -> Unit = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (toggle != null) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(if (on) Lime else Gray.copy(alpha = .55f)))
+                    Spacer(Modifier.width(4.dp))
+                }
+                Text(caption, color = if (on) GreenDark else Gray, fontSize = if (wide) 11.sp else 10.sp,
+                    fontWeight = if (toggle != null) FontWeight.SemiBold else FontWeight.Normal,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         if (wide) {
-            // Desktop: one compact row with a hint, instead of a tall, mostly empty tile.
-            Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            // Escritorio: una fila compacta con la descripción al lado.
+            Row(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 badge()
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(label, color = Night, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1)
-                    Text(hint, color = Gray, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    captionRow()
                 }
             }
         } else {
-            Column(Modifier.padding(vertical = 14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                Modifier.fillMaxSize().padding(horizontal = 4.dp, vertical = 12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
                 badge()
                 Spacer(Modifier.height(8.dp))
-                Text(label, color = Night, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1)
+                Text(label, color = Night, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Spacer(Modifier.height(2.dp))
+                captionRow()
             }
         }
     }

@@ -15,7 +15,10 @@ data class CapturedTransaction(
 interface DeviceAutomation {
     val voiceAvailable: Boolean
     val notificationReaderAvailable: Boolean
+    /** Ubicación lista para usar: permiso concedido y no apagada desde Dinex. */
     val locationAvailable: Boolean
+    /** true si este equipo puede guardar la ubicación de los gastos (solo Android). */
+    val supportsLocation: Boolean get() = false
     val hotwordEnabled: Boolean get() = false
     val supportsBackgroundVoice: Boolean get() = false
     val overlayAvailable: Boolean get() = false
@@ -51,6 +54,8 @@ interface DeviceAutomation {
     fun setHotwordEnabled(enabled: Boolean): String? = "Esta función solo está disponible en Android."
     fun consumePendingVoiceCommand(): String? = null
     fun requestLocationPermission()
+    /** Enciende o apaga la ubicación desde Dinex; al encenderla pide el permiso si falta. */
+    fun setLocationEnabled(enabled: Boolean) { if (enabled) requestLocationPermission() }
     fun drainNotifications(): List<CapturedTransaction>
     fun currentLocationLabel(): String?
     fun currentLocation(): DinexLocation? = null

@@ -268,13 +268,16 @@ internal fun AutomationDialog(
                 AutomationSection(
                     icon = DinexNavigationIcons.Analysis, tint = Orange, title = "Ubicación",
                     subtitle = "Opcional, para tu mapa de gastos",
-                    status = if (automation.locationAvailable) "Activa" to true else "Apagada" to false,
+                    status = if (accessRefresh.let { automation.locationAvailable }) "Activa" to true else "Apagada" to false,
                 ) {
                     if (automation.locationAvailable) {
                         Text(t("Estás en: {0}", automation.currentLocationLabel() ?: t("se guardará al registrar")), color = NightSoft, fontSize = 13.sp)
+                        TextButton(onClick = { automation.setLocationEnabled(false); accessRefresh++ }, modifier = Modifier.fillMaxWidth()) {
+                            Text(t("Apagar ubicación"), color = Red, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                        }
                     } else {
                         Text(t("Solo se pide con tu permiso y se guarda en tu teléfono."), color = Gray, fontSize = 13.sp)
-                        OutlinedButton(onClick = { automation.requestLocationPermission() }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
+                        OutlinedButton(onClick = { automation.setLocationEnabled(true); accessRefresh++ }, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(12.dp)) {
                             Text(t("Activar ubicación"), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                         }
                     }
@@ -288,6 +291,85 @@ internal fun AutomationDialog(
                 Text(t("Dinex solo lee alertas con tu autorización. “Oye Dinex” usa el micrófono únicamente mientras está activo."),
                     color = Gray, fontSize = 11.sp, lineHeight = 15.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth(),
                 )
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onClick = { automation.stopVoice(); onDismiss() }) { Text(t("Cerrar"), color = GreenDark, fontWeight = FontWeight.Bold) } },
+    )
+}
+
+/**
+ * Comando de voz directo (botón "Voz" del inicio): empieza a escuchar apenas se abre,
+ * sin pasar por la pantalla de registro automático.
+ */
+@Composable
+internal fun VoiceCommandDialog(
+    automation: DeviceAutomation,
+    onDismiss: () -> Unit,
+    onVoice: (String) -> Unit,
+    onMore: () -> Unit,
+) {
+    var listening by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+    var waitingMicrophone by remember { mutableStateOf(false) }
+    fun listen() {
+        error = null
+        if (!automation.voiceAvailable) { error = t("Este equipo no tiene reconocimiento de voz disponible."); return }
+        waitingMicrophone = automation.supportsBackgroundVoice && !automation.microphoneAvailable
+        listening = true
+        automation.startVoice(
+            onResult = { listening = false; onVoice(it) },
+            onError = { listening = false; error = it },
+        )
+    }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, automation) {
+        // Si tuvo que pedir el micrófono, vuelve a escuchar solo al regresar con el permiso concedido.
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME && waitingMicrophone && !listening && automation.microphoneAvailable) listen()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); automation.stopVoice() }
+    }
+    LaunchedEffect(Unit) { listen() }
+    AlertDialog(
+        onDismissRequest = { automation.stopVoice(); onDismiss() },
+        shape = RoundedCornerShape(28.dp),
+        containerColor = Card,
+        icon = { Image(painterResource(Res.drawable.dinex_mascot_ai), "Oye Dinex", Modifier.size(72.dp), contentScale = ContentScale.Fit) },
+        title = { Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(t("Oye Dinex"), color = Night, fontWeight = FontWeight.Black)
+            Text(
+                if (listening) t("Te escucho… habla ahora") else t("Comando de voz"),
+                color = if (listening) ElectricBlue else Gray, fontSize = 13.sp, textAlign = TextAlign.Center,
+            )
+        } },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Surface(shape = RoundedCornerShape(12.dp), color = ElectricBlue.copy(alpha = .08f)) {
+                    Text(t("“Registra 21.50 soles en comida”, “recibí 300 soles” o “¿cuánto gasté esta semana?”"),
+                        color = NightSoft, fontSize = 13.sp, lineHeight = 18.sp, textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 9.dp))
+                }
+                error?.let {
+                    Surface(shape = RoundedCornerShape(12.dp), color = Red.copy(alpha = .10f)) {
+                        Text(it, color = Red, fontSize = 13.sp, modifier = Modifier.fillMaxWidth().padding(10.dp))
+                    }
+                }
+                Button(
+                    onClick = { listen() },
+                    enabled = !listening,
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = ElectricBlue),
+                ) {
+                    Icon(DinexNavigationIcons.Microphone, null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (listening) t("Escuchando...") else t("Volver a escuchar"), fontWeight = FontWeight.Bold)
+                }
+                TextButton(onClick = { automation.stopVoice(); onMore() }) {
+                    Text(t("Más opciones de voz y alertas"), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                }
             }
         },
         confirmButton = {},

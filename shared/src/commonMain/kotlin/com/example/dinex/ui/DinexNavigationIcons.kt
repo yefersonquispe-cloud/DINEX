@@ -169,6 +169,15 @@ internal object DinexNavigationIcons {
         moveTo(18f, 6f); lineTo(6f, 18f)
     }
 
+    /** Cuatro cuadrados redondeados: abre más opciones (automatización). */
+    val More = outline("DinexMore", strokeWidth = 1.8f) {
+        listOf(4f to 4f, 13.5f to 4f, 4f to 13.5f, 13.5f to 13.5f).forEach { (x, y) ->
+            moveTo(x + 2f, y); lineTo(x + 4.5f, y); quadTo(x + 6.5f, y, x + 6.5f, y + 2f); lineTo(x + 6.5f, y + 4.5f)
+            quadTo(x + 6.5f, y + 6.5f, x + 4.5f, y + 6.5f); lineTo(x + 2f, y + 6.5f); quadTo(x, y + 6.5f, x, y + 4.5f)
+            lineTo(x, y + 2f); quadTo(x, y, x + 2f, y); close()
+        }
+    }
+
     val Back = outline("DinexBack") {
         moveTo(15f, 5f); lineTo(8f, 12f); lineTo(15f, 19f)
     }
