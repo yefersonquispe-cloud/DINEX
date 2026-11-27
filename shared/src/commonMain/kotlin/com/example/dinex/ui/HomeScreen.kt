@@ -246,12 +246,12 @@ internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, sav
     Surface(
         modifier = Modifier.fillMaxWidth().dinexEntrance(),
         shape = RoundedCornerShape(RadiusLg),
-        color = Green,
+        color = HeroBase,
         shadowElevation = 8.dp,
     ) {
         Column(
             Modifier.fillMaxWidth()
-                .background(Brush.linearGradient(listOf(Color(0xFF0E5431), Green, Color(0xFF328859))))
+                .background(Brush.linearGradient(HeroGradient))
                 .padding(22.dp),
         ) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -272,7 +272,7 @@ internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, sav
 @Composable
 private fun BalanceStat(label: String, value: String, modifier: Modifier, expense: Boolean) {
     val amountColor = if (expense) Color(0xFFFF7182) else Color(0xFF56FF9C)
-    Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = Color(0xFF082B1D).copy(alpha = .96f),
+    Surface(modifier, shape = RoundedCornerShape(RadiusSm), color = HeroInset.copy(alpha = .96f),
         border = BorderStroke(1.dp, Color.White.copy(alpha = .23f))) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 11.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(t(label), color = Color.White.copy(alpha = .82f), fontSize = 12.sp, textAlign = TextAlign.Center)

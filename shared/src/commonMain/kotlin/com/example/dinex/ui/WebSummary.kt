@@ -93,7 +93,7 @@ private fun BalanceHero(available: Double, current: MonthTotals, savings: Double
     }
     Column(
         modifier.fillMaxWidth().dinexEntrance().clip(WebCardShape)
-            .background(Brush.linearGradient(listOf(W.forestDeep, W.forest, W.forest2)))
+            .background(Brush.linearGradient(W.hero))
             .drawBehind {
                 drawCircle(Brush.radialGradient(listOf(W.lime.copy(alpha = .20f), Color.Transparent), Offset(size.width * .95f, 0f), size.height * .9f), size.height * .9f, Offset(size.width * .95f, 0f))
                 drawCircle(Brush.radialGradient(listOf(Color(0xFF2E8B57).copy(alpha = .25f), Color.Transparent), Offset(0f, size.height), size.height * .8f), size.height * .8f, Offset(0f, size.height))

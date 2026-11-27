@@ -411,7 +411,7 @@ internal fun GoalsWebPage(data: FinancialData, actions: WebActions) {
     PageFrame {
         Row(
             Modifier.fillMaxWidth().dinexEntrance().clip(WebCardShape)
-                .background(androidx.compose.ui.graphics.Brush.linearGradient(listOf(W.forestDeep, W.forest, W.forest2))).padding(24.dp),
+                .background(androidx.compose.ui.graphics.Brush.linearGradient(W.hero)).padding(24.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             RingProgress(if (target > 0) (saved / target).toFloat() else 0f, W.lime, 104.dp, 11.dp, track = Color.White.copy(alpha = .1f)) {

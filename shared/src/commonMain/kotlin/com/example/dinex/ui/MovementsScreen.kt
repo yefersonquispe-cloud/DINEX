@@ -135,7 +135,8 @@ internal fun MovementListRow(movement: Movement, onClick: () -> Unit) {
 
 @Composable
 internal fun MonthPass(income: Double, expense: Double, movementCount: Int) {
-    DinexCard(elevated = true, accent = GreenDark, vibrant = true) {
+    // En oscuro toma el azul pizarra de la tarjeta de saldo del inicio.
+    DinexCard(elevated = true, accent = if (DinexThemeState.dark) HeroGradient.last() else GreenDark, vibrant = true) {
         Text(t("BALANCE DE LOS MOVIMIENTOS VISIBLES"), color = Gray, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
         Text(money(income - expense), color = Night, fontWeight = FontWeight.Black, fontSize = 26.sp)
         Spacer(Modifier.height(12.dp))

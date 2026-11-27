@@ -148,19 +148,19 @@ internal class WebActions(
 
 // ---------------------------------------------------------------- Paleta y tipografía
 
-/** Colores de la web: los mismos verdes y lima de DINEX, en modo claro y oscuro. */
+/** Colores de la web: los verdes y lima de DINEX; en modo oscuro, fondos gris carbón neutros. */
 internal object W {
     private val dark get() = DinexThemeState.dark
-    val canvas get() = if (dark) Color(0xFF0B130F) else Color(0xFFF2F4F0)
-    val surface get() = if (dark) Color(0xFF121C17) else Color(0xFFFFFFFF)
-    val surfaceAlt get() = if (dark) Color(0xFF17231D) else Color(0xFFF7F8F5)
-    val hover get() = if (dark) Color(0xFF1B2A22) else Color(0xFFF1F5F1)
-    val line get() = if (dark) Color(0xFF23332A) else Color(0xFFE2E7E1)
-    val ink get() = if (dark) Color(0xFFEAF2EC) else Color(0xFF101B15)
-    val ink2 get() = if (dark) Color(0xFFA6B8AC) else Color(0xFF526258)
-    val ink3 get() = if (dark) Color(0xFF6F8277) else Color(0xFF8A978E)
+    val canvas get() = if (dark) Color(0xFF0F1113) else Color(0xFFF2F4F0)
+    val surface get() = if (dark) Color(0xFF17191C) else Color(0xFFFFFFFF)
+    val surfaceAlt get() = if (dark) Color(0xFF1D2024) else Color(0xFFF7F8F5)
+    val hover get() = if (dark) Color(0xFF23272B) else Color(0xFFF1F5F1)
+    val line get() = if (dark) Color(0xFF2C3136) else Color(0xFFE2E7E1)
+    val ink get() = if (dark) Color(0xFFEEF1F4) else Color(0xFF101B15)
+    val ink2 get() = if (dark) Color(0xFFAAB3BB) else Color(0xFF526258)
+    val ink3 get() = if (dark) Color(0xFF747E87) else Color(0xFF8A978E)
     val brand get() = if (dark) Color(0xFF5ED49B) else Color(0xFF0D6A43)
-    val brandSoft get() = if (dark) Color(0xFF173627) else Color(0xFFE1F0E6)
+    val brandSoft get() = if (dark) Color(0xFF1E2B25) else Color(0xFFE1F0E6)
     val positive get() = if (dark) Color(0xFF5ED49B) else Color(0xFF12804A)
     val negative get() = if (dark) Color(0xFFF08B7B) else Color(0xFFC0392B)
     val warning get() = if (dark) Color(0xFFF2C46B) else Color(0xFFB7791F)
@@ -173,6 +173,8 @@ internal object W {
     val sidebarInk = Color(0xFFDCE7DF)
     val sidebarMuted = Color(0xFF7D9586)
     val sidebarActive = Color(0xFF1A2E23)
+    /** Tarjetas principales (saldo, metas, Dinex IA): bosque en modo claro, azul pizarra en oscuro (igual que la app). */
+    val hero: List<Color> get() = if (dark) listOf(Color(0xFF26333F), Color(0xFF33445A), Color(0xFF43586D)) else listOf(forestDeep, forest, forest2)
 }
 
 internal val WebCardShape = RoundedCornerShape(22.dp)

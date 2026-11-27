@@ -79,7 +79,7 @@ internal fun WebAuthShowcase(modifier: Modifier = Modifier) {
     val float by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(6000, easing = LinearEasing)), label = "flotar")
     val phase = if (reduced) 0f else float
     BoxWithConstraints(
-        modifier.background(Brush.linearGradient(listOf(W.forestDeep, W.forest, W.forest2))).drawBehind {
+        modifier.background(Brush.linearGradient(W.hero)).drawBehind {
             val step = 34.dp.toPx()
             var x = step
             while (x < size.width) { drawLine(Color.White.copy(alpha = .03f), Offset(x, 0f), Offset(x, size.height), 1f); x += step }

@@ -44,22 +44,31 @@ fun isDinexDarkModeEnabled(): Boolean = DinexRepository().darkMode()
 
 /** Opción "Reducir movimiento" de Dinex, para las vistas nativas de Android (burbuja de voz). */
 fun isDinexReducedMotionEnabled(): Boolean = DinexRepository().reduceMotion()
-internal val AppBg get() = if (DinexThemeState.dark) Color(0xFF101A15) else Color(0xFFF7FAF7)
-internal val Night get() = if (DinexThemeState.dark) Color(0xFFF3F8F3) else Color(0xFF183326)
-internal val NightSoft get() = if (DinexThemeState.dark) Color(0xFFC0D6C5) else Color(0xFF365442)
+// Modo oscuro: fondos gris carbón neutros (no verdosos); el verde queda para botones y detalles.
+internal val AppBg get() = if (DinexThemeState.dark) Color(0xFF111315) else Color(0xFFF7FAF7)
+internal val Night get() = if (DinexThemeState.dark) Color(0xFFF2F4F6) else Color(0xFF183326)
+internal val NightSoft get() = if (DinexThemeState.dark) Color(0xFFC8CFD5) else Color(0xFF365442)
 internal val Green get() = Color(0xFF176B43)
 internal val GreenDark get() = if (DinexThemeState.dark) Color(0xFF9CE3B5) else Color(0xFF115B38)
-internal val Mint get() = if (DinexThemeState.dark) Color(0xFF203D2C) else Color(0xFFE5F3E9)
+internal val Mint get() = if (DinexThemeState.dark) Color(0xFF1E2B25) else Color(0xFFE5F3E9)
 internal val Lime get() = if (DinexThemeState.dark) Color(0xFFA8DA99) else Color(0xFF438A53)
-internal val Card get() = if (DinexThemeState.dark) Color(0xFF19271F) else Color(0xFFFFFFFF)
-internal val CardRaised get() = if (DinexThemeState.dark) Color(0xFF23382B) else Color(0xFFF0F7F1)
-internal val SurfaceHover get() = if (DinexThemeState.dark) Color(0xFF2B4435) else Color(0xFFE7F1E9)
+internal val Card get() = if (DinexThemeState.dark) Color(0xFF1B1F23) else Color(0xFFFFFFFF)
+internal val CardRaised get() = if (DinexThemeState.dark) Color(0xFF23272B) else Color(0xFFF0F7F1)
+internal val SurfaceHover get() = if (DinexThemeState.dark) Color(0xFF2B3035) else Color(0xFFE7F1E9)
 internal val Red get() = if (DinexThemeState.dark) Color(0xFFEF9CA5) else Color(0xFFB84754)
 internal val Orange get() = if (DinexThemeState.dark) Color(0xFFEAC081) else Color(0xFFA66822)
 internal val Indigo get() = if (DinexThemeState.dark) Color(0xFFB7A6E6) else Color(0xFF6959A5)
 internal val ElectricBlue get() = if (DinexThemeState.dark) Color(0xFF9AC8DD) else Color(0xFF326D91)
-internal val Gray get() = if (DinexThemeState.dark) Color(0xFFB9C8BC) else Color(0xFF536A5A)
-internal val Border get() = if (DinexThemeState.dark) Color(0xFF385641) else Color(0xFFD4E4D8)
+internal val Gray get() = if (DinexThemeState.dark) Color(0xFFA9B2B9) else Color(0xFF536A5A)
+internal val Border get() = if (DinexThemeState.dark) Color(0xFF2F363D) else Color(0xFFD4E4D8)
+
+/** Tarjeta principal (saldo, mercado, consejos): verde en modo claro, azul pizarra más claro en oscuro. */
+internal val HeroGradient: List<Color> get() = if (DinexThemeState.dark)
+    listOf(Color(0xFF2E3D4C), Color(0xFF3B4E60), Color(0xFF4B6176))
+else listOf(Color(0xFF0E5431), Color(0xFF176B43), Color(0xFF328859))
+internal val HeroBase get() = if (DinexThemeState.dark) Color(0xFF3B4E60) else Color(0xFF176B43)
+/** Cajitas de ingresos y gastos dentro de la tarjeta principal. */
+internal val HeroInset get() = if (DinexThemeState.dark) Color(0xFF1C2630) else Color(0xFF082B1D)
 
 // Las medallas conservan su material; sus rótulos se oscurecen sobre blanco.
 internal fun readableAccent(color: Color): Color = lerp(color, Night, .48f)
@@ -114,10 +123,17 @@ internal fun DinexCard(
         ),
         shape = RoundedCornerShape(RadiusLg),
         color = Color.Transparent,
-        border = BorderStroke(1.dp, accent.copy(alpha = .22f)),
+        // Modo oscuro: borde sólido y apenas teñido para que la tarjeta se separe del fondo sin verse verdosa.
+        border = BorderStroke(1.dp, if (DinexThemeState.dark) lerp(Border, accent, .18f) else accent.copy(alpha = .22f)),
         shadowElevation = if (elevated) 8.dp else 0.dp,
     ) {
-        Column(Modifier.fillMaxWidth().background(lerp(bg, accent, if (vibrant) .06f else .02f)).padding(if (vibrant) 22.dp else 18.dp), content = content)
+        val tint = when {
+            DinexThemeState.dark && vibrant -> .035f
+            DinexThemeState.dark -> .012f
+            vibrant -> .06f
+            else -> .02f
+        }
+        Column(Modifier.fillMaxWidth().background(lerp(bg, accent, tint)).padding(if (vibrant) 22.dp else 18.dp), content = content)
     }
 }
 

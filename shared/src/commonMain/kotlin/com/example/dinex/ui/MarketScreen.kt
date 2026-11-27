@@ -338,7 +338,7 @@ private fun Converter(data: MarketSnapshot, code: String, onCode: (String) -> Un
     Surface(shape = RoundedCornerShape(RadiusLg), color = Color.Transparent, shadowElevation = 6.dp) {
         Column(
             Modifier.fillMaxWidth()
-                .background(Brush.linearGradient(listOf(Color(0xFF0E5431), Green, Color(0xFF328859))))
+                .background(Brush.linearGradient(HeroGradient))
                 .padding(20.dp),
         ) {
             Text("CONVERTIDOR", color = Color.White.copy(alpha = .78f), fontWeight = FontWeight.Bold, fontSize = 11.sp, letterSpacing = 1.2.sp)
