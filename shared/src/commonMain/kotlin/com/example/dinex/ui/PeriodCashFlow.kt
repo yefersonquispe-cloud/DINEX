@@ -75,7 +75,7 @@ internal fun PeriodCashFlow(movements: List<Movement>, dates: List<String>) {
     val still = LocalDinexReducedMotion.current
     val grow = remember(dates) { Animatable(if (still) 1f else 0f) }
     LaunchedEffect(dates) { if (!still) grow.animateTo(1f, tween(700, easing = FastOutSlowInEasing)) }
-    val incomeColor = Green
+    val incomeColor = GreenDark
     val expenseColor = Red
     val lineColor = Indigo
     val gridColor = Border
@@ -300,7 +300,7 @@ internal fun DailyBars(movements: List<Movement>, year: Int = civilDateFromEpoch
                     Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                         Box(Modifier.size(8.dp).clip(CircleShape).background(categories.firstOrNull { it.name == movement.category }?.color ?: Gray))
                         Spacer(Modifier.width(8.dp))
-                        Text(movement.title, color = Night, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(movement.displayTitle, color = Night, fontSize = 12.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(money(movement.amount), color = Gray, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     }
                 }

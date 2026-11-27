@@ -67,7 +67,7 @@ internal fun ImportMovementsDialog(existing: List<Movement>, onDismiss: () -> Un
             }
             if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(t("Preparando la vista previa…"), color = Gray) }
             review?.let { result ->
-                Text(t("{0} para importar", countLabel(candidates.size, "movimiento", "movimientos")), color = Green, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Text(t("{0} para importar", countLabel(candidates.size, "movimiento", "movimientos")), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                 Text(t("Ingresos {0}\nEgresos {1}", money(candidates.filter { it.income }.sumOf { it.amount }), money(candidates.filterNot { it.income }.sumOf { it.amount })), color = Night)
                 Row { Checkbox(skipDuplicates, { skipDuplicates = it }); Text(t("Omitir movimientos repetidos"), modifier = Modifier.padding(top = 12.dp), color = Night) }
                 if (duplicates > 0) Text(t("{0} movimientos repetidos se omitirán.", duplicates), color = Gray)
@@ -173,7 +173,7 @@ internal fun ExportReportDialog(movements: List<Movement>, owner: String, onDism
             }
             if (selected.isEmpty()) Text(t("No hay movimientos en este periodo. Elige otro o registra uno primero."), color = Gray, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
             if (busy) { LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green); Text(t("Preparando y guardando tu reporte…"), color = Gray, fontSize = 12.sp) }
-            if (message.isNotBlank()) Text(message, color = Green, fontSize = 13.sp)
+            if (message.isNotBlank()) Text(message, color = GreenDark, fontSize = 13.sp)
             if (error.isNotBlank()) Text(error, color = Red, fontSize = 13.sp)
         } },
         confirmButton = { Button(enabled = !busy && validRange && selected.isNotEmpty(), onClick = {

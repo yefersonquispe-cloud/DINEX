@@ -4,7 +4,20 @@ package com.example.dinex
 // SERIALIZATION & FORMATTING
 // Local account, movement and reminder persistence plus display helpers.
 // ═══════════════════════════════════════════════════════════════════════════
-internal fun money(value: Double): String = "S/ ${format2(value)}"
+/** S/ 1,234.50: monto para mostrar en pantalla, con separador de miles. */
+internal fun money(value: Double): String {
+    val plain = format2(value)
+    val negative = plain.startsWith('-')
+    val (whole, cents) = plain.removePrefix("-").split('.')
+    val grouped = whole.reversed().chunked(3).joinToString(",").reversed()
+    return "S/ ${if (negative) "-" else ""}$grouped.$cents"
+}
+
+/** S/ 1234.50: monto sin separador, para lo que Dinex dice en voz alta. */
+internal fun moneyPlain(value: Double): String = "S/ ${format2(value)}"
+
+/** Título del movimiento con la primera letra en mayúscula ("almuerzo" → "Almuerzo"). */
+internal val Movement.displayTitle: String get() = title.replaceFirstChar { it.uppercase() }
 
 /** "1 meta", "3 metas": cantidad con la palabra en singular o plural. */
 internal fun countLabel(count: Int, one: String, many: String): String = "$count ${t(if (count == 1) one else many)}"

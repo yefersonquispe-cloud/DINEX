@@ -51,6 +51,10 @@ import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.max
 import org.jetbrains.compose.resources.painterResource
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.ColorFilter
+import dinex.shared.generated.resources.Res
+import dinex.shared.generated.resources.dinex_mascot_ai
 
 @Composable
 internal fun HomePage(
@@ -242,6 +246,11 @@ private fun QuickActionTile(
     }
 }
 
+/**
+ * Tarjeta Dinex del inicio: parece una tarjeta propia (chip, logo DINEX con la mascota,
+ * silueta de la mascota de fondo y una franja andina como la del chullo) con el saldo,
+ * cuánto de los ingresos ya se usó y los totales del mes, en poco alto.
+ */
 @Composable
 internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, savingRate: Int) {
     val dark = DinexThemeState.dark
@@ -254,73 +263,145 @@ internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, sav
         modifier = Modifier.fillMaxWidth().dinexEntrance(),
         shape = RoundedCornerShape(RadiusLg),
         color = HeroBase,
-        shadowElevation = 10.dp,
+        shadowElevation = 12.dp,
+        border = BorderStroke(1.dp, Color.White.copy(alpha = .14f)),
     ) {
         Box(
             Modifier.fillMaxWidth()
                 .background(Brush.linearGradient(HeroGradient))
                 .drawBehind {
-                    // Luz suave arriba a la derecha y un brillo de acento abajo a la izquierda.
-                    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = .20f), Color.Transparent),
-                        center = Offset(size.width * .95f, 0f), radius = size.width * .62f),
-                        radius = size.width * .62f, center = Offset(size.width * .95f, 0f))
-                    drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = .30f), Color.Transparent),
-                        center = Offset(0f, size.height), radius = size.width * .55f),
-                        radius = size.width * .55f, center = Offset(0f, size.height))
-                    // Anillos finos decorativos.
-                    val ring = Offset(size.width - 18.dp.toPx(), 22.dp.toPx())
-                    drawCircle(Color.White.copy(alpha = .10f), radius = 64.dp.toPx(), center = ring, style = Stroke(1.dp.toPx()))
-                    drawCircle(Color.White.copy(alpha = .07f), radius = 100.dp.toPx(), center = ring, style = Stroke(1.dp.toPx()))
+                    // Luz suave arriba a la derecha y brillo de acento abajo a la izquierda.
+                    drawCircle(Brush.radialGradient(listOf(Color.White.copy(alpha = .22f), Color.Transparent),
+                        center = Offset(size.width * .9f, 0f), radius = size.width * .7f),
+                        radius = size.width * .7f, center = Offset(size.width * .9f, 0f))
+                    drawCircle(Brush.radialGradient(listOf(glow.copy(alpha = .22f), Color.Transparent),
+                        center = Offset(0f, size.height), radius = size.width * .6f),
+                        radius = size.width * .6f, center = Offset(0f, size.height))
+                    // Reflejo diagonal, como el brillo de una tarjeta plastificada.
+                    drawRect(Brush.linearGradient(
+                        0f to Color.Transparent, .46f to Color.Transparent, .5f to Color.White.copy(alpha = .07f),
+                        .56f to Color.Transparent, 1f to Color.Transparent,
+                        start = Offset.Zero, end = Offset(size.width, size.height)))
+                    drawAndeanBand(glow)
                 },
         ) {
-            Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 20.dp)) {
+            // Silueta de la mascota de Dinex como marca de agua.
+            Box(Modifier.matchParentSize()) {
+                Image(
+                    painterResource(Res.drawable.dinex_mascot_ai), contentDescription = null,
+                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = .055f)),
+                    modifier = Modifier.size(200.dp).align(Alignment.BottomEnd).offset(x = 70.dp, y = 44.dp).rotate(-14f),
+                )
+            }
+            Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 24.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    CardChip()
+                    Spacer(Modifier.width(8.dp))
+                    ContactlessMark(Modifier.size(width = 12.dp, height = 18.dp))
+                    Spacer(Modifier.weight(1f))
                     Box(
-                        Modifier.size(34.dp).clip(RoundedCornerShape(11.dp)).background(Color.White.copy(alpha = .15f))
-                            .border(1.dp, Color.White.copy(alpha = .18f), RoundedCornerShape(11.dp)),
+                        Modifier.size(26.dp).clip(CircleShape).background(Color.White.copy(alpha = .92f)),
                         contentAlignment = Alignment.Center,
-                    ) { Icon(DinexNavigationIcons.Wallet, contentDescription = null, tint = Color.White, modifier = Modifier.size(19.dp)) }
-                    Spacer(Modifier.width(10.dp))
-                    Text(t("SALDO DISPONIBLE"), color = Color.White.copy(alpha = .86f), fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.3.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                    ) { Image(painterResource(Res.drawable.dinex_mascot_ai), contentDescription = null, modifier = Modifier.size(22.dp)) }
+                    Spacer(Modifier.width(7.dp))
+                    Text("DINEX", color = Color.White, fontWeight = FontWeight.Black, fontSize = 15.sp, letterSpacing = 2.6.sp)
+                }
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(t("SALDO DISPONIBLE"), color = Color.White.copy(alpha = .84f), fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                        letterSpacing = 1.2.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                     if (income > 0) {
                         Spacer(Modifier.width(8.dp))
                         Row(
                             Modifier.clip(CircleShape).background(if (overspent) Color(0x33FF8A98) else Color.White.copy(alpha = .15f))
-                                .border(1.dp, Color.White.copy(alpha = .16f), CircleShape)
-                                .padding(horizontal = 10.dp, vertical = 5.dp),
+                                .border(1.dp, Color.White.copy(alpha = .18f), CircleShape)
+                                .padding(horizontal = 9.dp, vertical = 3.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Box(Modifier.size(6.dp).clip(CircleShape).background(if (overspent) Color(0xFFFFB4BE) else glow))
-                            Spacer(Modifier.width(6.dp))
+                            Spacer(Modifier.width(5.dp))
                             Text(if (overspent) t("Gastas de más") else t("Ahorras {0}%", savingRate.coerceAtLeast(0)),
-                                color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+                                color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
                         }
                     }
                 }
-                Spacer(Modifier.height(14.dp))
                 Text(moneyGrouped(rememberCountUp(balance)), color = Color.White, fontWeight = FontWeight.ExtraBold,
-                    fontSize = 38.sp, letterSpacing = (-1.2).sp, maxLines = 1)
+                    fontSize = 32.sp, letterSpacing = (-1).sp, maxLines = 1)
                 if (income > 0) {
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(8.dp))
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(t("Usaste {0}% de tus ingresos", ((expenses / income) * 100).toInt()),
-                            color = Color.White.copy(alpha = .80f), fontSize = 12.sp, modifier = Modifier.weight(1f))
-                    }
-                    Spacer(Modifier.height(7.dp))
-                    Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(Color.White.copy(alpha = .16f))) {
-                        Box(
-                            Modifier.fillMaxWidth(spentAnim).fillMaxHeight().clip(CircleShape)
-                                .background(if (spentShare >= .8f) Color(0xFFFFB4BE) else Color(0xFFD9FBE6)),
-                        )
+                        Box(Modifier.weight(1f).height(5.dp).clip(CircleShape).background(Color.White.copy(alpha = .16f))) {
+                            Box(
+                                Modifier.fillMaxWidth(spentAnim).fillMaxHeight().clip(CircleShape)
+                                    .background(if (spentShare >= .8f) Color(0xFFFFB4BE) else Color(0xFFD9FBE6)),
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(t("Usaste {0}%", ((expenses / income) * 100).toInt()), color = Color.White.copy(alpha = .80f), fontSize = 11.sp, maxLines = 1)
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-                Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    BalanceStat("Ingresos", "+ ${moneyGrouped(income)}", Modifier.weight(1f).fillMaxHeight(), expense = false)
-                    BalanceStat("Gastos", "− ${moneyGrouped(expenses)}", Modifier.weight(1f).fillMaxHeight(), expense = true)
+                Spacer(Modifier.height(12.dp))
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    BalanceStat("Ingresos", "+ ${moneyGrouped(income)}", Modifier.weight(1f), expense = false)
+                    Box(Modifier.width(1.dp).height(30.dp).background(Color.White.copy(alpha = .18f)))
+                    Spacer(Modifier.width(12.dp))
+                    BalanceStat("Gastos", "− ${moneyGrouped(expenses)}", Modifier.weight(1f), expense = true)
                 }
             }
+        }
+    }
+}
+
+/** Franja andina al pie de la tarjeta: rombos escalonados como el tejido del chullo de la mascota. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawAndeanBand(glow: Color) {
+    val unit = 7.dp.toPx()
+    val y = size.height - unit * 1.35f
+    drawLine(Color.White.copy(alpha = .14f), Offset(0f, y - unit * .95f), Offset(size.width, y - unit * .95f), 1.dp.toPx())
+    var x = unit
+    var i = 0
+    while (x < size.width) {
+        val color = if (i % 2 == 0) Color.White.copy(alpha = .20f) else glow.copy(alpha = .42f)
+        val half = unit * .62f
+        val diamond = androidx.compose.ui.graphics.Path().apply {
+            moveTo(x, y - half); lineTo(x + half, y); lineTo(x, y + half); lineTo(x - half, y); close()
+        }
+        drawPath(diamond, color)
+        // Puntito entre rombos.
+        drawCircle(Color.White.copy(alpha = .16f), radius = 1.2.dp.toPx(), center = Offset(x + unit, y))
+        x += unit * 2f
+        i++
+    }
+}
+
+/** Chip dorado de tarjeta dibujado a mano. */
+@Composable
+private fun CardChip() {
+    Canvas(Modifier.size(width = 34.dp, height = 25.dp)) {
+        val r = CornerRadius(6.dp.toPx())
+        drawRoundRect(Brush.linearGradient(listOf(Color(0xFFF7E19A), Color(0xFFD9B45A), Color(0xFFB8913C)),
+            start = Offset.Zero, end = Offset(size.width, size.height)), cornerRadius = r)
+        val line = Color(0xFF8A6A25).copy(alpha = .55f)
+        val w = 1.dp.toPx()
+        drawLine(line, Offset(size.width * .34f, 0f), Offset(size.width * .34f, size.height), w)
+        drawLine(line, Offset(size.width * .66f, 0f), Offset(size.width * .66f, size.height), w)
+        drawLine(line, Offset(0f, size.height * .5f), Offset(size.width * .34f, size.height * .5f), w)
+        drawLine(line, Offset(size.width * .66f, size.height * .5f), Offset(size.width, size.height * .5f), w)
+        drawRoundRect(line, topLeft = Offset(size.width * .34f, size.height * .28f),
+            size = androidx.compose.ui.geometry.Size(size.width * .32f, size.height * .44f), cornerRadius = CornerRadius(3.dp.toPx()), style = Stroke(w))
+        drawRoundRect(Color.White.copy(alpha = .35f), cornerRadius = r, style = Stroke(w))
+    }
+}
+
+/** Ondas de pago sin contacto. */
+@Composable
+private fun ContactlessMark(modifier: Modifier) {
+    Canvas(modifier) {
+        val stroke = Stroke(1.8.dp.toPx(), cap = StrokeCap.Round)
+        for (k in 0..2) {
+            val radius = size.height * (.22f + k * .17f)
+            drawArc(Color.White.copy(alpha = .85f - k * .15f), startAngle = -50f, sweepAngle = 100f, useCenter = false,
+                topLeft = Offset(-radius + 2.dp.toPx(), size.height / 2 - radius),
+                size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2), style = stroke)
         }
     }
 }
@@ -329,22 +410,15 @@ internal fun BalanceStrip(balance: Double, income: Double, expenses: Double, sav
 private fun BalanceStat(label: String, value: String, modifier: Modifier, expense: Boolean) {
     val amountColor = if (expense) Color(0xFFFFC2CB) else Color(0xFFC4F7D4)
     val badge = if (expense) Color(0xFFFF8A98) else Color(0xFF6BE3A0)
-    Surface(
-        modifier,
-        shape = RoundedCornerShape(16.dp),
-        color = HeroInset.copy(alpha = .38f),
-        border = BorderStroke(1.dp, Color.White.copy(alpha = .16f)),
-    ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 11.dp, vertical = 11.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(32.dp).clip(CircleShape).background(badge.copy(alpha = .22f)), contentAlignment = Alignment.Center) {
-                Icon(if (expense) DinexNavigationIcons.ArrowDown else DinexNavigationIcons.ArrowUp, contentDescription = null,
-                    tint = amountColor, modifier = Modifier.size(16.dp))
-            }
-            Spacer(Modifier.width(9.dp))
-            Column(Modifier.weight(1f)) {
-                Text(t(label), color = Color.White.copy(alpha = .78f), fontSize = 12.sp, maxLines = 1)
-                Text(value, color = amountColor, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
+    Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(26.dp).clip(CircleShape).background(badge.copy(alpha = .24f)), contentAlignment = Alignment.Center) {
+            Icon(if (expense) DinexNavigationIcons.ArrowDown else DinexNavigationIcons.ArrowUp, contentDescription = null,
+                tint = amountColor, modifier = Modifier.size(14.dp))
+        }
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(t(label), color = Color.White.copy(alpha = .76f), fontSize = 11.sp, maxLines = 1)
+            Text(value, color = amountColor, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -633,7 +707,7 @@ internal fun DailyBudget(today: Double, limit: Float, onChange: (Float) -> Unit,
         }
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            MiniStat("Diario", money(limit.toDouble()), Green, Modifier.weight(1f))
+            MiniStat("Diario", money(limit.toDouble()), GreenDark, Modifier.weight(1f))
             MiniStat("Gastado", money(today), if (warning) Red else Night, Modifier.weight(1f))
             MiniStat("Disponible", money(remaining), if (warning) Orange else Lime, Modifier.weight(1f))
         }
@@ -796,7 +870,7 @@ internal fun MovementRow(movement: Movement, onClick: (() -> Unit)? = null) {
         CategoryMark(movementCode(movement), tint)
         Spacer(Modifier.width(10.dp))
         Column(Modifier.weight(1f)) {
-            Text(movement.title, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Night, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(movement.displayTitle, fontWeight = FontWeight.SemiBold, fontSize = 15.sp, color = Night, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 MethodMark(movement.method, tint)
                 Spacer(Modifier.width(6.dp))

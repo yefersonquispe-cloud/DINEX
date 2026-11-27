@@ -536,12 +536,12 @@ private fun confirmationPrompt(draft: VoiceDraft): String {
     val type = if (item.income) "un ingreso" else "un gasto"
     val where = if (item.income) "" else " en ${item.category}"
     val day = if (item.day == civilDateFromEpochDays().day && item.month == civilDateFromEpochDays().month) "" else " del ${item.day}/${item.month}"
-    return "¿Guardo $type de ${money(item.amount)}$where$day? ${draft.doubts.first()}."
+    return "¿Guardo $type de ${moneyPlain(item.amount)}$where$day? ${draft.doubts.first()}."
 }
 
 internal fun voiceSavedMessage(item: Movement): String =
-    if (item.income) "Listo: ingreso de ${money(item.amount)} guardado."
-    else "Listo: gasto de ${money(item.amount)} en ${item.category} guardado."
+    if (item.income) "Listo: ingreso de ${moneyPlain(item.amount)} guardado."
+    else "Listo: gasto de ${moneyPlain(item.amount)} en ${item.category} guardado."
 
 // ── Respuestas con datos reales ───────────────────────────────────────────────
 
@@ -580,34 +580,34 @@ internal fun answerVoiceQuery(data: FinancialData, query: VoiceQuery, today: Int
             val total = items.sumOf { it.amount }
             when {
                 query.category != null && total <= 0 -> VoiceOutcome.Answer("No tienes gastos en ${query.category} ${query.period.label}.")
-                query.category != null -> VoiceOutcome.Answer("${query.period.sentenceStart()} gastaste ${money(total)} en ${query.category}.")
+                query.category != null -> VoiceOutcome.Answer("${query.period.sentenceStart()} gastaste ${moneyPlain(total)} en ${query.category}.")
                 total <= 0 -> VoiceOutcome.Answer("No registraste gastos ${query.period.label}.")
                 else -> {
                     val top = items.groupBy { it.budgetCategory() }.mapValues { (_, list) -> list.sumOf { it.amount } }.maxByOrNull { it.value }
                     val detail = top?.let { (name, value) ->
-                        if (variant % 2 == 0) " Tu categoría con mayor gasto fue $name: ${money(value)}." else " Donde más gastaste fue en $name (${money(value)})."
+                        if (variant % 2 == 0) " Tu categoría con mayor gasto fue $name: ${moneyPlain(value)}." else " Donde más gastaste fue en $name (${moneyPlain(value)})."
                     }.orEmpty()
-                    VoiceOutcome.Answer("${query.period.sentenceStart()} gastaste ${money(total)}.$detail")
+                    VoiceOutcome.Answer("${query.period.sentenceStart()} gastaste ${moneyPlain(total)}.$detail")
                 }
             }
         }
         is VoiceQuery.Earned -> {
             val total = data.movementsIn(query.period, today).filter { it.income }.sumOf { it.amount }
             if (total <= 0) VoiceOutcome.Answer("No registraste ingresos ${query.period.label}.")
-            else VoiceOutcome.Answer("${query.period.sentenceStart()} ingresaste ${money(total)}.")
+            else VoiceOutcome.Answer("${query.period.sentenceStart()} ingresaste ${moneyPlain(total)}.")
         }
         VoiceQuery.Balance -> {
             val balance = data.availableBalance()
-            val goals = if (data.savings > 0) " Además, tienes ${money(data.savings)} separados en tus metas." else ""
-            if (data.movements.isEmpty()) VoiceOutcome.Answer("Aún no tienes movimientos registrados. Tu saldo disponible es ${money(0.0)}.")
-            else VoiceOutcome.Answer("Tienes ${money(balance)} disponibles.$goals")
+            val goals = if (data.savings > 0) " Además, tienes ${moneyPlain(data.savings)} separados en tus metas." else ""
+            if (data.movements.isEmpty()) VoiceOutcome.Answer("Aún no tienes movimientos registrados. Tu saldo disponible es ${moneyPlain(0.0)}.")
+            else VoiceOutcome.Answer("Tienes ${moneyPlain(balance)} disponibles.$goals")
         }
         is VoiceQuery.TopExpenses -> {
             val top = data.movementsIn(query.period, today).filterNot { it.income }.sortedByDescending { it.amount }.take(3)
             if (top.isEmpty()) VoiceOutcome.Answer("No tienes gastos ${query.period.label}.")
             else VoiceOutcome.Answer(
-                "Tus mayores gastos ${query.period.label}: " + top.joinToString(", ", limit = 3) { "${it.title} ${money(it.amount)}" } + ".",
-                top.map { "${it.title} · ${it.budgetCategory()} · ${money(it.amount)}" },
+                "Tus mayores gastos ${query.period.label}: " + top.joinToString(", ", limit = 3) { "${it.title} ${moneyPlain(it.amount)}" } + ".",
+                top.map { "${it.title} · ${it.budgetCategory()} · ${moneyPlain(it.amount)}" },
             )
         }
         is VoiceQuery.Saved -> {
@@ -615,11 +615,11 @@ internal fun answerVoiceQuery(data: FinancialData, query: VoiceQuery, today: Int
             val income = items.filter { it.income }.sumOf { it.amount }
             val spent = items.filterNot { it.income }.sumOf { it.amount }
             val net = income - spent
-            val goals = if (data.savings > 0) " En tus metas tienes ${money(data.savings)} ahorrados en total." else ""
+            val goals = if (data.savings > 0) " En tus metas tienes ${moneyPlain(data.savings)} ahorrados en total." else ""
             when {
                 income <= 0 && spent <= 0 -> VoiceOutcome.Answer("No tienes movimientos ${query.period.label}.$goals")
-                net >= 0 -> VoiceOutcome.Answer("${query.period.sentenceStart()} ingresaste ${money(income)} y gastaste ${money(spent)}: te quedaron ${money(net)}.$goals")
-                else -> VoiceOutcome.Answer("${query.period.sentenceStart()} gastaste ${money(-net)} más de lo que ingresaste.$goals")
+                net >= 0 -> VoiceOutcome.Answer("${query.period.sentenceStart()} ingresaste ${moneyPlain(income)} y gastaste ${moneyPlain(spent)}: te quedaron ${moneyPlain(net)}.$goals")
+                else -> VoiceOutcome.Answer("${query.period.sentenceStart()} gastaste ${moneyPlain(-net)} más de lo que ingresaste.$goals")
             }
         }
         VoiceQuery.Recent -> {
@@ -629,7 +629,7 @@ internal fun answerVoiceQuery(data: FinancialData, query: VoiceQuery, today: Int
                 "Estos son tus últimos ${recent.size} movimientos.",
                 recent.map { item ->
                     val day = when (item.epochDay()) { today -> "Hoy"; today - 1 -> "Ayer"; else -> "${item.day}/${item.month}" }
-                    "$day · ${item.title} · ${if (item.income) "+" else "−"}${money(item.amount)}"
+                    "$day · ${item.title} · ${if (item.income) "+" else "−"}${moneyPlain(item.amount)}"
                 },
             )
         }

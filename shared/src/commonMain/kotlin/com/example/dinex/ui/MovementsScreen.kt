@@ -169,7 +169,7 @@ internal fun MovementDetailDialog(movement: Movement, onDismiss: () -> Unit, onD
                 CategoryMark(movementCode(movement), tint, 40.dp)
                 Spacer(Modifier.width(10.dp))
                 Column {
-                    Text(movement.title, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Night, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    Text(movement.displayTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp, color = Night, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     Text(movement.category, color = Gray, fontSize = 11.sp)
                 }
             }

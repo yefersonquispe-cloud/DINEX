@@ -498,7 +498,7 @@ internal fun ProfileDialog(
                 // Cabecera: foto, nombre, correo y nivel de racha sobre el verde de la marca.
                 Box(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(bottomStart = 32.dp, bottomEnd = 32.dp))
-                        .background(Brush.verticalGradient(listOf(Color(0xFF1F7A4D), Color(0xFF0F4A2E)))),
+                        .background(Brush.verticalGradient(if (DinexThemeState.dark) listOf(HeroGradient.last(), HeroGradient.first()) else listOf(Color(0xFF1F7A4D), Color(0xFF0F4A2E)))),
                 ) {
                     Column(Modifier.fillMaxWidth().statusBarsPadding().padding(bottom = if (webSidePanel) 14.dp else 22.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -532,7 +532,7 @@ internal fun ProfileDialog(
                                 StreakBadge(level, 30.dp, locked = streak == 0)
                                 Spacer(Modifier.width(8.dp))
                                 Column {
-                                    Text(t("Nivel {0} · {1} de racha", t(level.name), countLabel(streak, "día", "días")), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(if (streak == 0) t("Aún sin racha") else t("Nivel {0} · {1} de racha", t(level.name), countLabel(streak, "día", "días")), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                     Text(if (next == null) t("Completaste los 365 días") else t("{0} para {1}", countLabel(next.startsAt - streak, "día", "días"), t(next.name)), color = Color.White.copy(alpha = .75f), fontSize = 10.sp)
                                 }
                             }
@@ -568,7 +568,7 @@ internal fun ProfileDialog(
                     ProfileSection("Preferencias") {
                         LanguagePicker(DinexI18n.language, onLanguage)
                         ProfileRowDivider()
-                        ProfileSwitchRow(if (darkMode) DinexNavigationIcons.Moon else DinexNavigationIcons.Sun, "Modo oscuro", if (darkMode) "Verde bosque" else "Verde y blanco", darkMode, onDarkMode)
+                        ProfileSwitchRow(if (darkMode) DinexNavigationIcons.Moon else DinexNavigationIcons.Sun, "Modo oscuro", if (darkMode) "Gris carbón" else "Verde y blanco", darkMode, onDarkMode)
                         ProfileRowDivider()
                         ProfileSwitchRow(DinexNavigationIcons.Sparkle, "Reducir movimiento", "Menos animaciones", reduceMotion, onReduceMotion)
                         ProfileRowDivider()
