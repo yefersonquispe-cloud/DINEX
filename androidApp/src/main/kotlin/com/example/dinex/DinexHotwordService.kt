@@ -548,7 +548,10 @@ class DinexHotwordService : Service(), DinexVoiceOverlayActions {
      */
     private fun wakeCommand(value: String, strict: Boolean): String? {
         val normalized = Normalizer.normalize(value.lowercase(Locale.forLanguageTag("es-PE")), Normalizer.Form.NFD)
-            .replace(Regex("\\p{Mn}+"), "").replace(Regex("[^a-z0-9ñ ]"), " ").replace(Regex("\\s+"), " ").trim()
+            .replace(Regex("\\p{Mn}+"), "")
+            // Se conservan el punto o la coma entre cifras y "s/": si no, "21.50" quedaba como "21 50" y se guardaba 50.
+            .replace(Regex("(?<!\\d)[.,]|[.,](?!\\d)|[^a-z0-9ñ.,/ ]"), " ")
+            .replace(Regex("\\s+"), " ").trim()
         val phrases = if (strict) listOf("oye dinex", "hey dinex") else listOf("oye dinex", "hey dinex", "oye dines", "oye inex", "hola dinex", "oye dinez", "ey dinex")
         val match = phrases.firstOrNull { normalized.startsWith(it) || normalized.contains(" $it") } ?: return null
         val index = normalized.indexOf(match)

@@ -124,10 +124,33 @@ internal fun normalizeVoice(text: String): String {
     value = Regex("\\b\\d{1,3}(?:[.,]\\d{3})+\\b").replace(value) { it.value.filter(Char::isDigit) }
     value = Regex("(\\d),(\\d{1,2})\\b").replace(value) { "${it.groupValues[1]}.${it.groupValues[2]}" }
     value = spokenNumbersToDigits(value)
-    // "18 con 50" → 18.50 ; "20 y medio" → 20.50
-    value = Regex("\\b(\\d+)\\s+(?:soles?\\s+)?con\\s+(\\d{2})\\b").replace(value) { "${it.groupValues[1]}.${it.groupValues[2]} " }
-    value = Regex("\\b(\\d+)\\s+(soles?\\s+)?y\\s+medio\\b").replace(value) { "${it.groupValues[1]}.50 ${it.groupValues[2]}" }
+    value = spokenDecimals(value)
     return value.replace(',', ' ').replace(Regex("\\s+"), " ").trim()
+}
+
+private fun cents(digits: String) = if (digits.length == 1) "${digits}0" else digits
+
+/**
+ * Céntimos dichos de varias formas, siempre con la moneda conservada:
+ * "21 con 50", "21 soles con 50 céntimos", "21 punto 50", "21 coma 5", "21 soles 50",
+ * "veintiuno cincuenta" (→ "21 50"), "20 y medio" y "50 céntimos".
+ */
+internal fun spokenDecimals(text: String): String {
+    var value = text
+    // "21 con 50", "21 soles con 50 centimos", "21 punto 5", "21 coma 50"
+    value = Regex("(?<![\\d.])(\\d+)\\s+(soles?\\s+)?(?:con|punto|coma)\\s+(\\d{1,2})(?![\\d.])(?:\\s+centimos?)?")
+        .replace(value) { "${it.groupValues[1]}.${cents(it.groupValues[3])} ${it.groupValues[2]}" }
+    // "21 soles 50 centimos" o "21 soles 50" al final o antes de "en/de/para/por/hoy/ayer/con"
+    value = Regex("(?<![\\d.])(\\d+)\\s+(soles?)\\s+(\\d{1,2})(?:\\s+centimos?(?=\\s|$)|(?=\\s+(?:en|de|para|por|hoy|ayer|con|del)\\b|\\s*$))")
+        .replace(value) { "${it.groupValues[1]}.${cents(it.groupValues[3])} ${it.groupValues[2]}" }
+    // "21 50 soles": un número seguido de dos cifras sueltas son soles con céntimos (no fechas: "el 15").
+    value = Regex("(?<![\\d.])(?<!\\bel )(?<!\\bdia )(?<!\\blas )(\\d+)\\s+(\\d{2})(?![\\d.])")
+        .replace(value) { "${it.groupValues[1]}.${it.groupValues[2]}" }
+    // "20 y medio" → 20.50
+    value = Regex("(?<![\\d.])(\\d+)\\s+(soles?\\s+)?y\\s+medio\\b").replace(value) { "${it.groupValues[1]}.50 ${it.groupValues[2]}" }
+    // "50 centimos" sin soles → 0.50
+    value = Regex("(?<![\\d.])(\\d{1,2})\\s+centimos?\\b").replace(value) { "0.${it.groupValues[1].padStart(2, '0')} soles" }
+    return value.replace(Regex("\\s+"), " ").trim()
 }
 
 private val Units = mapOf(
@@ -162,6 +185,9 @@ internal fun spokenNumbersToDigits(text: String): String {
         while (index < tokens.size) {
             val word = tokens[index]
             when {
+                // "veintiuno cincuenta" son dos números (21 y 50), no 71: solo se suma lo que completa
+                // el número ("ciento" + "veinte", "treinta" + "cinco").
+                word in Units && consumed && !fitsAfter(current, Units.getValue(word)) -> break
                 word in Units -> { current += Units.getValue(word); consumed = true; index++ }
                 word == "mil" -> { current = (if (current == 0) 1 else current) * 1000; total += current; current = 0; consumed = true; index++ }
                 word == "y" && consumed && tokens.getOrNull(index + 1) in Units && tokens[index + 1] !in setOf("un", "una", "uno") -> index++
@@ -171,6 +197,17 @@ internal fun spokenNumbersToDigits(text: String): String {
         out += (total + current).toString()
     }
     return out.joinToString(" ")
+}
+
+/** true si [next] completa [current]: 100 + 20, 120 + 5, 30 + 5; no 21 + 50 ni 20 + 50. */
+private fun fitsAfter(current: Int, next: Int): Boolean {
+    val rest = current % 1000
+    return when {
+        rest == 0 -> true
+        rest % 100 == 0 -> next < 100
+        rest % 10 == 0 && rest > 20 -> next < 10
+        else -> false
+    }
 }
 
 // ── Detección de intenciones ─────────────────────────────────────────────────
@@ -204,20 +241,121 @@ private fun periodOf(text: String): VoicePeriod? = when {
     else -> null
 }
 
-private val CategoryWords = linkedMapOf(
-    // Transporte se revisa antes que comida: "pasaje del metro" es transporte, "compré en Metro" es comida.
-    "Transporte" to listOf("transporte", "taxi", "uber", "didi", "indrive", "cabify", "pasaje", "pasajes", "metropolitano", "tren", "linea 1", "gasolina", "combustible", "bus", "micro", "combi", "colectivo", "movilidad"),
-    "Comida" to listOf("comida", "alimentacion", "alimentos", "almuerzo", "cena", "desayuno", "lonche", "restaurante", "snack", "mercado", "supermercado", "super", "tottus", "metro", "plaza vea", "wong", "kfc", "bembos", "pollo", "polleria", "chifa", "menu", "cafe", "pan", "hamburguesa", "pizza", "gaseosa", "delivery"),
-    "Estudios" to listOf("estudio", "estudios", "libro", "libros", "curso", "pension", "copia", "copias", "universidad", "instituto", "colegio", "matricula", "utiles"),
-    "Entretenimiento" to listOf("entretenimiento", "cine", "juego", "juegos", "salida", "bar", "fiesta", "netflix", "spotify", "steam", "concierto", "disney", "youtube"),
-    "Otros" to listOf("otros", "otro", "varios"),
+/**
+ * Vocabulario de cada categoría, sin tildes y en minúsculas (como queda la frase normalizada).
+ * [names] es el nombre de la categoría dicho tal cual ("en comida"): manda sobre todo lo demás.
+ * [words] son pistas (verbos, comidas, lugares, marcas) que se cuentan para elegir la categoría.
+ */
+private class CategoryVocabulary(val category: String, val names: List<String>, val words: List<String>)
+
+private val CategoryVocabularies = listOf(
+    CategoryVocabulary(
+        "Comida",
+        names = listOf("comida", "comidas", "alimentacion", "alimento", "alimentos"),
+        words = listOf(
+            // Verbos y momentos del día
+            "comer", "comi", "comimos", "comiendo", "como algo", "almuerzo", "almorzar", "almorce", "almorzamos", "almorzando",
+            "cena", "cenar", "cene", "cenamos", "desayuno", "desayunar", "desayune", "desayunamos", "lonche", "lonchera",
+            "merienda", "refrigerio", "piqueo", "antojo", "bocadito", "tentempie",
+            // Platos y productos
+            "menu", "pollo", "pollo a la brasa", "broaster", "chifa", "ceviche", "cevicheria", "polleria", "anticucho", "salchipapa",
+            "hamburguesa", "pizza", "sanguche", "sandwich", "empanada", "tamal", "tamales", "lomo saltado", "arroz con pollo",
+            "sopa", "caldo", "parrilla", "parrillada", "sushi", "tacos", "hot dog", "papas fritas", "postre", "helado", "torta", "keke",
+            "pastel", "galleta", "galletas", "golosina", "golosinas", "dulce", "dulces", "chocolate", "caramelos", "snack",
+            "pan", "panaderia", "pasteleria", "cafe", "cafeteria", "jugo", "jugos", "gaseosa", "refresco", "bebida",
+            "agua mineral", "leche", "yogurt", "queso", "huevos", "arroz", "fideos", "carne", "pescado", "fruta", "frutas",
+            "verdura", "verduras", "abarrotes", "viveres", "despensa", "canasta",
+            // Lugares, tiendas y apps
+            "restaurante", "restaurant", "comedor", "fonda", "food court", "patio de comidas", "mercado", "supermercado", "super",
+            "bodega", "minimarket", "tienda de abarrotes", "tottus", "metro", "plaza vea", "wong", "vivanda", "makro", "mass",
+            "tambo", "oxxo", "mia market", "kfc", "bembos", "mcdonalds", "mc donalds", "burger king", "popeyes", "pizza hut",
+            "papa johns", "dominos", "little caesars", "starbucks", "norkys", "rokys", "pardos", "la lucha", "dunkin",
+            "delivery", "rappi", "pedidosya", "pedidos ya", "uber eats", "didi food",
+        ),
+    ),
+    CategoryVocabulary(
+        "Transporte",
+        names = listOf("transporte", "transportes", "movilidad"),
+        words = listOf(
+            "pasaje", "pasajes", "taxi", "uber", "didi", "indrive", "cabify", "beat", "mototaxi", "moto taxi", "bus", "buses",
+            "micro", "combi", "colectivo", "custer", "carro", "auto", "metropolitano", "corredor", "corredor rojo", "corredor azul",
+            "tren", "tren electrico", "linea 1", "linea 2", "metro de lima", "pasaje del metro", "tarjeta del metro",
+            "gasolina", "combustible", "grifo", "petroleo", "diesel", "gnv", "glp", "gas del carro", "peaje", "peajes",
+            "estacionamiento", "parqueo", "cochera", "playa de estacionamiento", "mecanico", "taller mecanico", "llanta", "llantas",
+            "cambio de aceite", "lavado de carro", "soat", "revision tecnica", "brevete", "papeleta", "bicicleta", "scooter",
+            "moto", "vuelo", "avion", "pasaje aereo", "boleto de bus", "terminal", "aeropuerto", "viaje en bus", "recarga del metropolitano",
+        ),
+    ),
+    CategoryVocabulary(
+        "Estudios",
+        names = listOf("estudios", "estudio", "educacion"),
+        words = listOf(
+            "libro", "libros", "libreria", "cuaderno", "cuadernos", "utiles", "utiles escolares", "lapicero", "lapiceros",
+            "lapiz", "plumones", "resaltador", "mochila", "folder", "archivador", "calculadora", "regla",
+            "curso", "cursos", "clase", "clases", "taller", "diplomado", "maestria", "certificado", "certificacion", "seminario",
+            "examen", "examenes", "pension", "matricula", "mensualidad del instituto", "cuota de la universidad", "universidad",
+            "instituto", "tecsup", "colegio", "academia", "preu", "pre universitaria", "escuela", "facultad",
+            "copia", "copias", "fotocopia", "fotocopias", "impresion", "impresiones", "imprimir", "anillado", "empastado",
+            "tesis", "separata", "separatas", "monografia", "proyecto del curso", "tarea", "tareas", "uniforme",
+            "udemy", "platzi", "coursera", "duolingo", "idiomas", "clases de ingles",
+        ),
+    ),
+    CategoryVocabulary(
+        "Entretenimiento",
+        names = listOf("entretenimiento", "diversion", "ocio"),
+        words = listOf(
+            "cine", "cinema", "cineplanet", "cinemark", "uvk", "pelicula", "peliculas", "canchita", "juego", "juegos",
+            "videojuego", "videojuegos", "play", "playstation", "xbox", "nintendo", "steam", "free fire", "fortnite", "roblox",
+            "fiesta", "fiestas", "discoteca", "disco", "bar", "cerveza", "cervezas", "chela", "chelas", "trago", "tragos",
+            "karaoke", "concierto", "conciertos", "entradas", "teatro", "museo", "parque de diversiones", "zoologico",
+            "netflix", "spotify", "disney", "disney plus", "hbo", "prime video", "amazon prime", "youtube", "youtube premium",
+            "crunchyroll", "twitch", "paseo", "paseos", "vacaciones", "viaje", "excursion", "playa", "piscina", "bowling",
+            "boliche", "billar", "futbol", "pichanga", "partido", "estadio", "juguete", "juguetes", "salida con amigos",
+            "cumpleanos", "hobby",
+        ),
+    ),
+    CategoryVocabulary(
+        "Otros",
+        names = listOf("otros", "varios", "miscelaneos"),
+        words = listOf(
+            "salud", "farmacia", "botica", "inkafarma", "mifarma", "medicina", "medicinas", "medicamento", "medicamentos",
+            "pastillas", "doctor", "medico", "clinica", "hospital", "dentista", "lentes", "optica",
+            "ropa", "zapatillas", "zapatos", "polo", "polos", "casaca", "pantalon", "camisa", "vestido", "zara", "saga",
+            "ripley", "oechsle", "peluqueria", "corte de pelo", "barberia", "maquillaje", "perfume",
+            "luz", "recibo de luz", "recibo de agua", "internet", "cable", "telefono", "celular", "recarga", "recargas",
+            "alquiler", "renta", "servicios", "gas", "balon de gas", "regalo", "regalos", "donacion", "ofrenda",
+            "mascota", "veterinaria", "veterinario", "gimnasio", "gym", "limpieza", "detergente", "aseo", "shampoo", "jabon",
+            "papel higienico", "ferreteria", "deuda", "prestamo", "cuota del banco", "comision bancaria",
+        ),
+    ),
 )
 
-/** Categoría mencionada en la frase, o null si no se nombró ninguna. */
-internal fun voiceCategory(normalized: String): String? =
-    CategoryWords.entries.firstOrNull { (_, words) -> words.any { normalized.hasWordOrPlural(it) } }?.key
+private data class CategoryHit(val category: String, val position: Int, val length: Int)
 
-private fun String.hasWordOrPlural(word: String) = Regex("\\b${Regex.escape(word)}(?:s|es)?\\b").containsMatchIn(this)
+private fun String.wordHits(category: String, words: List<String>): List<CategoryHit> = words.mapNotNull { word ->
+    Regex("\\b${Regex.escape(word)}(?:s|es)?\\b").find(this)?.let { CategoryHit(category, it.range.first, word.length) }
+}
+
+/**
+ * Categoría de la frase, o null si no hay ninguna pista.
+ * 1. Si se dice el nombre de una categoría ("en comida", "en transporte"), se usa esa.
+ * 2. Si no, gana la categoría con más pistas; si empatan, la que se dijo primero
+ *    ("taxi al mercado" es transporte) y luego la pista más larga ("uber eats" es comida).
+ */
+internal fun voiceCategory(normalized: String): String? {
+    val byName = CategoryVocabularies.flatMap { normalized.wordHits(it.category, it.names) }
+    // "Otros" solo manda si no se nombró otra categoría: "registra otros 20 soles en comida" es comida.
+    if (byName.isNotEmpty()) return byName.minWith(
+        compareBy<CategoryHit> { it.category == "Otros" }.thenBy { it.position }.thenByDescending { it.length },
+    ).category
+    val hits = CategoryVocabularies.flatMap { normalized.wordHits(it.category, it.words) }
+    if (hits.isEmpty()) return null
+    return hits.groupBy { it.category }.entries.minWith(
+        compareByDescending<Map.Entry<String, List<CategoryHit>>> { it.value.size }
+            .thenBy { entry -> entry.value.minOf { it.position } }
+            .thenByDescending { entry -> entry.value.maxOf { it.length } },
+    ).key
+}
 
 private val QueryWords = arrayOf("cuanto", "cuanta", "cuantos", "cuales", "cual", "en que", "donde", "muestrame", "muestra", "dime", "ensename", "como voy", "quiero ver", "ver mis", "saldo", "disponible", "resumen")
 private val RecordCommands = arrayOf("registra", "registrar", "anota", "anotar", "agrega", "agregar", "apunta", "guarda", "anade", "pon")
