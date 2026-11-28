@@ -4,7 +4,16 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class YupayGoal(val name: String, val targetCents: Int)
-internal data class YupaySettings(val linked: Boolean = false, val goal: YupayGoal? = null)
+/**
+ * [goalId]: meta de Dinex que recibe lo que entra en la alcancía (null = no se suma a ninguna).
+ * [lastCoinId]: última moneda ya guardada como ahorro; -1 = todavía no se tomó el punto de partida.
+ */
+internal data class YupaySettings(
+    val linked: Boolean = false,
+    val goal: YupayGoal? = null,
+    val goalId: Int? = null,
+    val lastCoinId: Int = -1,
+)
 internal val yupayCoins = listOf(10, 20, 50, 100, 200, 500)
 internal fun yupayMoney(cents: Long): String = "S/ ${cents / 100}.${(cents % 100).toString().padStart(2, '0')}"
 internal fun yupayPercent(total: Long, goal: YupayGoal?): Float =
@@ -93,6 +102,25 @@ internal fun yupayLineSegments(recent: List<YupayRecent>): List<List<YupayRecent
     return segments
 }
 
+/** Monedas que entraron a la alcancía después de [YupaySettings.lastCoinId]. */
+internal data class YupayCoinRow(val id: Int, val cents: Int, val count: Int)
+internal data class YupayNewCoins(val rows: List<YupayCoinRow>, val lastId: Int)
+
+internal fun parseYupayNewCoins(text: String): YupayNewCoins {
+    val root = jsonMap(text)
+    if (root["ok"] != true) throw YupayApiException("No pudimos leer las monedas nuevas.")
+    val raw = root["monedas"] as? List<*> ?: throw YupayApiException("Monedas inválidas de la alcancía.")
+    val rows = raw.take(500).mapNotNull { item ->
+        val row = item as? Map<*, *> ?: return@mapNotNull null
+        val id = row.int("id")?.takeIf { it > 0 } ?: return@mapNotNull null
+        val cents = row.int("centimos")?.takeIf { it in yupayCoins } ?: return@mapNotNull null
+        YupayCoinRow(id, cents, (row.int("nuevas") ?: 1).coerceIn(1, 100))
+    }.sortedBy { it.id }
+    // "ultimo" es el id más alto de la tabla: sirve como punto de partida la primera vez.
+    val last = maxOf(root.int("ultimo")?.takeIf { it >= 0 } ?: 0, rows.maxOfOrNull { it.id } ?: 0)
+    return YupayNewCoins(rows, last)
+}
+
 internal enum class YupayCommand(val wire: String) { ON("on"), OFF("off"), STATUS("estado"), RESET("reset") }
 internal fun yupayCommandBody(command: YupayCommand) = "{\"cmd\":\"${command.wire}\"}"
 
@@ -138,6 +166,7 @@ internal class YupayApi(
 
     suspend fun live(): YupayLive = parseYupayLive(request("GET", "estado"))
     suspend fun history(): YupayHistory = parseYupayHistory(request("GET", "historial"))
+    suspend fun newCoins(after: Int): YupayNewCoins = parseYupayNewCoins(request("GET", "monedas?desde=${after.coerceAtLeast(0)}"))
 
     /** Las órdenes mueven el cajón físico: nunca se repiten solas. */
     suspend fun command(command: YupayCommand) {

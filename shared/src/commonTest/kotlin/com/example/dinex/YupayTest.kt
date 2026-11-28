@@ -126,4 +126,22 @@ class YupayTest {
         // Sin meta solo se guarda el enlace.
         assertEquals(YupaySettings(linked = true), unpackProfile(packProfile(before.copy(yupay = YupaySettings(true)))).yupay)
     }
+
+    @Test
+    fun newCoinsAreSortedAndInvalidRowsSkipped() {
+        val news = parseYupayNewCoins("""{"ok":true,"ultimo":120,"monedas":[{"id":118,"centimos":50,"nuevas":1},{"id":117,"centimos":500},{"id":119,"centimos":3},{"id":120,"centimos":100,"nuevas":2}]}""")
+        assertEquals(listOf(117, 118, 120), news.rows.map { it.id })
+        assertEquals(120, news.lastId)
+        assertEquals(YupayNewCoins(emptyList(), 0), parseYupayNewCoins("""{"ok":true,"monedas":[]}"""))
+        assertFailsWith<YupayApiException> { parseYupayNewCoins("""{"ok":false,"codigo":"SESION"}""") }
+    }
+
+    @Test
+    fun goalDestinationAndLastCoinTravelWithTheProfile() {
+        val before = FinancialData(goals = listOf(SavingsGoal(3, "Bici", 900.0, 610.0)), nextGoalId = 4)
+        val data = before.copy(yupay = YupaySettings(linked = true, goalId = 3, lastCoinId = 120))
+        assertEquals(data, unpackProfile(packProfile(data)))
+        // Un perfil anterior (sin destino) empieza sin punto de partida: no suma monedas viejas.
+        assertEquals(-1, unpackProfile(packProfile(before)).yupay.lastCoinId)
+    }
 }

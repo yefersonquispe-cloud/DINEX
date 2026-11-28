@@ -166,6 +166,9 @@ internal fun DinexSignedInView(model: DinexViewModel, state: DinexUiState) {
         }
     }
 
+    // Dinex YUPAY: lo que entra en la alcancía se guarda como ahorro en la meta elegida.
+    LaunchedEffect(Unit) { model.keepYupaySaving() }
+
     // Oye Dinex: preguntas que no son comandos se envían a Dinex IA (con su límite diario).
     LaunchedEffect(state.pendingAiQuestion) {
         model.consumePendingAiQuestion()?.let { question ->

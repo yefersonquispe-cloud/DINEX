@@ -818,7 +818,87 @@ internal class DinexViewModel(
         validSession()?.idToken
     } catch (_: CloudAuthException) { null }
 
-    /** YUPAY solo guarda la meta y el permiso de enlace; nunca cambia las cifras financieras. */
+    /** Meta de Dinex que recibe el dinero de la alcancía (null = no sumar a ninguna). */
+    fun setYupayGoal(goalId: Int?) {
+        if (value.email == null) return
+        if (goalId != null && value.data.savingGoals().none { it.id == goalId }) return
+        persist(value.data.copy(yupay = value.data.yupay.copy(goalId = goalId)))
+    }
+
+    private val yupayApi by lazy { YupayApi(::yupayToken) }
+
+    /**
+     * Opción 2 de YUPAY: mientras la sesión está abierta, lo que entra en la alcancía se registra
+     * como ingreso y se guarda en la meta elegida. El saldo disponible no cambia y el ahorro sube.
+     */
+    suspend fun keepYupaySaving() {
+        var wait = 15_000L
+        while (true) {
+            val email = value.email ?: return
+            val settings = value.data.yupay
+            if (settings.linked && settings.goalId != null) {
+                try {
+                    val reached = applyYupayCoins(email, yupayApi.newCoins(settings.lastCoinId))
+                    // Meta cumplida: el cajón se libera solo (servo a 0°) para que puedas sacar el dinero.
+                    if (reached != null) try {
+                        yupayApi.command(YupayCommand.OFF)
+                        showMessage(t("¡Cumpliste «{0}»! Tu alcancía liberó el cajón.", reached))
+                    } catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Throwable) { showMessage(t("¡Cumpliste «{0}»! Libera el cajón desde Dinex YUPAY.", reached)) }
+                    wait = 15_000L
+                } catch (cancel: CancellationException) { throw cancel }
+                catch (_: YupayAccessException) { wait = 300_000L }
+                catch (_: Throwable) { wait = (wait * 2).coerceAtMost(120_000L) }
+            }
+            delay(wait)
+        }
+    }
+
+    /** Suma las monedas nuevas a la meta. Devuelve el nombre de la meta si con estas monedas se acaba de cumplir. */
+    internal fun applyYupayCoins(email: String, news: YupayNewCoins, today: Int = currentDayIndex()): String? {
+        if (value.email != email) return null
+        val old = value.data
+        val settings = old.yupay
+        // Primera vez: lo que ya estaba en el cajón no se suma; se empieza a contar desde aquí.
+        if (settings.lastCoinId < 0) {
+            persist(old.copy(yupay = settings.copy(lastCoinId = news.lastId)))
+            return null
+        }
+        val fresh = news.rows.filter { it.id > settings.lastCoinId }
+        val lastId = fresh.maxOfOrNull { it.id } ?: return null
+        val goal = old.savingGoals().firstOrNull { it.id == settings.goalId } ?: return null
+        val cents = fresh.sumOf { it.cents.toLong() * it.count }
+        if (cents <= 0) return null
+        val amount = cents / 100.0
+        val coins = fresh.sumOf { it.count }
+        val date = civilDateFromEpochDays(today)
+        val movement = Movement(
+            id = nextMovementId(),
+            title = t("Alcancía Dinex Yupay") + " (" + countLabel(coins, "moneda", "monedas") + ")",
+            category = "Ingreso", amount = amount, income = true, day = date.day,
+            method = "Alcancía Yupay", location = "yupay:$lastId", month = date.month, year = date.year,
+        )
+        val goals = old.savingGoals().map { if (it.id == goal.id) it.copy(saved = it.saved + amount) else it }
+        val streak = when (old.streakDay) {
+            today -> old.streak
+            today - 1 -> old.streak + 1
+            else -> 1
+        }
+        // Un solo guardado: ingreso, ahorro en la meta y última moneda van juntos (no se suma dos veces).
+        persist(old.copy(
+            movements = listOf(movement) + old.movements,
+            goals = goals,
+            savings = goals.sumOf { it.saved },
+            streak = streak,
+            streakDay = today,
+            yupay = settings.copy(lastCoinId = lastId),
+        ))
+        showMessage(t("Tu alcancía guardó {0} en «{1}»", money(amount), goal.name))
+        val reached = goal.target > 0 && goal.saved < goal.target && goal.saved + amount >= goal.target
+        return if (reached) goal.name else null
+    }
+
+    /** YUPAY guarda la meta, el permiso de enlace y la última moneda sumada. */
     fun setYupay(settings: YupaySettings) {
         if (value.email == null) return
         val goal = settings.goal?.takeIf { it.name.isNotBlank() && it.name.length <= 40 && it.targetCents > 0 }

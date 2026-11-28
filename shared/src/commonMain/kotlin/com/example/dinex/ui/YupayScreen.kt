@@ -10,14 +10,15 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,8 +35,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -48,6 +51,8 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.PI
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 import kotlin.math.sin
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -107,8 +112,8 @@ internal fun YupayScreen(model: DinexViewModel, onClose: () -> Unit) {
     var sending by remember(email) { mutableStateOf<YupayCommand?>(null) }
     var commandResult by remember(email) { mutableStateOf<String?>(null) }
     var confirm by remember(email) { mutableStateOf<YupayCommand?>(null) }
-    var deleteGoal by remember { mutableStateOf(false) }
     var unlink by remember { mutableStateOf(false) }
+    var tab by rememberSaveable { mutableIntStateOf(0) }
 
     fun current() = model.state.value.email == email && model.state.value.data.yupay.linked
     fun denied(error: YupayAccessException) {
@@ -177,9 +182,6 @@ internal fun YupayScreen(model: DinexViewModel, onClose: () -> Unit) {
             if (off) "Liberar" else "Poner en cero", onDismiss = { confirm = null },
         ) { confirm = null; send(command) }
     }
-    if (deleteGoal) YupayDialog("¿Eliminar tu meta?", "Se borrará solo la meta. Las monedas de tu alcancía no cambian.", "Eliminar", { deleteGoal = false }) {
-        model.setYupay(settings.copy(goal = null)); deleteGoal = false
-    }
     if (unlink) YupayDialog("¿Desvincular la alcancía?", "Dejarás de ver sus monedas en esta cuenta. Tu meta se conserva.", "Desvincular", { unlink = false }) {
         model.setYupay(settings.copy(linked = false)); unlink = false
     }
@@ -191,32 +193,21 @@ internal fun YupayScreen(model: DinexViewModel, onClose: () -> Unit) {
                 val wide = maxWidth >= 860.dp
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = if (wide) 28.dp else 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Column(Modifier.widthIn(max = 1180.dp).fillMaxWidth().padding(bottom = 28.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        val goalPanel: @Composable () -> Unit = {
-                            YupayGoalPanel(settings.goal, email.orEmpty(), onSave = { model.setYupay(settings.copy(goal = it)) }, onDelete = { deleteGoal = true })
-                        }
+                        val goals = account.data.savingGoals()
+                        val selected = goals.firstOrNull { it.id == settings.goalId }
+                        val picker: @Composable () -> Unit = { YupayGoalPicker(goals, settings.goalId, onSelect = model::setYupayGoal) }
                         when {
-                            !settings.linked -> { YupayIntro { model.setYupay(settings.copy(linked = true)) }; goalPanel() }
+                            !settings.linked -> { YupayIntro { model.setYupay(settings.copy(linked = true)) }; picker() }
                             access != null -> YupayDenied(access!!, onRetry = { access = null; refresh++ }, onUnlink = { unlink = true })
                             else -> {
-                                YupayHero(live, settings.goal, now, liveError != null, wide)
                                 if (liveError != null && live == null) YupayNotice(liveError.orEmpty()) { refresh++ }
-                                val device = live?.device
-                                val controls: @Composable () -> Unit = {
-                                    if (accepted) YupayControls(device, sending, commandResult) { command ->
+                                YupayTabs(tab) { tab = it }
+                                if (tab == 0) {
+                                    YupayDashboard(live, history, selected, now, liveError != null, sending, commandResult) { command ->
                                         if (command == YupayCommand.OFF || command == YupayCommand.RESET) confirm = command else send(command)
                                     }
-                                }
-                                if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        goalPanel(); YupayCoins(device); controls()
-                                    }
-                                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                                        YupayToday(history, historyError); YupayDays(history); YupayLineChart(history); YupayTimeline(history, historyError)
-                                    }
-                                } else {
-                                    goalPanel(); YupayToday(history, historyError); YupayCoins(device); YupayDays(history); YupayLineChart(history)
-                                    YupayTimeline(history, historyError); controls()
-                                }
+                                    picker()
+                                } else YupayHistoryTab(history, historyError, wide)
                                 TextButton(onClick = { unlink = true }, modifier = Modifier.align(Alignment.CenterHorizontally)) {
                                     Text("Desvincular alcancía", color = Gray, fontSize = 13.sp)
                                 }
@@ -237,7 +228,7 @@ private fun YupayHeader(linked: Boolean, live: YupayLive?, error: String?, acces
         IconButton(onClick = onClose) { Icon(DinexNavigationIcons.Back, t("Volver"), tint = GreenDark, modifier = Modifier.size(22.dp)) }
         Column(Modifier.weight(1f)) {
             Text("Dinex YUPAY", color = Night, fontWeight = FontWeight.Black, fontSize = 19.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text("Tu alcancía inteligente", color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("Alcancía inteligente conectada a tus metas", color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (linked && access == null) {
             val online = live?.connection == "online" && error == null
@@ -253,7 +244,12 @@ private fun YupayHeader(linked: Boolean, live: YupayLive?, error: String?, acces
                 Spacer(Modifier.width(7.dp))
                 Text(label, color = Night, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
-            IconButton(onClick = onRefresh) { Icon(DinexNavigationIcons.Refresh, t("Actualizar"), tint = GreenDark, modifier = Modifier.size(20.dp)) }
+            Spacer(Modifier.width(8.dp))
+            OutlinedButton(onClick = onRefresh, border = BorderStroke(1.dp, Border), contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)) {
+                Icon(DinexNavigationIcons.Refresh, null, tint = Night, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(6.dp))
+                Text("Actualizar", color = Night, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+            }
         }
     }
 }
@@ -334,48 +330,6 @@ private fun YupayHeroBox(content: @Composable ColumnScope.() -> Unit) = Column(
     content = content,
 )
 
-@Composable
-private fun YupayHero(live: YupayLive?, goal: YupayGoal?, now: Long, failing: Boolean, wide: Boolean) {
-    val device = live?.device
-    val fraction = yupayPercent(device?.totalCents ?: 0, goal)
-    val missing = goal?.let { (it.targetCents - (device?.totalCents ?: 0)).coerceAtLeast(0) }
-    YupayHeroBox {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("AHORRADO EN TU ALCANCÍA", color = YLime, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.2.sp)
-                Text(device?.let { yupayMoney((rememberCountUp(it.totalCents.toDouble())).toLong()) } ?: "S/ —", color = Color.White,
-                    fontSize = if (wide) 54.sp else 38.sp, fontWeight = FontWeight.Black, letterSpacing = (-1).sp, maxLines = 1)
-                Text(device?.let { countLabel(it.coins, "moneda", "monedas") } ?: "Esperando a tu alcancía…", color = Color.White.copy(alpha = .8f), fontSize = 15.sp)
-                if (goal != null && device != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(if (missing == 0L) t("¡Cumpliste «{0}»!", goal.name) else t("Te faltan {0} para «{1}»", yupayMoney(missing ?: 0), goal.name),
-                        color = YLime, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-            Spacer(Modifier.width(14.dp))
-            Box(contentAlignment = Alignment.Center) {
-                YupayJar(fraction, if (wide) Modifier.size(150.dp, 180.dp) else Modifier.size(104.dp, 128.dp))
-                if (goal != null && device != null) Text("${(fraction * 100).toInt()}%", color = Color.White, fontWeight = FontWeight.Black, fontSize = if (wide) 26.sp else 20.sp, modifier = Modifier.padding(top = 18.dp))
-            }
-        }
-        Spacer(Modifier.height(16.dp))
-        @OptIn(ExperimentalLayoutApi::class)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            live?.receivedAt?.let { YupayChip(t("Dato de {0}", yupayAgo(now - it).lowercase())) }
-            device?.on?.let { YupayChip(if (it) "Contando · cajón trabado" else "Cajón libre") }
-            device?.rssi?.let { YupayChip(t("Wi-Fi {0}", t(if (it >= -60) "buena" else if (it >= -75) "regular" else "baja"))) }
-        }
-        if (live != null && (live.connection != "online" || failing)) {
-            Spacer(Modifier.height(12.dp))
-            Text("La alcancía no está conectada ahora. Estas son las últimas cifras que envió.", color = Color(0xFFFFD79A), fontSize = 13.sp, lineHeight = 18.sp)
-        }
-    }
-}
-
-@Composable
-private fun YupayChip(text: String) = Text(text, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
-    modifier = Modifier.clip(CircleShape).background(Color.White.copy(alpha = .12f)).padding(horizontal = 12.dp, vertical = 6.dp))
-
 /** Frasco que se llena según la meta, con una ola suave. */
 @Composable
 private fun YupayJar(fraction: Float, modifier: Modifier) {
@@ -408,47 +362,16 @@ private fun YupayJar(fraction: Float, modifier: Modifier) {
     }
 }
 
-// ---------------------------------------------------------------- Meta única
-
-@Composable
-private fun YupayGoalPanel(goal: YupayGoal?, accountKey: String, onSave: (YupayGoal) -> Unit, onDelete: () -> Unit) {
-    var editing by remember(accountKey) { mutableStateOf(false) }
-    var name by remember(accountKey, goal) { mutableStateOf(goal?.name.orEmpty()) }
-    var amount by remember(accountKey, goal) { mutableStateOf(goal?.targetCents?.let { "${it / 100}.${(it % 100).toString().padStart(2, '0')}" }.orEmpty()) }
-    val cents = yupayInputCents(amount)
-    YupayPanel("Mi meta de ahorro", DinexNavigationIcons.Target) {
-        if (goal != null && !editing) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(goal.name, color = Night, fontWeight = FontWeight.Black, fontSize = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    Text(yupayMoney(goal.targetCents.toLong()), color = GreenDark, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                }
-                TextButton(onClick = { editing = true }) { Text("Editar", color = GreenDark, fontWeight = FontWeight.Bold) }
-                TextButton(onClick = onDelete) { Text("Eliminar", color = Red, fontWeight = FontWeight.Bold) }
-            }
-        } else {
-            if (goal == null) Text("¿Para qué estás ahorrando? Tu alcancía se llenará hacia esta meta.", color = Gray, fontSize = 14.sp)
-            OutlinedTextField(name, { name = it.take(40) }, label = { Text("Nombre de la meta") }, singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp))
-            OutlinedTextField(amount, { amount = it.filter { c -> c in '0'..'9' || c == '.' || c == ',' }.take(10) }, label = { Text("¿Cuánto quieres juntar? (S/)") },
-                singleLine = true, modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(15.dp), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Button(onClick = { onSave(YupayGoal(name.trim(), cents ?: return@Button)); editing = false }, enabled = name.isNotBlank() && cents != null,
-                    colors = ButtonDefaults.buttonColors(containerColor = Green, contentColor = Color.White), modifier = Modifier.weight(1f).height(48.dp)) {
-                    Text(if (goal == null) "Crear meta" else "Guardar", fontWeight = FontWeight.Bold)
-                }
-                if (goal != null) OutlinedButton(onClick = { editing = false; name = goal.name }, modifier = Modifier.height(48.dp)) { Text("Cancelar", color = GreenDark) }
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------- Monedas
+
+/** 0.10, 0.20 y 0.50 son dorados; 1.00 plateado; 2.00 y 5.00 con el anillo plateado. */
+private fun yupayCoinTone(cents: Int) = if (cents >= 100) YSilver else YGold
 
 private fun coinText(cents: Int) = if (cents >= 100) "${cents / 100}" else ".${cents.toString().padStart(2, '0')}"
 
 @Composable
 private fun YupayCoin(cents: Int, size: Dp) {
-    val edge = if (cents >= 200) YSilver else if (cents >= 50) YSilver else YGold
+    val edge = yupayCoinTone(cents)
     val middle = if (cents >= 200) YGold else edge
     Box(Modifier.size(size), contentAlignment = Alignment.Center) {
         Canvas(Modifier.fillMaxSize()) {
@@ -461,155 +384,494 @@ private fun YupayCoin(cents: Int, size: Dp) {
     }
 }
 
-@Composable
-private fun YupayCoins(device: YupayDevice?) = YupayPanel("Monedas por valor", DinexNavigationIcons.Wallet) {
-    yupayCoins.chunked(3).forEach { row ->
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            row.forEach { cents ->
-                val count = device?.counts?.get(cents)
-                Column(Modifier.weight(1f).clip(RoundedCornerShape(18.dp)).background(CardRaised).padding(vertical = 12.dp, horizontal = 6.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    YupayCoin(cents, 46.dp)
-                    Spacer(Modifier.height(8.dp))
-                    Text(count?.let { "× $it" } ?: "—", color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp)
-                    Text(count?.let { yupayMoney(it.toLong() * cents) } ?: "—", color = Gray, fontSize = 12.sp, maxLines = 1)
-                }
-            }
-        }
-    }
-    if (device != null && device.totalCents > 0) {
-        val tones = listOf(Color(0xFFE0B64A), Color(0xFFC98F3A), Color(0xFF9BB4A4), Color(0xFF5FA37C), Color(0xFF2E8B57), Color(0xFF115B38))
-        Row(Modifier.fillMaxWidth().height(10.dp).clip(CircleShape)) {
-            yupayCoins.forEachIndexed { i, cents ->
-                val part = (device.counts[cents] ?: 0).toLong() * cents
-                if (part > 0) Box(Modifier.weight(part.toFloat()).fillMaxHeight().background(tones[i]))
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------- Hoy, gráfico e historial
 
-@Composable
-private fun YupayToday(history: YupayHistory?, error: String?) = YupayPanel("Hoy", DinexNavigationIcons.Sparkle, history?.let { yupayMoney(it.todayCents()) }) {
-    when {
-        history == null -> Text(error ?: "Esperando datos de la alcancía…", color = Gray)
-        history.today.isEmpty() -> Text("Hoy todavía no entraron monedas.", color = Gray)
-        else -> history.today.forEach { item ->
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                YupayCoin(item.coinCents, 32.dp)
-                Spacer(Modifier.width(11.dp))
-                Text(countLabel(item.quantity, "moneda", "monedas"), color = NightSoft, modifier = Modifier.weight(1f))
-                Text("+ ${yupayMoney(item.sumCents)}", color = GreenDark, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-/** Barras de los últimos 14 días; los días sin monedas se muestran vacíos. */
-@Composable
-private fun YupayDays(history: YupayHistory?) {
-    val days = history?.days.orEmpty()
-    if (days.isEmpty()) return
-    val totals = days.associate { it.day to it.sumCents }
+/** (día del mes, céntimos) de los últimos 14 días, del más antiguo a hoy. */
+private fun yupayLast14(history: YupayHistory?): List<Pair<Int, Long>> {
+    val totals = history?.days.orEmpty().associate { it.day to it.sumCents }
     val today = currentDayIndex()
-    val slots = (13 downTo 0).map { back ->
+    return (13 downTo 0).map { back ->
         val date = civilDateFromEpochDays(today - back)
         date.day to (totals["${date.year}-${date.month.toString().padStart(2, '0')}-${date.day.toString().padStart(2, '0')}"] ?: 0L)
     }
-    val high = slots.maxOf { it.second }.coerceAtLeast(1)
-    YupayPanel("Últimos 14 días", DinexNavigationIcons.Analysis, yupayMoney(slots.sumOf { it.second })) {
-        Row(Modifier.fillMaxWidth().height(128.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.Bottom) {
-            slots.forEachIndexed { i, (day, cents) ->
-                Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Box(Modifier.fillMaxWidth().height((6 + 92f * cents / high).dp).clip(RoundedCornerShape(7.dp))
-                        .background(if (cents == 0L) CardRaised else if (i == 13) Lime else Green))
-                    Spacer(Modifier.height(5.dp))
-                    Text("$day", color = if (i == 13) Night else Gray, fontSize = 10.sp, fontWeight = if (i == 13) FontWeight.Bold else FontWeight.Normal)
+}
+
+// ---------------------------------------------------------------- Panel principal (resumen, alcancía y cajón)
+
+private val YInk = Color(0xFF0A120E)
+private val YRule = Color.White.copy(alpha = .12f)
+private val YDanger = Color(0xFFFF9B8A)
+
+@Composable
+private fun YupayDashboard(
+    live: YupayLive?, history: YupayHistory?, goal: SavingsGoal?, now: Long, failing: Boolean,
+    sending: YupayCommand?, result: String?, onCommand: (YupayCommand) -> Unit,
+) {
+    val device = live?.device
+    val online = live?.connection == "online" && !failing
+    BoxWithConstraints(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(Brush.linearGradient(listOf(YForest, YForest2)))
+            .border(1.dp, Color.White.copy(alpha = .08f), RoundedCornerShape(28.dp)).drawBehind {
+            drawCircle(Brush.radialGradient(listOf(YLime.copy(alpha = .14f), Color.Transparent), Offset(size.width * .55f, size.height * .45f), size.minDimension * .6f),
+                size.minDimension * .6f, Offset(size.width * .55f, size.height * .45f))
+        },
+    ) {
+        val width = maxWidth
+        when {
+            width >= 1040.dp -> Row(Modifier.height(IntrinsicSize.Min)) {
+                YupaySummary(live, device, history, goal, now, online, sending, result, false, Modifier.weight(1.6f).padding(28.dp), onCommand)
+                Box(Modifier.width(1.dp).fillMaxHeight().background(YRule))
+                YupayMachine(device, online, Modifier.weight(.75f).fillMaxHeight().padding(vertical = 24.dp))
+                Box(Modifier.width(1.dp).fillMaxHeight().background(YRule))
+                YupayDrawer(device, Modifier.weight(.9f).padding(28.dp))
+            }
+            width >= 640.dp -> Column {
+                YupaySummary(live, device, history, goal, now, online, sending, result, false, Modifier.padding(24.dp), onCommand)
+                Box(Modifier.fillMaxWidth().height(1.dp).background(YRule))
+                Row(Modifier.height(IntrinsicSize.Min)) {
+                    YupayMachine(device, online, Modifier.weight(1f).fillMaxHeight().padding(vertical = 22.dp))
+                    Box(Modifier.width(1.dp).fillMaxHeight().background(YRule))
+                    YupayDrawer(device, Modifier.weight(1.2f).padding(24.dp))
                 }
+            }
+            else -> Column {
+                YupaySummary(live, device, history, goal, now, online, sending, result, true, Modifier.padding(20.dp), onCommand)
+                Box(Modifier.fillMaxWidth().height(1.dp).background(YRule))
+                YupayMachine(device, online, Modifier.fillMaxWidth().padding(vertical = 22.dp))
+                Box(Modifier.fillMaxWidth().height(1.dp).background(YRule))
+                YupayDrawer(device, Modifier.padding(20.dp))
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun YupayLineChart(history: YupayHistory?) {
-    val recent = history?.recent ?: return
-    if (recent.size < 2) return
-    val count = recent.size
-    val segments = yupayLineSegments(recent)
-    val high = recent.maxOf { it.totalCents }.coerceAtLeast(1)
-    val line = GreenDark; val grid = Border; val fill = Lime
-    YupayPanel("Cómo va creciendo", DinexNavigationIcons.Analysis, yupayMoney(recent.first().totalCents)) {
-        Canvas(Modifier.fillMaxWidth().height(150.dp)) {
-            for (i in 0..3) drawLine(grid, Offset(0f, size.height * i / 3), Offset(size.width, size.height * i / 3), 1f)
-            fun at(i: Int, cents: Long) = Offset(6.dp.toPx() + (size.width - 12.dp.toPx()) * i / (count - 1), size.height - 6.dp.toPx() - (size.height - 14.dp.toPx()) * cents / high)
-            var start = 0
-            segments.forEach { segment ->
-                val points = segment.mapIndexed { i, item -> at(start + i, item.totalCents) }
-                start += segment.size
-                if (points.size > 1) {
-                    val path = Path().apply { moveTo(points[0].x, points[0].y); points.drop(1).forEach { lineTo(it.x, it.y) } }
-                    drawPath(Path().apply { addPath(path); lineTo(points.last().x, size.height); lineTo(points.first().x, size.height); close() },
-                        Brush.verticalGradient(listOf(fill.copy(alpha = .28f), Color.Transparent)))
-                    drawPath(path, line, style = Stroke(2.5.dp.toPx(), cap = StrokeCap.Round))
+private fun YupaySummary(
+    live: YupayLive?, device: YupayDevice?, history: YupayHistory?, goal: SavingsGoal?, now: Long, online: Boolean,
+    sending: YupayCommand?, result: String?, compact: Boolean, modifier: Modifier, onCommand: (YupayCommand) -> Unit,
+) = Column(modifier) {
+    YupayWrap(compact) {
+        Text("AHORRADO EN TU ALCANCÍA", color = YForest, fontSize = 11.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp,
+            modifier = Modifier.clip(CircleShape).background(YLime).padding(horizontal = 12.dp, vertical = 6.dp))
+        val tint = if (live == null) Color.White.copy(alpha = .6f) else if (online) Color(0xFF6BE39A) else Color(0xFFF2B35B)
+        val label = when {
+            live == null -> t("Conectando…")
+            online -> live.receivedAt?.let { t("Conectada · dato {0}", yupayAgo(now - it).lowercase()) } ?: t("Conectada")
+            else -> live.receivedAt?.let { t("Sin conexión · último dato {0}", yupayAgo(now - it).lowercase()) } ?: t("Sin conexión")
+        }
+        Row(Modifier.clip(CircleShape).border(1.dp, tint.copy(alpha = .45f), CircleShape).background(tint.copy(alpha = .1f)).padding(horizontal = 12.dp, vertical = 5.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(7.dp).clip(CircleShape).background(tint))
+            Spacer(Modifier.width(7.dp))
+            Text(label, color = tint, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+    Spacer(Modifier.height(18.dp))
+    Row(verticalAlignment = Alignment.Bottom) {
+        Text("S/", color = Color.White.copy(alpha = .75f), fontSize = if (compact) 22.sp else 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = if (compact) 8.dp else 12.dp))
+        Spacer(Modifier.width(6.dp))
+        val shown = device?.let { yupayMoney(rememberCountUp(it.totalCents.toDouble()).toLong()).removePrefix("S/ ") } ?: "—"
+        Text(shown, color = Color.White, fontSize = if (compact) 48.sp else 66.sp, fontWeight = FontWeight.Black, letterSpacing = (-1.5).sp, maxLines = 1)
+    }
+    Text(
+        buildAnnotatedString {
+            if (goal != null) {
+                append(t("Destino actual: "))
+                withStyle(SpanStyle(color = YLime, fontWeight = FontWeight.Bold)) { append(goal.name) }
+                if (device != null && goal.target > 0) append(t(" · aporta el {0} % de tu meta", ((device.totalCents / 100.0) / goal.target * 100).roundToInt()))
+            } else append(t("Elige abajo a qué meta va lo que entra en la alcancía."))
+        },
+        color = Color.White.copy(alpha = .8f), fontSize = 14.sp,
+    )
+    Spacer(Modifier.height(20.dp))
+    val stats = listOf(
+        "HOY" to (history?.let { "+${yupayMoney(it.todayCents())}" } ?: "—"),
+        "14 DÍAS" to (history?.let { yupayMoney(yupayLast14(it).sumOf { day -> day.second }) } ?: "—"),
+        "MONEDAS" to (device?.coins?.toString() ?: "—"),
+        "CAJÓN" to when (device?.on) { true -> t("Trabado"); false -> t("Libre"); null -> "—" },
+    )
+    Column(Modifier.fillMaxWidth().drawBehind {
+        drawLine(YRule, Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx())
+        drawLine(YRule, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx())
+    }) {
+        stats.chunked(if (compact) 2 else 4).forEachIndexed { r, row ->
+            if (r > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(YRule))
+            Row(Modifier.height(IntrinsicSize.Min)) {
+                row.forEachIndexed { i, (label, value) ->
+                    if (i > 0) Box(Modifier.width(1.dp).fillMaxHeight().background(YRule))
+                    Column(Modifier.weight(1f).padding(start = if (i > 0) 14.dp else 0.dp, top = 14.dp, bottom = 14.dp, end = 8.dp)) {
+                        Text(t(label), color = Color.White.copy(alpha = .55f), fontSize = 11.sp, letterSpacing = .6.sp, maxLines = 1)
+                        Spacer(Modifier.height(4.dp))
+                        Text(value, color = if (label == "HOY") YLime else Color.White, fontSize = 18.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
                 }
-                points.forEach { drawCircle(line, 3.dp.toPx(), it) }
             }
         }
-        if (segments.size > 1) Text("Cada corte es una vez que el conteo volvió a empezar.", color = Gray, fontSize = 12.sp)
+    }
+    if (goal != null) {
+        val fraction = if (goal.target > 0) (goal.saved / goal.target).coerceIn(0.0, 1.0).toFloat() else 0f
+        val reduced = LocalDinexReducedMotion.current
+        val shownFraction by animateFloatAsState(fraction, tween(if (reduced) 0 else 900), label = "meta")
+        Spacer(Modifier.height(18.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(t("Meta {0} · {1} de {2}", goal.name, money(goal.saved), money(goal.target)), color = Color.White.copy(alpha = .8f), fontSize = 13.sp,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            Text("${(fraction * 100).roundToInt()} %", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Black)
+        }
+        Spacer(Modifier.height(8.dp))
+        Box(Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(Color.White.copy(alpha = .12f))) {
+            Box(Modifier.fillMaxWidth(shownFraction).fillMaxHeight().clip(CircleShape).background(Brush.horizontalGradient(listOf(Color(0xFF5FC48A), YLime))))
+        }
+        Spacer(Modifier.height(8.dp))
+        val missing = (goal.target - goal.saved).coerceAtLeast(0.0)
+        Text(if (missing <= 0.0) t("¡Meta cumplida!") else t("Te faltan {0}", money(missing)), color = Color.White.copy(alpha = .55f), fontSize = 12.sp)
+    }
+    Spacer(Modifier.height(22.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            YupayHeroButton("Contar y trabar", DinexNavigationIcons.Shield, device?.on == true, sending == null, modifier = Modifier.weight(1f)) { onCommand(YupayCommand.ON) }
+            YupayHeroButton("Liberar cajón", DinexNavigationIcons.ArrowUp, device?.on == false, sending == null, modifier = Modifier.weight(1f)) { onCommand(YupayCommand.OFF) }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            YupayHeroButton("Pedir estado", DinexNavigationIcons.Refresh, false, sending == null, modifier = Modifier.weight(1f)) { onCommand(YupayCommand.STATUS) }
+            YupayHeroButton("Vaciar (poner en cero)", DinexNavigationIcons.Close, false, sending == null, danger = true, modifier = Modifier.weight(1f)) { onCommand(YupayCommand.RESET) }
+        }
+    }
+    if (sending != null) {
+        Spacer(Modifier.height(12.dp))
+        LinearProgressIndicator(Modifier.fillMaxWidth().clip(CircleShape), color = YLime, trackColor = Color.White.copy(alpha = .12f))
+    }
+    result?.let {
+        Spacer(Modifier.height(10.dp))
+        Text(it, color = Color.White.copy(alpha = .75f), fontSize = 13.sp)
+    }
+    if (live != null && !online) {
+        Spacer(Modifier.height(10.dp))
+        Text("La alcancía no está conectada ahora. Estas son las últimas cifras que envió.", color = Color(0xFFFFD79A), fontSize = 12.sp, lineHeight = 17.sp)
     }
 }
 
+/** En celular las etiquetas bajan de linea; en pantallas anchas van en una fila (el panel mide su alto por intrinsecos). */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun YupayTimeline(history: YupayHistory?, error: String?) = YupayPanel("Últimas monedas", DinexNavigationIcons.History) {
-    when {
-        history == null -> Text(error ?: "Esperando datos de la alcancía…", color = Gray)
-        history.recent.isEmpty() -> Text("Todavía no se registran monedas.", color = Gray)
-        else -> history.recent.take(10).forEachIndexed { i, item ->
-            if (i > 0) HorizontalDivider(color = Border)
+private fun YupayWrap(wrap: Boolean, content: @Composable () -> Unit) {
+    if (wrap) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+    else Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) { content() }
+}
+
+@Composable
+private fun YupayHeroButton(label: String, icon: ImageVector, active: Boolean, enabled: Boolean, danger: Boolean = false, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val content = if (active) YForest else if (danger) YDanger else Color.White
+    Surface(onClick = onClick, enabled = enabled, shape = RoundedCornerShape(14.dp), color = if (active) YLime else if (danger) YDanger.copy(alpha = .08f) else Color.Transparent,
+        border = if (active) null else BorderStroke(1.dp, if (danger) YDanger.copy(alpha = .45f) else Color.White.copy(alpha = .28f)), modifier = modifier.heightIn(min = 48.dp)) {
+        Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.Center) {
+            Icon(icon, null, tint = content, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(label, color = content, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** La alcancía dibujada: pantalla con el total y una ventana con una pila por cada moneda. */
+@Composable
+private fun YupayMachine(device: YupayDevice?, online: Boolean, modifier: Modifier) {
+    val counts = yupayCoins.map { device?.counts?.get(it) ?: 0 }
+    val reduced = LocalDinexReducedMotion.current
+    val grow by animateFloatAsState(if (device == null) 0f else 1f, tween(if (reduced) 0 else 900), label = "pilas")
+    val led = if (device == null) Color.White.copy(alpha = .4f) else if (online) Color(0xFF6BE39A) else Color(0xFFF2B35B)
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        Box(Modifier.size(200.dp, 290.dp)) {
+            Canvas(Modifier.fillMaxSize()) {
+                val w = size.width; val h = size.height
+                drawOval(Color.Black.copy(alpha = .35f), Offset(w * .08f, h * .93f), Size(w * .84f, h * .06f))
+                val body = Rect(w * .06f, h * .02f, w * .94f, h * .95f)
+                drawRoundRect(Brush.verticalGradient(listOf(Color(0xFF2C3E35), Color(0xFF121C17)), body.top, body.bottom), body.topLeft, body.size, CornerRadius(w * .26f))
+                drawRoundRect(Color.White.copy(alpha = .16f), body.topLeft, body.size, CornerRadius(w * .26f), style = Stroke(1.5.dp.toPx()))
+                // ranura con luz
+                drawRoundRect(Color.Black, Offset(w * .3f, h * .045f), Size(w * .4f, h * .032f), CornerRadius(h))
+                drawRoundRect(YLime, Offset(w * .34f, h * .054f), Size(w * .32f, h * .013f), CornerRadius(h))
+                // pantalla
+                drawRoundRect(YInk, Offset(w * .17f, h * .105f), Size(w * .66f, h * .115f), CornerRadius(10.dp.toPx()))
+                drawRoundRect(YLime.copy(alpha = .25f), Offset(w * .17f, h * .105f), Size(w * .66f, h * .115f), CornerRadius(10.dp.toPx()), style = Stroke(1.dp.toPx()))
+                // ventana de vidrio
+                val glass = Rect(w * .15f, h * .26f, w * .85f, h * .86f)
+                drawRoundRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = .55f), Color(0xFF0F1A15)), glass.top, glass.bottom), glass.topLeft, glass.size, CornerRadius(w * .13f))
+                // pilas de monedas
+                val high = counts.max().coerceAtLeast(1)
+                val slot = glass.width * .86f / counts.size
+                val coinW = slot * .78f
+                val layer = 3.2.dp.toPx()
+                val floor = glass.bottom - glass.height * .05f
+                counts.forEachIndexed { i, count ->
+                    val tone = yupayCoinTone(yupayCoins[i])
+                    val dark = tone.copy(red = tone.red * .62f, green = tone.green * .62f, blue = tone.blue * .62f)
+                    val stack = (glass.height * .8f * count / high * grow).coerceAtLeast(if (count > 0) layer else 0f)
+                    val layers = (stack / layer).toInt()
+                    val x = glass.left + glass.width * .07f + slot * i + (slot - coinW) / 2
+                    for (k in 0 until layers) {
+                        val y = floor - (k + 1) * layer
+                        drawRoundRect(Brush.horizontalGradient(listOf(dark, tone, Color.White.copy(alpha = .9f), tone, dark), x, x + coinW), Offset(x, y), Size(coinW, layer * .82f), CornerRadius(layer))
+                    }
+                }
+                // reflejo del vidrio
+                drawLine(Color.White.copy(alpha = .22f), Offset(glass.left + glass.width * .08f, glass.top + glass.height * .1f),
+                    Offset(glass.left + glass.width * .08f, glass.top + glass.height * .5f), 3.dp.toPx(), StrokeCap.Round)
+                drawRoundRect(Color.White.copy(alpha = .2f), glass.topLeft, glass.size, CornerRadius(w * .13f), style = Stroke(1.2.dp.toPx()))
+                // luz de estado
+                drawCircle(led.copy(alpha = .3f), 8.dp.toPx(), Offset(w * .5f, h * .905f))
+                drawCircle(led, 3.5.dp.toPx(), Offset(w * .5f, h * .905f))
+            }
+            Text(device?.let { yupayMoney(it.totalCents) } ?: "S/ —", color = YLime, fontSize = 16.sp, fontWeight = FontWeight.Black,
+                modifier = Modifier.align(Alignment.TopCenter).padding(top = 39.dp))
+        }
+        Spacer(Modifier.height(12.dp))
+        val wifi = device?.rssi?.let { t("Wi-Fi {0}", t(if (it >= -60) "buena" else if (it >= -75) "regular" else "baja")) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(6.dp).clip(CircleShape).background(led))
+            Spacer(Modifier.width(6.dp))
+            Text(listOfNotNull("ESP32", t("{0} sensores", yupayCoins.size), wifi).joinToString("   ·   "), color = Color.White.copy(alpha = .55f), fontSize = 11.sp)
+        }
+    }
+}
+
+/** Composición del cajón: cuánto hay de cada moneda. */
+@Composable
+private fun YupayDrawer(device: YupayDevice?, modifier: Modifier) = Column(modifier) {
+    val tones = listOf(Color(0xFFE0B64A), Color(0xFFC99A3A), Color(0xFFF0CF72), Color(0xFFB9C3CA), Color(0xFF8FCB6B), YLime)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text("COMPOSICIÓN DEL CAJÓN", color = Color.White.copy(alpha = .6f), fontSize = 11.sp, letterSpacing = 1.6.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+        Text(device?.let { yupayMoney(it.totalCents) } ?: "—", color = Color.White.copy(alpha = .6f), fontSize = 12.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold)
+    }
+    Spacer(Modifier.height(14.dp))
+    Row(Modifier.fillMaxWidth().height(8.dp).clip(CircleShape).background(Color.White.copy(alpha = .1f))) {
+        if (device != null && device.totalCents > 0) yupayCoins.forEachIndexed { i, cents ->
+            val part = (device.counts[cents] ?: 0).toLong() * cents
+            if (part > 0) Box(Modifier.weight(part.toFloat()).fillMaxHeight().background(tones[i]))
+        }
+    }
+    Spacer(Modifier.height(8.dp))
+    yupayCoins.forEachIndexed { i, cents ->
+        if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = .07f)))
+        val count = device?.counts?.get(cents)
+        Row(Modifier.padding(vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+            YupayCoin(cents, 32.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(yupayMoney(cents.toLong()), color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(count?.let { "× " + countLabel(it, "moneda", "monedas") } ?: "—", color = Color.White.copy(alpha = .5f), fontSize = 11.sp)
+            }
+            Text(count?.let { yupayMoney(it.toLong() * cents) } ?: "—", color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Destino del ahorro (metas de Dinex)
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun YupayGoalPicker(goals: List<SavingsGoal>, selectedId: Int?, onSelect: (Int?) -> Unit) {
+    val selected = goals.firstOrNull { it.id == selectedId }
+    Column(
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Card).border(1.dp, Border, RoundedCornerShape(24.dp)).padding(20.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                YupayCoin(item.coinCents, 36.dp)
+                Box(Modifier.size(38.dp).clip(RoundedCornerShape(12.dp)).background(Mint), contentAlignment = Alignment.Center) {
+                    Icon(DinexNavigationIcons.Target, null, tint = GreenDark, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text("Destino del ahorro", color = Night, fontWeight = FontWeight.Black, fontSize = 17.sp)
+                    Text("Elige a qué meta de Dinex se suma lo que entra en la alcancía", color = Gray, fontSize = 13.sp)
+                }
+            }
+            if (selected != null) Row(Modifier.clip(RoundedCornerShape(12.dp)).background(Mint.copy(alpha = .6f)).border(1.dp, Border, RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Las monedas nuevas van a ", color = Gray, fontSize = 13.sp)
+                Text(selected.name, color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        if (goals.isEmpty()) {
+            Text("Aún no tienes metas. Crea una en Metas y vuelve aquí para elegirla.", color = Night, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        } else BoxWithConstraints(Modifier.fillMaxWidth()) {
+            val columns = when { maxWidth >= 1000.dp -> 4; maxWidth >= 720.dp -> 3; maxWidth >= 460.dp -> 2; else -> 1 }
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                goals.chunked(columns).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        row.forEach { goal -> YupayGoalCard(goal, goal.id == selectedId, Modifier.weight(1f)) { onSelect(goal.id) } }
+                        repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
+        if (selected != null) TextButton(onClick = { onSelect(null) }) { Text("No guardar en ninguna meta", color = Gray, fontSize = 13.sp) }
+    }
+}
+
+@Composable
+private fun YupayGoalCard(goal: SavingsGoal, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    val percent = if (goal.target > 0) (goal.saved / goal.target).coerceIn(0.0, 1.0).toFloat() else 0f
+    Column(
+        modifier.clip(RoundedCornerShape(18.dp)).border(if (on) 2.dp else 1.dp, if (on) Green else Border, RoundedCornerShape(18.dp))
+            .background(if (on) Mint.copy(alpha = .35f) else Card).clickable(onClick = onClick).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Row {
+            GoalAvatar(goal.name, 46.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f).padding(top = 4.dp)) {
+                Text(goal.name, color = Night, fontWeight = FontWeight.Bold, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(t("{0} de {1}", money(goal.saved), money(goal.target)), color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (on) Text("DESTINO", color = GreenDark, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = .8.sp,
+                modifier = Modifier.clip(CircleShape).background(Mint).padding(horizontal = 9.dp, vertical = 4.dp))
+            else Box(Modifier.size(18.dp).clip(CircleShape).border(1.5.dp, Gray.copy(alpha = .6f), CircleShape))
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.weight(1f).height(6.dp).clip(CircleShape).background(Mint)) {
+                Box(Modifier.fillMaxWidth(percent).fillMaxHeight().clip(CircleShape).background(Green))
+            }
+            Spacer(Modifier.width(10.dp))
+            Text("${(percent * 100).roundToInt()} %", color = Night, fontSize = 12.sp, fontWeight = FontWeight.Black)
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Pestañas: Alcancía | Historial
+
+@Composable
+private fun YupayTabs(selected: Int, onSelect: (Int) -> Unit) {
+    Row(Modifier.clip(CircleShape).background(CardRaised).border(1.dp, Border, CircleShape).padding(4.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        listOf("Alcancía" to DinexNavigationIcons.Wallet, "Historial" to DinexNavigationIcons.History).forEachIndexed { i, (label, icon) ->
+            val on = i == selected
+            Row(
+                Modifier.clip(CircleShape).background(if (on) YForest2 else Color.Transparent).clickable { onSelect(i) }
+                    .padding(horizontal = 18.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(icon, null, tint = if (on) YLime else Gray, modifier = Modifier.size(16.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(t(label), color = if (on) Color.White else Gray, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// ---------------------------------------------------------------- Historial
+
+@Composable
+private fun YupayHistoryTab(history: YupayHistory?, error: String?, wide: Boolean) {
+    if (history == null) {
+        YupayPanel { Text(error ?: t("Cargando el historial de tu alcancía…"), color = Gray) }
+        return
+    }
+    val slots = yupayLast14(history)
+    val total = slots.sumOf { it.second }
+    val activeDays = slots.count { it.second > 0 }
+    val best = slots.maxByOrNull { it.second }
+    val stats: @Composable (Modifier) -> Unit = { m ->
+        YupayStatCard(t("Últimos 14 días"), yupayMoney(total), countLabel(activeDays, "día con monedas", "días con monedas"), m)
+    }
+    val average: @Composable (Modifier) -> Unit = { m ->
+        YupayStatCard(t("Promedio por día"), yupayMoney(if (activeDays > 0) total / activeDays else 0), t("contando solo los días con monedas"), m)
+    }
+    val bestDay: @Composable (Modifier) -> Unit = { m ->
+        YupayStatCard(t("Mejor día"), if (best != null && best.second > 0) yupayMoney(best.second) else "—",
+            if (best != null && best.second > 0) t("el día {0}", best.first) else t("aún sin monedas"), m)
+    }
+    if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        stats(Modifier.weight(1f)); average(Modifier.weight(1f)); bestDay(Modifier.weight(1f))
+    } else Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        stats(Modifier.fillMaxWidth())
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) { average(Modifier.weight(1f)); bestDay(Modifier.weight(1f)) }
+    }
+    if (wide) Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Box(Modifier.weight(1.15f)) { YupayActivity(slots) }
+        Box(Modifier.weight(1f)) { YupayMovements(history.recent) }
+    } else {
+        YupayActivity(slots)
+        YupayMovements(history.recent)
+    }
+}
+
+@Composable
+private fun YupayStatCard(label: String, value: String, note: String, modifier: Modifier) = Column(
+    modifier.clip(RoundedCornerShape(20.dp)).background(Card).border(1.dp, Border, RoundedCornerShape(20.dp)).padding(18.dp),
+    verticalArrangement = Arrangement.spacedBy(4.dp),
+) {
+    Text(label.uppercase(), color = Gray, fontSize = 11.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
+    Text(value, color = Night, fontSize = 24.sp, fontWeight = FontWeight.Black, maxLines = 1)
+    Text(note, color = Gray, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+/** Barras de 14 días: hoy resaltado y el monto encima de los días con monedas. */
+@Composable
+private fun YupayActivity(slots: List<Pair<Int, Long>>) = YupayPanel("Actividad de 14 días", DinexNavigationIcons.Analysis) {
+    val high = slots.maxOf { it.second }.coerceAtLeast(1)
+    val reduced = LocalDinexReducedMotion.current
+    val grow by animateFloatAsState(1f, tween(if (reduced) 0 else 700), label = "barras")
+    Row(Modifier.fillMaxWidth().height(210.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.Bottom) {
+        slots.forEachIndexed { i, (day, cents) ->
+            val today = i == slots.lastIndex
+            Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
+                val fraction = if (cents > 0) (cents.toFloat() / high * grow).coerceIn(.04f, 1f) else 0f
+                Spacer(Modifier.weight(1f - fraction + .0001f))
+                if (cents > 0) Text(
+                    if (cents >= 10_000) "${cents / 100}" else yupayMoney(cents).removePrefix("S/ "),
+                    color = if (today) GreenDark else Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1,
+                )
+                Spacer(Modifier.height(4.dp))
+                Box(
+                    Modifier.fillMaxWidth().weight(fraction.coerceAtLeast(.0001f)).clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp, bottomStart = 3.dp, bottomEnd = 3.dp))
+                        .background(
+                            when {
+                                cents == 0L -> Brush.verticalGradient(listOf(Color.Transparent, Color.Transparent))
+                                today -> Brush.verticalGradient(listOf(Color(0xFF9BD64E), Green))
+                                else -> Brush.verticalGradient(listOf(Green.copy(alpha = .85f), GreenDark))
+                            },
+                        ),
+                )
+                Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(if (cents == 0L) Border else Color.Transparent))
+                Spacer(Modifier.height(6.dp))
+                Text(if (today) t("Hoy") else "$day", color = if (today) Night else Gray, fontSize = 10.sp,
+                    fontWeight = if (today) FontWeight.Black else FontWeight.Normal, maxLines = 1)
+            }
+        }
+    }
+}
+
+/** Monedas recientes agrupadas por día, sin el total acumulado (que confundía). */
+@Composable
+private fun YupayMovements(recent: List<YupayRecent>) = YupayPanel("Monedas recientes", DinexNavigationIcons.History) {
+    if (recent.isEmpty()) {
+        Text("Todavía no se registran monedas.", color = Gray)
+        return@YupayPanel
+    }
+    var all by remember { mutableStateOf(false) }
+    val shown = if (all) recent else recent.take(12)
+    shown.groupBy { it.hour.substringBefore(' ') }.forEach { (date, items) ->
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(CardRaised).padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(date, color = NightSoft, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(t("{0} · {1}", countLabel(items.sumOf { it.quantity }, "moneda", "monedas"), yupayMoney(items.sumOf { it.coinCents.toLong() * it.quantity })),
+                color = Gray, fontSize = 12.sp)
+        }
+        items.forEach { item ->
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                YupayCoin(item.coinCents, 30.dp)
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("+ ${yupayMoney(item.coinCents.toLong())}", color = Night, fontWeight = FontWeight.Bold)
-                    Text(item.hour, color = Gray, fontSize = 12.sp)
+                    Text(t("Moneda de {0}", yupayMoney(item.coinCents.toLong())) + if (item.quantity > 1) " ×${item.quantity}" else "",
+                        color = Night, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(item.hour.substringAfter(' ').take(5), color = Gray, fontSize = 12.sp)
                 }
-                Column(horizontalAlignment = Alignment.End) {
-                    Text(yupayMoney(item.totalCents), color = GreenDark, fontWeight = FontWeight.Bold)
-                    Text("en el cajón", color = Gray, fontSize = 11.sp)
-                }
+                Text("+${yupayMoney(item.coinCents.toLong() * item.quantity)}", color = GreenDark, fontSize = 14.sp, fontWeight = FontWeight.Black)
             }
         }
     }
-}
-
-// ---------------------------------------------------------------- Control del cajón
-
-@Composable
-private fun YupayControls(device: YupayDevice?, sending: YupayCommand?, result: String?, onCommand: (YupayCommand) -> Unit) = YupayPanel("Control del cajón", DinexNavigationIcons.Settings) {
-    Text("Estas órdenes mueven tu alcancía de verdad.", color = Gray, fontSize = 13.sp)
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        YupayAction("Contar y trabar", DinexNavigationIcons.Shield, YupayCommand.ON, sending, device?.on == true, Modifier.weight(1f), onCommand)
-        YupayAction("Liberar cajón", DinexNavigationIcons.ArrowUp, YupayCommand.OFF, sending, device?.on == false, Modifier.weight(1f), onCommand)
-    }
-    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        YupayAction("Pedir estado", DinexNavigationIcons.Refresh, YupayCommand.STATUS, sending, false, Modifier.weight(1f), onCommand)
-        YupayAction("Poner en cero", DinexNavigationIcons.Close, YupayCommand.RESET, sending, false, Modifier.weight(1f), onCommand)
-    }
-    if (sending != null) LinearProgressIndicator(Modifier.fillMaxWidth(), color = Green, trackColor = Mint)
-    result?.let { Text(it, color = NightSoft, fontSize = 13.sp, fontWeight = FontWeight.SemiBold) }
-}
-
-@Composable
-private fun YupayAction(label: String, icon: ImageVector, command: YupayCommand, sending: YupayCommand?, active: Boolean, modifier: Modifier, onCommand: (YupayCommand) -> Unit) {
-    val danger = command == YupayCommand.RESET
-    val tint = if (danger) Red else if (active) Color.White else GreenDark
-    Surface(onClick = { onCommand(command) }, enabled = sending == null, modifier = modifier.height(64.dp), shape = RoundedCornerShape(18.dp),
-        color = if (active) Green else if (danger) Red.copy(alpha = .08f) else CardRaised, border = BorderStroke(1.dp, if (danger) Red.copy(alpha = .35f) else Border)) {
-        Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(9.dp))
-            Text(label, color = tint, fontWeight = FontWeight.Bold, fontSize = 13.sp, lineHeight = 16.sp)
-        }
+    if (recent.size > 12) TextButton(onClick = { all = !all }) {
+        Text(if (all) t("Ver menos") else t("Ver las {0} monedas", recent.size), color = GreenDark, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
