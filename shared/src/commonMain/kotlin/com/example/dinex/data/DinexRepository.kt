@@ -143,19 +143,26 @@ private fun packFields(fields: List<String>): String = fields.joinToString("") {
 
 /** Campo final del bloque de presupuestos: el lector anterior ignora el elemento suelto. */
 private fun packYupay(settings: YupaySettings): List<String> =
-    if (!settings.linked && settings.goal == null) emptyList() else listOf("yupay:v1:" + packFields(listOf(
+    if (!settings.linked && settings.goal == null && settings.goalId == null && settings.lastCoinId < 0) emptyList()
+    else listOf("yupay:v2:" + packFields(listOf(
         settings.linked.toString(), settings.goal?.name.orEmpty(), settings.goal?.targetCents?.toString().orEmpty(),
+        settings.goalId?.toString().orEmpty(), settings.lastCoinId.toString(),
     )))
 
 private fun unpackYupay(raw: String?): YupaySettings {
     val fields = unpackFields(raw).orEmpty()
-    if (fields.size % 2 != 1 || !fields.last().startsWith("yupay:v1:")) return YupaySettings()
-    val values = unpackFields(fields.last().removePrefix("yupay:v1:")) ?: return YupaySettings()
-    if (values.size != 3) return YupaySettings()
+    val last = fields.lastOrNull().orEmpty()
+    if (fields.size % 2 != 1 || !(last.startsWith("yupay:v1:") || last.startsWith("yupay:v2:"))) return YupaySettings()
+    val values = unpackFields(last.drop(9)) ?: return YupaySettings()
+    if (values.size != 3 && values.size != 5) return YupaySettings()
     val goal = values[2].toIntOrNull()?.takeIf { it > 0 }?.let { target ->
         values[1].takeIf { it.isNotBlank() && it.length <= 40 }?.let { YupayGoal(it, target) }
     }
-    return YupaySettings(linked = values[0] == "true", goal = goal)
+    return YupaySettings(
+        linked = values[0] == "true", goal = goal,
+        goalId = values.getOrNull(3)?.toIntOrNull()?.takeIf { it > 0 },
+        lastCoinId = values.getOrNull(4)?.toIntOrNull()?.coerceAtLeast(-1) ?: -1,
+    )
 }
 
 private fun unpackFields(raw: String?): List<String>? {
